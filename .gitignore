@@ -1,0 +1,37 @@
+# === Visual Studio 関連 ===
+.vs/
+*.user
+*.userosscache
+*.sln.docstates
+*.suo
+
+# === C++ ビルド結果・中間ファイル ===
+[Dd]ebug/
+[Dd]ebugPublic/
+[Rr]elease/
+[Rr]eleases/
+x64/
+x86/
+[Aa][Rr][Mm]/
+[Aa][Rr][Mm]64/
+bld/
+[Bb]in/
+[Oo]bj/
+[Ll]og/
+
+# 一時ファイル・デバッグ情報
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.aps
+*.ncb
+*.opendb
+*.dbmdl
+*.sdf
+*.ipch
+*.cache
+
+# === その他 OS が勝手に作るファイル ===
+.DS_Store
+Thumbs.db

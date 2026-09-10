@@ -1,0 +1,305 @@
+#include "GameManager.h"
+#include "Player3D.h"
+#include "Mouse3D.h"
+#include "Obstacle3D.h"
+#include "FontManager.h"
+#include "ModelConfig.h"
+#include "Config.h"
+#include "Common.h"
+#include "DxLib.h"
+#include <cstdlib>
+
+void GameManager::Init() {
+    m_state = GameState::Title;
+    m_titleCameraAngle = 0.0f;
+    m_frameCount = 0;
+    m_fpsTimer = GetNowCount();
+
+    m_objManager.InitStage();
+    StartGame(); // タイトル背景用の初期シーン生成
+    m_state = GameState::Title;
+}
+
+void GameManager::StartGame() {
+    m_objManager.Clear();
+
+    // プレイヤー生成（原点）
+    auto player = std::make_shared<Player3D>(VGet(0.0f, 0.0f, 0.0f));
+    m_objManager.SetPlayer(player);
+
+    // カメラ初期化
+    m_camera.Init(player->GetPos());
+
+    // ========================================================================
+    // 3Dジム風障害物の配置（コンパクトな3Dステージレイアウト）
+    // ========================================================================
+    // 1. 左上: ベンチプレス台
+    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
+        VGet(-120.0f, 0.0f, 80.0f), 60.0f, 25.0f, 40.0f,
+        "BENCH PRESS", ModelConfig::BENCH_PRESS_MODEL_PATH,
+        GetColor(60, 65, 75), GetColor(160, 170, 190)));
+
+    // 2. 右上: ダンベルラック
+    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
+        VGet(120.0f, 0.0f, 80.0f), 60.0f, 25.0f, 40.0f,
+        "DUMBBELLS", ModelConfig::DUMBBELL_RACK_MODEL_PATH,
+        GetColor(90, 45, 45), GetColor(210, 100, 100)));
+
+    // 3. 左下: プロテインバー
+    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
+        VGet(-120.0f, 0.0f, -80.0f), 60.0f, 25.0f, 40.0f,
+        "PROTEIN BAR", ModelConfig::PROTEIN_BAR_MODEL_PATH,
+        GetColor(45, 75, 55), GetColor(100, 190, 120)));
+
+    // 4. 右下: パワーラック
+    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
+        VGet(120.0f, 0.0f, -80.0f), 60.0f, 35.0f, 40.0f,
+        "POWER RACK", ModelConfig::POWER_RACK_MODEL_PATH,
+        GetColor(45, 55, 85), GetColor(100, 140, 210)));
+
+    // 5. 中央上: スミスマシン
+    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
+        VGet(0.0f, 0.0f, 110.0f), 55.0f, 35.0f, 35.0f,
+        "SMITH MACHINE", ModelConfig::SMITH_MACHINE_MODEL_PATH,
+        GetColor(75, 60, 45), GetColor(220, 160, 90)));
+
+    // 6. 中央下: トレッドミル台
+    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
+        VGet(0.0f, 0.0f, -110.0f), 45.0f, 20.0f, 60.0f,
+        "TREADMILL", ModelConfig::TREADMILL_MODEL_PATH,
+        GetColor(65, 45, 75), GetColor(180, 120, 210)));
+
+    // ========================================================================
+    // ネズミの生成（外周エリアに分散配置）
+    // ========================================================================
+    for (int i = 0; i < Config::NORMAL_MOUSE_COUNT; ++i) {
+        float x = static_cast<float>(-200 + rand() % 400);
+        float z = static_cast<float>(60 + rand() % 100);
+        if (rand() % 2 == 0) z = -z;
+        m_objManager.AddObject(std::make_shared<NormalMouse3D>(VGet(x, 0.0f, z), player));
+    }
+
+    for (int i = 0; i < Config::FAST_MOUSE_COUNT; ++i) {
+        float x = static_cast<float>(-200 + rand() % 400);
+        float z = static_cast<float>(80 + rand() % 90);
+        if (rand() % 2 == 0) z = -z;
+        m_objManager.AddObject(std::make_shared<FastMouse3D>(VGet(x, 0.0f, z), player));
+    }
+
+    m_startCount = GetNowCount();
+    m_clearCount = 0;
+    m_clearTimeSeconds = 0.0f;
+    m_state = GameState::Playing;
+}
+
+void GameManager::Update() {
+    if (m_state == GameState::Title) {
+        // タイトル画面：カメラが3D空間をゆったり旋回
+        m_titleCameraAngle += 0.008f;
+        VECTOR center = VGet(0.0f, 15.0f, 0.0f);
+        float camDist = 180.0f;
+        VECTOR camPos = VGet(
+            std::sin(m_titleCameraAngle) * camDist,
+            80.0f,
+            std::cos(m_titleCameraAngle) * camDist
+        );
+        SetCameraPositionAndTarget_UpVecY(camPos, center);
+
+        if (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_RETURN)) {
+            StartGame();
+        }
+    } else if (m_state == GameState::Playing) {
+        auto player = m_objManager.GetPlayer();
+        if (player) {
+            m_camera.Update(player->GetPos(), player->GetRotY());
+        }
+        m_camera.Apply();
+
+        m_objManager.Update(m_camera);
+
+        // クリア判定
+        if (m_objManager.GetRemainingMouseCount() == 0) {
+            m_state = GameState::GameClear;
+            m_clearCount = GetNowCount();
+            m_clearTimeSeconds = (m_clearCount - m_startCount) / 1000.0f;
+        }
+    } else if (m_state == GameState::GameClear) {
+        auto player = m_objManager.GetPlayer();
+        if (player) {
+            m_camera.Update(player->GetPos(), player->GetRotY());
+        }
+        m_camera.Apply();
+
+        // リトライまたはタイトル
+        if (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_R)) {
+            StartGame();
+        } else if (CheckHitKey(KEY_INPUT_T)) {
+            m_state = GameState::Title;
+        }
+    }
+}
+
+void GameManager::Draw() {
+    // ------------------------------------------------------------------------
+    // 1. 3Dシーンの描画 (Zバッファ有効)
+    // ------------------------------------------------------------------------
+    SetUseZBuffer3D(TRUE);
+    SetWriteZBuffer3D(TRUE);
+
+    m_objManager.Draw3D();
+
+    // ------------------------------------------------------------------------
+    // 2. 2D HUD / UI描画 (Zバッファ無効)
+    // ------------------------------------------------------------------------
+    SetUseZBuffer3D(FALSE);
+    SetWriteZBuffer3D(FALSE);
+
+    m_objManager.Draw2D();
+
+    const auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
+    int font16 = fm.GetFont16();
+    int font18 = fm.GetFont18();
+    int font24 = fm.GetFont24();
+    int font36 = fm.GetFont36();
+    int font48 = fm.GetFont48();
+
+    unsigned int white  = GetColor(255, 255, 255);
+    unsigned int yellow = GetColor(255, 240, 60);
+    unsigned int gray   = GetColor(180, 180, 180);
+    unsigned int cyan   = GetColor(100, 220, 255);
+
+    // FPS & 処理時間計測（0.5秒ごとに更新）
+    m_frameCount++;
+    int now = GetNowCount();
+    if (now - m_fpsTimer >= 500) {
+        m_currentFps = (m_frameCount * 1000.0f) / static_cast<float>(now - m_fpsTimer);
+        m_frameCount = 0;
+        m_fpsTimer = now;
+    }
+    DrawFormatStringToHandle(Config::SCREEN_WIDTH - 170, 18, GetColor(140, 240, 140), font13, "FPS: %.1f (%.1fms)", m_currentFps, m_frameProcessTimeMs);
+
+    if (m_state == GameState::Title) {
+        // ====================================================================
+        // タイトル画面（簡易）
+        // ====================================================================
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 140);
+        DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(10, 15, 25), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        int titleW = GetDrawStringWidthToHandle("マッスルねこ 3D", static_cast<int>(std::string("マッスルねこ 3D").length()), font48);
+        DrawStringToHandle((Config::SCREEN_WIDTH - titleW) / 2, 160, "マッスルねこ 3D", yellow, font48);
+
+        int subW = GetDrawStringWidthToHandle("- MUSCLE CAT 3D CHASE -", static_cast<int>(std::string("- MUSCLE CAT 3D CHASE -").length()), font18);
+        DrawStringToHandle((Config::SCREEN_WIDTH - subW) / 2, 225, "- MUSCLE CAT 3D CHASE -", white, font18);
+
+        // スタート促進点滅表示
+        if ((GetNowCount() / 400) % 2 == 0) {
+            int startW = GetDrawStringWidthToHandle("[ PRESS SPACE TO START ]", static_cast<int>(std::string("[ PRESS SPACE TO START ]").length()), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - startW) / 2, 360, "[ PRESS SPACE TO START ]", cyan, font24);
+        }
+
+        // 操作説明パネル
+        int panelX = (Config::SCREEN_WIDTH - 600) / 2;
+        int panelY = 440;
+        DrawBox(panelX, panelY, panelX + 600, panelY + 200, GetColor(30, 35, 48), TRUE);
+        DrawBox(panelX, panelY, panelX + 600, panelY + 200, GetColor(100, 120, 160), FALSE);
+
+        DrawStringToHandle(panelX + 20, panelY + 20, "【操作方法】", yellow, font18);
+        DrawStringToHandle(panelX + 30, panelY + 55, "・移動: WASD キー （カメラの向き基準で3D移動）", white, font16);
+        DrawStringToHandle(panelX + 30, panelY + 85, "・筋トレ: [SPACE] キー （タイミングよく押してRep獲得＆加速！）", GetColor(255, 210, 80), font16);
+        DrawStringToHandle(panelX + 30, panelY + 115, "・飛びつき: [SHIFT] または [X] キー （4 Rep以上で跳躍突進！）", GetColor(255, 140, 60), font16);
+        DrawStringToHandle(panelX + 30, panelY + 145, "・視点操作: [Q] / [E] キー または [マウス右ボタンドラッグ]", cyan, font16);
+        DrawStringToHandle(panelX + 30, panelY + 170, "※ 筋トレ失敗で5秒間筋肉痛（停止） / 10秒放置で筋肉減衰", GetColor(255, 120, 120), font13);
+
+    } else if (m_state == GameState::Playing) {
+        // ====================================================================
+        // ゲームプレイHUD
+        // ====================================================================
+        float currentSec = (GetNowCount() - m_startCount) / 1000.0f;
+
+        // 左上ステータス枠
+        DrawBox(12, 12, 420, 115, GetColor(20, 25, 35), TRUE);
+        DrawBox(12, 12, 420, 115, GetColor(70, 80, 110), FALSE);
+
+        DrawFormatStringToHandle(22, 18, white, font16, "タイム: %.2f 秒", currentSec);
+        DrawFormatStringToHandle(22, 40, yellow, font16, "残りネズミ: %d 匹", m_objManager.GetRemainingMouseCount());
+
+        auto player = m_objManager.GetPlayer();
+        if (player) {
+            MuscleState ms = player->GetMuscleState();
+            float speed = player->GetCurrentSpeed();
+            int reps = player->GetRepCount();
+            float mouseSpeed = m_objManager.GetCurrentMouseSpeed();
+            int caught = m_objManager.GetCaughtCount();
+
+            if (player->IsPouncing()) {
+                DrawFormatStringToHandle(22, 62, GetColor(255, 80, 0), font16, "猫速度: %.1f [%d Rep 飛びつき突進中!!]", speed, reps);
+            } else if (ms == MuscleState::Soreness) {
+                DrawFormatStringToHandle(22, 62, GetColor(100, 180, 255), font16, "猫速度: 0.0 [筋肉痛!! 残り%.1fs]", player->GetSorenessRemainingSeconds());
+            } else if (reps >= 4) {
+                DrawFormatStringToHandle(22, 62, GetColor(255, 140, 0), font16, "猫速度: %.1f [%d Rep (飛びつき可! 残り%.1fs)]", speed, reps, player->GetPumpDecayRemainingSeconds());
+            } else if (reps > 0) {
+                DrawFormatStringToHandle(22, 62, GetColor(255, 200, 50), font16, "猫速度: %.1f [%d Rep (+%.2f / 残り%.1fs)]", speed, reps, reps * 0.15f, player->GetPumpDecayRemainingSeconds());
+            } else {
+                DrawFormatStringToHandle(22, 62, white, font16, "猫速度: %.1f [0 Rep (通常)]", speed);
+            }
+
+            DrawFormatStringToHandle(22, 85, (caught > 0) ? GetColor(255, 130, 130) : gray, font13, "鼠速度: %.1f (%d匹捕獲パニック加速中)", mouseSpeed, caught);
+        }
+
+        // 画面下の操作ヒント枠
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 180);
+        DrawBox(10, Config::SCREEN_HEIGHT - 72, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 8, GetColor(15, 20, 30), TRUE);
+        DrawBox(10, Config::SCREEN_HEIGHT - 72, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 8, GetColor(60, 70, 95), FALSE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        if (player && player->GetRepCount() >= 4 && player->GetMuscleState() != MuscleState::Soreness) {
+            DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 66, GetColor(255, 230, 80), font16, "★ 飛びつき: [SHIFT] または [X] (%d Rep跳躍突進！)", player->GetRepCount());
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 45, "移動: WASD  /  視点旋回: Q / E または 右ドラッグ", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 25, "筋トレ: [SPACE] でさらにRep追加！ (10秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
+        } else {
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 55, "移動: WASD  /  視点旋回: Q / E または 右ドラッグ", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でRep追加！ (10秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
+        }
+
+    } else if (m_state == GameState::GameClear) {
+        // ====================================================================
+        // リザルト画面（簡易）
+        // ====================================================================
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 190);
+        DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(10, 15, 25), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        int resultBoxW = 600;
+        int resultBoxH = 380;
+        int boxX = (Config::SCREEN_WIDTH - resultBoxW) / 2;
+        int boxY = (Config::SCREEN_HEIGHT - resultBoxH) / 2;
+
+        DrawBox(boxX, boxY, boxX + resultBoxW, boxY + resultBoxH, GetColor(30, 35, 50), TRUE);
+        DrawBox(boxX, boxY, boxX + resultBoxW, boxY + resultBoxH, yellow, FALSE);
+
+        int clearW = GetDrawStringWidthToHandle("★ STAGE CLEAR!! ★", static_cast<int>(std::string("★ STAGE CLEAR!! ★").length()), font36);
+        DrawStringToHandle((Config::SCREEN_WIDTH - clearW) / 2, boxY + 30, "★ STAGE CLEAR!! ★", yellow, font36);
+
+        DrawFormatStringToHandle(boxX + 130, boxY + 110, white, font24, "クリアタイム : %.2f 秒", m_clearTimeSeconds);
+
+        // 評価ランク算出
+        const char* rankText = "C";
+        unsigned int rankColor = GetColor(180, 180, 180);
+        if (m_clearTimeSeconds <= 20.0f) {
+            rankText = "S (GOD MUSCLE CAT)";
+            rankColor = GetColor(255, 215, 0);
+        } else if (m_clearTimeSeconds <= 35.0f) {
+            rankText = "A (GREAT MUSCLE)";
+            rankColor = GetColor(255, 130, 50);
+        } else if (m_clearTimeSeconds <= 50.0f) {
+            rankText = "B (NICE PUMP)";
+            rankColor = GetColor(100, 220, 120);
+        }
+        DrawFormatStringToHandle(boxX + 130, boxY + 160, rankColor, font24, "ランク       : %s", rankText);
+
+        DrawStringToHandle(boxX + 130, boxY + 240, "[SPACE] または [R] キー: リトライ", GetColor(150, 255, 150), font18);
+        DrawStringToHandle(boxX + 130, boxY + 280, "[T] キー: タイトル画面へ戻る", cyan, font18);
+    }
+}
