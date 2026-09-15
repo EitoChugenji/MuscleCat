@@ -22,10 +22,10 @@ void Stage3D::Init() {
     SetLightDifColor(GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
     SetLightSpcColor(GetColorF(0.5f, 0.5f, 0.5f, 1.0f));
 
-    // フォグ設定（明るい空気感）
+    // フォグ設定（広大で明るい空気感）
     SetFogEnable(TRUE);
     SetFogColor(205, 228, 250);
-    SetFogStartEnd(900.0f, 2200.0f);
+    SetFogStartEnd(1400.0f, 3500.0f);
 }
 
 void Stage3D::Draw3D() {

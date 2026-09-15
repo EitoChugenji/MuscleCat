@@ -245,9 +245,11 @@ void ModelManager::DrawFallbackStage(float halfW, float halfD, float wallH) {
         }
     }
 
-    // 2. 外周の壁・フェンス（明るいホワイト/ライトブルー）
-    unsigned int wallColor = GetColor(242, 246, 255);
+    // 2. 外周の壁・フェンス（視界を遮らない半透明ガラスフェンス＆くっきり手すり）
+    unsigned int wallColor = GetColor(220, 235, 255);
     unsigned int wallBorderColor = GetColor(50, 140, 240);
+
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 90);
 
     // 北壁 (Z = +halfD)
     VECTOR nw_b = VGet(-halfW, 0.0f, halfD);
@@ -256,7 +258,6 @@ void ModelManager::DrawFallbackStage(float halfW, float halfD, float wallH) {
     VECTOR ne_t = VGet( halfW, wallH, halfD);
     DrawTriangle3D(nw_b, ne_b, ne_t, wallColor, TRUE);
     DrawTriangle3D(nw_b, ne_t, nw_t, wallColor, TRUE);
-    DrawLine3D(nw_t, ne_t, wallBorderColor);
 
     // 南壁 (Z = -halfD)
     VECTOR sw_b = VGet(-halfW, 0.0f, -halfD);
@@ -265,15 +266,20 @@ void ModelManager::DrawFallbackStage(float halfW, float halfD, float wallH) {
     VECTOR se_t = VGet( halfW, wallH, -halfD);
     DrawTriangle3D(se_b, sw_b, sw_t, wallColor, TRUE);
     DrawTriangle3D(se_b, sw_t, se_t, wallColor, TRUE);
-    DrawLine3D(sw_t, se_t, wallBorderColor);
 
     // 東壁 (X = +halfW)
     DrawTriangle3D(ne_b, se_b, se_t, wallColor, TRUE);
     DrawTriangle3D(ne_b, se_t, ne_t, wallColor, TRUE);
-    DrawLine3D(se_t, ne_t, wallBorderColor);
 
     // 西壁 (X = -halfW)
     DrawTriangle3D(sw_b, nw_b, nw_t, wallColor, TRUE);
     DrawTriangle3D(sw_b, nw_t, sw_t, wallColor, TRUE);
+
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+    // 手すり（境界ライン）
+    DrawLine3D(nw_t, ne_t, wallBorderColor);
+    DrawLine3D(sw_t, se_t, wallBorderColor);
+    DrawLine3D(se_t, ne_t, wallBorderColor);
     DrawLine3D(sw_t, nw_t, wallBorderColor);
 }

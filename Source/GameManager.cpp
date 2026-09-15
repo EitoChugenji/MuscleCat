@@ -31,57 +31,57 @@ void GameManager::StartGame() {
     m_camera.Init(player->GetPos());
 
     // ========================================================================
-    // 3Dジム風障害物の配置（コンパクトな3Dステージレイアウト）
+    // 3Dジム風障害物の配置（広域3Dステージレイアウト）
     // ========================================================================
     // 1. 左上: ベンチプレス台
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(-120.0f, 0.0f, 80.0f), 60.0f, 25.0f, 40.0f,
+        VGet(-220.0f, 0.0f, 160.0f), 70.0f, 25.0f, 45.0f,
         "BENCH PRESS", ModelConfig::BENCH_PRESS_MODEL_PATH,
         GetColor(60, 65, 75), GetColor(160, 170, 190)));
 
     // 2. 右上: ダンベルラック
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(120.0f, 0.0f, 80.0f), 60.0f, 25.0f, 40.0f,
+        VGet(220.0f, 0.0f, 160.0f), 70.0f, 25.0f, 45.0f,
         "DUMBBELLS", ModelConfig::DUMBBELL_RACK_MODEL_PATH,
         GetColor(90, 45, 45), GetColor(210, 100, 100)));
 
     // 3. 左下: プロテインバー
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(-120.0f, 0.0f, -80.0f), 60.0f, 25.0f, 40.0f,
+        VGet(-220.0f, 0.0f, -160.0f), 70.0f, 25.0f, 45.0f,
         "PROTEIN BAR", ModelConfig::PROTEIN_BAR_MODEL_PATH,
         GetColor(45, 75, 55), GetColor(100, 190, 120)));
 
     // 4. 右下: パワーラック
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(120.0f, 0.0f, -80.0f), 60.0f, 35.0f, 40.0f,
+        VGet(220.0f, 0.0f, -160.0f), 70.0f, 35.0f, 45.0f,
         "POWER RACK", ModelConfig::POWER_RACK_MODEL_PATH,
         GetColor(45, 55, 85), GetColor(100, 140, 210)));
 
     // 5. 中央上: スミスマシン
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(0.0f, 0.0f, 110.0f), 55.0f, 35.0f, 35.0f,
+        VGet(0.0f, 0.0f, 210.0f), 60.0f, 35.0f, 40.0f,
         "SMITH MACHINE", ModelConfig::SMITH_MACHINE_MODEL_PATH,
         GetColor(75, 60, 45), GetColor(220, 160, 90)));
 
     // 6. 中央下: トレッドミル台
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(0.0f, 0.0f, -110.0f), 45.0f, 20.0f, 60.0f,
+        VGet(0.0f, 0.0f, -210.0f), 55.0f, 20.0f, 70.0f,
         "TREADMILL", ModelConfig::TREADMILL_MODEL_PATH,
         GetColor(65, 45, 75), GetColor(180, 120, 210)));
 
     // ========================================================================
-    // ネズミの生成（外周エリアに分散配置）
+    // ネズミの生成（広域エリアに分散配置）
     // ========================================================================
     for (int i = 0; i < Config::NORMAL_MOUSE_COUNT; ++i) {
-        float x = static_cast<float>(-200 + rand() % 400);
-        float z = static_cast<float>(60 + rand() % 100);
+        float x = static_cast<float>(-380 + rand() % 760);
+        float z = static_cast<float>(100 + rand() % 220);
         if (rand() % 2 == 0) z = -z;
         m_objManager.AddObject(std::make_shared<NormalMouse3D>(VGet(x, 0.0f, z), player));
     }
 
     for (int i = 0; i < Config::FAST_MOUSE_COUNT; ++i) {
-        float x = static_cast<float>(-200 + rand() % 400);
-        float z = static_cast<float>(80 + rand() % 90);
+        float x = static_cast<float>(-380 + rand() % 760);
+        float z = static_cast<float>(120 + rand() % 200);
         if (rand() % 2 == 0) z = -z;
         m_objManager.AddObject(std::make_shared<FastMouse3D>(VGet(x, 0.0f, z), player));
     }
@@ -94,6 +94,7 @@ void GameManager::StartGame() {
 
 void GameManager::Update() {
     if (m_state == GameState::Title) {
+        SetMouseDispFlag(TRUE); // タイトル画面ではカーソル表示
         // タイトル画面：カメラが3D空間をゆったり旋回
         m_titleCameraAngle += 0.008f;
         VECTOR center = VGet(0.0f, 15.0f, 0.0f);
@@ -109,9 +110,10 @@ void GameManager::Update() {
             StartGame();
         }
     } else if (m_state == GameState::Playing) {
+        SetMouseDispFlag(FALSE); // ゲーム中はカーソル非表示
         auto player = m_objManager.GetPlayer();
         if (player) {
-            m_camera.Update(player->GetPos(), player->GetRotY());
+            m_camera.Update(player->GetPos(), player->GetRotY(), true);
         }
         m_camera.Apply();
 
@@ -124,9 +126,10 @@ void GameManager::Update() {
             m_clearTimeSeconds = (m_clearCount - m_startCount) / 1000.0f;
         }
     } else if (m_state == GameState::GameClear) {
+        SetMouseDispFlag(TRUE); // クリア画面ではカーソル表示
         auto player = m_objManager.GetPlayer();
         if (player) {
-            m_camera.Update(player->GetPos(), player->GetRotY());
+            m_camera.Update(player->GetPos(), player->GetRotY(), false);
         }
         m_camera.Apply();
 
