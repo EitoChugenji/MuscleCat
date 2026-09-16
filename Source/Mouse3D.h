@@ -14,6 +14,7 @@ protected:
     float m_baseSpeed = 2.4f;
     float m_speedBonus = 0.0f; // 仲間の被捕食数 * 0.1f
     float m_animTime = 0.0f;
+    int   m_stunTimer = 0;   // スタン残りフレーム数
 
 public:
     MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float baseSpeed);
@@ -21,7 +22,17 @@ public:
 
     void SetSpeedBonus(float bonus) { m_speedBonus = bonus; }
     float GetSpeedBonus() const { return m_speedBonus; }
-    virtual float GetCurrentSpeed() const { return m_baseSpeed + m_speedBonus; }
+    virtual float GetCurrentSpeed() const { return IsStunned() ? 0.0f : (m_baseSpeed + m_speedBonus); }
+
+    // スタン管理
+    void ApplyStun(int frames) {
+        if (frames > m_stunTimer) m_stunTimer = frames;
+    }
+    bool IsStunned() const { return m_stunTimer > 0; }
+    float GetStunRemainingSeconds() const { return static_cast<float>(m_stunTimer) / 60.0f; }
+
+    // スタンエフェクト（頭上のピヨピヨ星・パルス）描画
+    void DrawStunEffect();
 
     // 壁際でのスライディング脱出＆プレイヤー回避移動ベクトル算出
     void CalculateMovementVector(const VECTOR& playerPos, float fleeDistance, float speed, bool isFast);

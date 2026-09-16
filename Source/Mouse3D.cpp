@@ -15,11 +15,42 @@ MouseBase3D::MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float
     : GameObject3D(pos, radius, type)
     , m_baseSpeed(baseSpeed)
     , m_speedBonus(0.0f)
-    , m_animTime(0.0f) {
+    , m_animTime(0.0f)
+    , m_stunTimer(0) {
     float angle = static_cast<float>(rand() % 360) * MathHelper::DEG_TO_RAD;
     m_vx = std::sin(angle) * m_baseSpeed;
     m_vz = std::cos(angle) * m_baseSpeed;
     m_rotY = angle;
+}
+
+void MouseBase3D::DrawStunEffect() {
+    if (!IsStunned()) return;
+
+    // 頭上で回転する星・ひよこ（黄色い球とリング）
+    float headY = m_pos.y + 14.0f;
+    float spinSpeed = m_animTime * 10.0f;
+    float ringRadius = 8.5f;
+
+    // くるくる回る3つの星
+    for (int i = 0; i < 3; ++i) {
+        float angle = spinSpeed + static_cast<float>(i) * (2.0f * MathHelper::PI / 3.0f);
+        float starX = m_pos.x + std::cos(angle) * ringRadius;
+        float starZ = m_pos.z + std::sin(angle) * ringRadius;
+        float starY = headY + std::sin(angle * 2.0f) * 2.0f;
+
+        VECTOR starPos = VGet(starX, starY, starZ);
+        DrawSphere3D(starPos, 2.2f, 8, GetColor(255, 230, 40), GetColor(255, 240, 100), TRUE);
+    }
+
+    // 頭上の黄色い気絶リング（ピヨピヨリング）
+    int ringSegments = 16;
+    for (int i = 0; i < ringSegments; ++i) {
+        float a1 = static_cast<float>(i) * (2.0f * MathHelper::PI / ringSegments);
+        float a2 = static_cast<float>(i + 1) * (2.0f * MathHelper::PI / ringSegments);
+        VECTOR p1 = VGet(m_pos.x + std::cos(a1) * ringRadius, headY, m_pos.z + std::sin(a1) * ringRadius);
+        VECTOR p2 = VGet(m_pos.x + std::cos(a2) * ringRadius, headY, m_pos.z + std::sin(a2) * ringRadius);
+        DrawLine3D(p1, p2, GetColor(255, 240, 80));
+    }
 }
 
 void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDistance, float speed, bool isFast) {
@@ -99,6 +130,15 @@ NormalMouse3D::NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player
 
 void NormalMouse3D::Update() {
     m_animTime += 1.0f / 60.0f;
+
+    // スタン時は完全に行動停止
+    if (m_stunTimer > 0) {
+        m_stunTimer--;
+        m_vx = 0.0f;
+        m_vz = 0.0f;
+        return;
+    }
+
     float currentSpeed = GetCurrentSpeed();
 
     bool isFleeing = false;
@@ -143,6 +183,7 @@ void NormalMouse3D::Draw3D() {
             ModelConfig::MOUSE_NORMAL_MODEL_SCALE)) {
         ModelManager::GetInstance().DrawFallbackNormalMouse(m_pos, m_rotY, m_animTime);
     }
+    DrawStunEffect();
 }
 
 // ============================================================================
@@ -155,6 +196,14 @@ FastMouse3D::FastMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
 
 void FastMouse3D::Update() {
     m_animTime += 1.0f / 60.0f;
+
+    // スタン時は完全に行動停止
+    if (m_stunTimer > 0) {
+        m_stunTimer--;
+        m_vx = 0.0f;
+        m_vz = 0.0f;
+        return;
+    }
 
     bool isFleeing = false;
     if (m_targetPlayer && m_targetPlayer->IsAlive()) {
@@ -200,4 +249,5 @@ void FastMouse3D::Draw3D() {
             ModelConfig::MOUSE_FAST_MODEL_SCALE)) {
         ModelManager::GetInstance().DrawFallbackFastMouse(m_pos, m_rotY, m_animTime);
     }
+    DrawStunEffect();
 }

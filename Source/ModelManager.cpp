@@ -200,86 +200,173 @@ void ModelManager::DrawFallbackFastMouse(const VECTOR& pos, float rotY, float an
 }
 
 void ModelManager::DrawFallbackObstacle(const VECTOR& pos, float width, float height, float depth, unsigned int mainColor, unsigned int frameColor, const std::string& name) {
-    // 3D直方体（トレーニング器具の台）
+    // 3D直方体（家具の本体）
     VECTOR minPos = VGet(pos.x - width * 0.5f, pos.y, pos.z - depth * 0.5f);
     VECTOR maxPos = VGet(pos.x + width * 0.5f, pos.y + height, pos.z + depth * 0.5f);
 
-    // 直方体の本体描画
+    // 家具本体の描画
     DrawCube3D(minPos, maxPos, mainColor, mainColor, TRUE);
-    // 直方体のワイヤーフレーム（輪郭線）
     DrawCube3D(minPos, maxPos, frameColor, frameColor, FALSE);
 
-    // 器具上のポールや装飾（器具らしさを演出）
-    VECTOR leftPoleTop = VGet(pos.x - width * 0.35f, pos.y + height + 12.0f, pos.z);
-    VECTOR rightPoleTop = VGet(pos.x + width * 0.35f, pos.y + height + 12.0f, pos.z);
-    VECTOR leftPoleBot = VGet(pos.x - width * 0.35f, pos.y + height, pos.z);
-    VECTOR rightPoleBot = VGet(pos.x + width * 0.35f, pos.y + height, pos.z);
+    // ------------------------------------------------------------------------
+    // 家具の種類に応じたディテール装飾（家の中らしさを演出）
+    // ------------------------------------------------------------------------
+    if (name.find("SOFA") != std::string::npos) {
+        // ソファー：背もたれと肘掛け
+        VECTOR backMin = VGet(minPos.x, maxPos.y, maxPos.z - depth * 0.3f);
+        VECTOR backMax = VGet(maxPos.x, maxPos.y + 16.0f, maxPos.z);
+        DrawCube3D(backMin, backMax, frameColor, frameColor, TRUE);
+        DrawCube3D(backMin, backMax, mainColor, mainColor, FALSE);
 
-    DrawCapsule3D(leftPoleBot, leftPoleTop, 1.5f, 6, frameColor, frameColor, TRUE);
-    DrawCapsule3D(rightPoleBot, rightPoleTop, 1.5f, 6, frameColor, frameColor, TRUE);
-    DrawCapsule3D(leftPoleTop, rightPoleTop, 1.2f, 6, GetColor(200, 200, 210), GetColor(200, 200, 210), TRUE);
+        // 左右の肘掛け
+        VECTOR armLMin = VGet(minPos.x, maxPos.y, minPos.z);
+        VECTOR armLMax = VGet(minPos.x + width * 0.18f, maxPos.y + 10.0f, maxPos.z);
+        VECTOR armRMin = VGet(maxPos.x - width * 0.18f, maxPos.y, minPos.z);
+        VECTOR armRMax = VGet(maxPos.x, maxPos.y + 10.0f, maxPos.z);
+        DrawCube3D(armLMin, armLMax, frameColor, frameColor, TRUE);
+        DrawCube3D(armRMin, armRMax, frameColor, frameColor, TRUE);
+    } else if (name.find("TV") != std::string::npos) {
+        // テレビ台：薄型テレビの画面とスタンド
+        VECTOR tvMin = VGet(pos.x - width * 0.38f, maxPos.y + 3.0f, pos.z - 3.0f);
+        VECTOR tvMax = VGet(pos.x + width * 0.38f, maxPos.y + 36.0f, pos.z + 3.0f);
+        DrawCube3D(tvMin, tvMax, GetColor(25, 25, 30), GetColor(25, 25, 30), TRUE);
+        // 画面の青白い発光
+        VECTOR screenMin = VGet(tvMin.x + 3.0f, tvMin.y + 3.0f, tvMin.z - 0.5f);
+        VECTOR screenMax = VGet(tvMax.x - 3.0f, tvMax.y - 3.0f, tvMin.z);
+        DrawCube3D(screenMin, screenMax, GetColor(160, 200, 240), GetColor(160, 200, 240), TRUE);
+    } else if (name.find("TABLE") != std::string::npos) {
+        // テーブル：テーブルクロスと食器
+        VECTOR clothMin = VGet(pos.x - width * 0.42f, maxPos.y + 0.5f, pos.z - depth * 0.42f);
+        VECTOR clothMax = VGet(pos.x + width * 0.42f, maxPos.y + 1.0f, pos.z + depth * 0.42f);
+        DrawCube3D(clothMin, clothMax, GetColor(250, 245, 235), GetColor(250, 245, 235), TRUE);
+        // マグカップ
+        DrawCapsule3D(VGet(pos.x, maxPos.y + 1.0f, pos.z), VGet(pos.x, maxPos.y + 8.0f, pos.z), 3.0f, 8, GetColor(230, 80, 70), GetColor(230, 80, 70), TRUE);
+    } else if (name.find("CAT TOWER") != std::string::npos) {
+        // キャットタワー：支柱と展望台
+        VECTOR towerTop = VGet(pos.x, maxPos.y + 26.0f, pos.z);
+        DrawCapsule3D(VGet(pos.x, maxPos.y, pos.z), towerTop, 3.5f, 8, GetColor(200, 180, 140), GetColor(200, 180, 140), TRUE);
+        DrawCube3D(VGet(pos.x - 22.0f, towerTop.y, pos.z - 22.0f), VGet(pos.x + 22.0f, towerTop.y + 5.0f, pos.z + 22.0f), GetColor(235, 215, 180), GetColor(180, 150, 100), TRUE);
+    } else {
+        // 本棚やチェスト：天板の装飾
+        VECTOR topDecoMin = VGet(minPos.x + 4.0f, maxPos.y, minPos.z + 4.0f);
+        VECTOR topDecoMax = VGet(maxPos.x - 4.0f, maxPos.y + 6.0f, maxPos.z - 4.0f);
+        DrawCube3D(topDecoMin, topDecoMax, frameColor, frameColor, TRUE);
+    }
 }
 
 void ModelManager::DrawFallbackStage(float halfW, float halfD, float wallH) {
-    // 1. 床面（明るいチェッカーボード調フロア）
-    const float tileSize = 40.0f;
-    unsigned int floorColor1 = GetColor(232, 238, 248);
-    unsigned int floorColor2 = GetColor(214, 224, 238);
-    unsigned int gridLineColor = GetColor(180, 195, 215);
+    // ------------------------------------------------------------------------
+    // 1. 床面：温かみのあるナチュラルウッドの木目調フローリング
+    // ------------------------------------------------------------------------
+    const float plankW = 25.0f; // フローリング板の幅
+    const float plankL = 95.0f; // 板の長さ
+    unsigned int woodBase1 = GetColor(228, 192, 148); // 明るいオーク材
+    unsigned int woodBase2 = GetColor(218, 178, 134); // 木目バリエーション
+    unsigned int woodJoint = GetColor(185, 145, 105); // 板の目地ライン
 
-    for (float x = -halfW; x < halfW; x += tileSize) {
-        for (float z = -halfD; z < halfD; z += tileSize) {
-            float x2 = (x + tileSize > halfW) ? halfW : (x + tileSize);
-            float z2 = (z + tileSize > halfD) ? halfD : (z + tileSize);
+    for (float x = -halfW; x < halfW; x += plankW) {
+        float x2 = (x + plankW > halfW) ? halfW : (x + plankW);
+        int colIndex = static_cast<int>(std::floor((x + halfW) / plankW));
+        float zOffset = (colIndex % 3) * (plankL * 0.33f); // レンガ積み調の千鳥配置
 
-            int tileIndex = static_cast<int>(std::floor((x + halfW) / tileSize) + std::floor((z + halfD) / tileSize));
-            unsigned int c = (tileIndex % 2 == 0) ? floorColor1 : floorColor2;
+        for (float z = -halfD - zOffset; z < halfD; z += plankL) {
+            float zStart = (z < -halfD) ? -halfD : z;
+            float zEnd = (z + plankL > halfD) ? halfD : (z + plankL);
+            if (zStart >= zEnd) continue;
 
-            VECTOR p0 = VGet(x,  0.0f, z);
-            VECTOR p1 = VGet(x2, 0.0f, z);
-            VECTOR p2 = VGet(x2, 0.0f, z2);
-            VECTOR p3 = VGet(x,  0.0f, z2);
+            int rowIndex = static_cast<int>(std::floor((z + halfD) / plankL));
+            unsigned int c = ((colIndex + rowIndex) % 2 == 0) ? woodBase1 : woodBase2;
+
+            VECTOR p0 = VGet(x,  0.0f, zStart);
+            VECTOR p1 = VGet(x2, 0.0f, zStart);
+            VECTOR p2 = VGet(x2, 0.0f, zEnd);
+            VECTOR p3 = VGet(x,  0.0f, zEnd);
 
             DrawTriangle3D(p0, p1, p2, c, TRUE);
             DrawTriangle3D(p0, p2, p3, c, TRUE);
+
+            // 板の継ぎ目ライン
+            DrawLine3D(p0, p1, woodJoint);
+            DrawLine3D(p1, p2, woodJoint);
         }
     }
 
-    // 2. 外周の壁・フェンス（視界を遮らない半透明ガラスフェンス＆くっきり手すり）
-    unsigned int wallColor = GetColor(220, 235, 255);
-    unsigned int wallBorderColor = GetColor(50, 140, 240);
+    // ------------------------------------------------------------------------
+    // 2. リビングの中央ラグマット（お部屋らしさを演出）
+    // ------------------------------------------------------------------------
+    float rugW = 340.0f;
+    float rugD = 240.0f;
+    unsigned int rugColor = GetColor(170, 205, 190);     // 優しいセージグリーン
+    unsigned int rugBorderColor = GetColor(245, 240, 225); // アイボリーのフチ
+    VECTOR r0 = VGet(-rugW * 0.5f, 0.3f, -rugD * 0.5f);
+    VECTOR r1 = VGet( rugW * 0.5f, 0.3f, -rugD * 0.5f);
+    VECTOR r2 = VGet( rugW * 0.5f, 0.3f,  rugD * 0.5f);
+    VECTOR r3 = VGet(-rugW * 0.5f, 0.3f,  rugD * 0.5f);
+    DrawTriangle3D(r0, r1, r2, rugColor, TRUE);
+    DrawTriangle3D(r0, r2, r3, rugColor, TRUE);
+    DrawLine3D(r0, r1, rugBorderColor);
+    DrawLine3D(r1, r2, rugBorderColor);
+    DrawLine3D(r2, r3, rugBorderColor);
+    DrawLine3D(r3, r0, rugBorderColor);
 
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 90);
+    // ------------------------------------------------------------------------
+    // 3. お部屋の壁・巾木（ホワイト系クロスの腰壁と上品な木製巾木）
+    // ------------------------------------------------------------------------
+    unsigned int wallBaseColor = GetColor(246, 242, 235); // 落ち着いたアイボリーホワイトの壁
+    unsigned int skirtingBoardColor = GetColor(160, 115, 80); // 濃いブラウンの木製巾木
+    unsigned int wallTrimColor = GetColor(190, 150, 110);     // 笠木トリムライン
+
+    float skirtH = 7.0f; // 巾木の高さ
 
     // 北壁 (Z = +halfD)
     VECTOR nw_b = VGet(-halfW, 0.0f, halfD);
     VECTOR ne_b = VGet( halfW, 0.0f, halfD);
+    VECTOR nw_s = VGet(-halfW, skirtH, halfD);
+    VECTOR ne_s = VGet( halfW, skirtH, halfD);
     VECTOR nw_t = VGet(-halfW, wallH, halfD);
     VECTOR ne_t = VGet( halfW, wallH, halfD);
-    DrawTriangle3D(nw_b, ne_b, ne_t, wallColor, TRUE);
-    DrawTriangle3D(nw_b, ne_t, nw_t, wallColor, TRUE);
+    // 巾木
+    DrawTriangle3D(nw_b, ne_b, ne_s, skirtingBoardColor, TRUE);
+    DrawTriangle3D(nw_b, ne_s, nw_s, skirtingBoardColor, TRUE);
+    // 壁本体
+    DrawTriangle3D(nw_s, ne_s, ne_t, wallBaseColor, TRUE);
+    DrawTriangle3D(nw_s, ne_t, nw_t, wallBaseColor, TRUE);
 
-    // 南壁 (Z = -halfD)
+    // 南壁 (Z = -halfD) - 手前側はカメラ視界確保のため低めの腰壁フェンス風
     VECTOR sw_b = VGet(-halfW, 0.0f, -halfD);
     VECTOR se_b = VGet( halfW, 0.0f, -halfD);
-    VECTOR sw_t = VGet(-halfW, wallH, -halfD);
-    VECTOR se_t = VGet( halfW, wallH, -halfD);
-    DrawTriangle3D(se_b, sw_b, sw_t, wallColor, TRUE);
-    DrawTriangle3D(se_b, sw_t, se_t, wallColor, TRUE);
+    VECTOR sw_s = VGet(-halfW, skirtH, -halfD);
+    VECTOR se_s = VGet( halfW, skirtH, -halfD);
+    VECTOR sw_t = VGet(-halfW, wallH * 0.6f, -halfD);
+    VECTOR se_t = VGet( halfW, wallH * 0.6f, -halfD);
+    DrawTriangle3D(se_b, sw_b, sw_s, skirtingBoardColor, TRUE);
+    DrawTriangle3D(se_b, sw_s, se_s, skirtingBoardColor, TRUE);
+    DrawTriangle3D(se_s, sw_s, sw_t, wallBaseColor, TRUE);
+    DrawTriangle3D(se_s, sw_t, se_t, wallBaseColor, TRUE);
 
     // 東壁 (X = +halfW)
-    DrawTriangle3D(ne_b, se_b, se_t, wallColor, TRUE);
-    DrawTriangle3D(ne_b, se_t, ne_t, wallColor, TRUE);
+    VECTOR ee_s = VGet(halfW, skirtH, -halfD);
+    VECTOR en_s = VGet(halfW, skirtH,  halfD);
+    VECTOR ee_t = VGet(halfW, wallH, -halfD);
+    VECTOR en_t = VGet(halfW, wallH,  halfD);
+    DrawTriangle3D(ne_b, se_b, ee_s, skirtingBoardColor, TRUE);
+    DrawTriangle3D(ne_b, ee_s, en_s, skirtingBoardColor, TRUE);
+    DrawTriangle3D(en_s, ee_s, ee_t, wallBaseColor, TRUE);
+    DrawTriangle3D(en_s, ee_t, en_t, wallBaseColor, TRUE);
 
     // 西壁 (X = -halfW)
-    DrawTriangle3D(sw_b, nw_b, nw_t, wallColor, TRUE);
-    DrawTriangle3D(sw_b, nw_t, sw_t, wallColor, TRUE);
+    VECTOR ww_s = VGet(-halfW, skirtH, -halfD);
+    VECTOR wn_s = VGet(-halfW, skirtH,  halfD);
+    VECTOR ww_t = VGet(-halfW, wallH, -halfD);
+    VECTOR wn_t = VGet(-halfW, wallH,  halfD);
+    DrawTriangle3D(sw_b, nw_b, wn_s, skirtingBoardColor, TRUE);
+    DrawTriangle3D(sw_b, wn_s, ww_s, skirtingBoardColor, TRUE);
+    DrawTriangle3D(ww_s, wn_s, wn_t, wallBaseColor, TRUE);
+    DrawTriangle3D(ww_s, wn_t, ww_t, wallBaseColor, TRUE);
 
-    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-
-    // 手すり（境界ライン）
-    DrawLine3D(nw_t, ne_t, wallBorderColor);
-    DrawLine3D(sw_t, se_t, wallBorderColor);
-    DrawLine3D(se_t, ne_t, wallBorderColor);
-    DrawLine3D(sw_t, nw_t, wallBorderColor);
+    // 壁上の枠線トリムライン
+    DrawLine3D(nw_t, ne_t, wallTrimColor);
+    DrawLine3D(sw_t, se_t, wallTrimColor);
+    DrawLine3D(ee_t, en_t, wallTrimColor);
+    DrawLine3D(ww_t, wn_t, wallTrimColor);
 }

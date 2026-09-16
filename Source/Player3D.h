@@ -58,6 +58,21 @@ private:
     bool   m_prevPounceKey = false;
     std::deque<TrailPoint3D> m_trails; // 3D残像履歴
 
+    // タックル（Tackle: [E] キー）関連
+    bool   m_isTackling = false;
+    int    m_tackleTimer = 0;
+    int    m_tackleCooldown = 0;
+    VECTOR m_tackleDir = VGet(0.0f, 0.0f, 1.0f);
+    bool   m_prevTackleKey = false;
+
+    // スタン（壁・家具衝突時）関連
+    int    m_stunTimer = 0;           // 猫のスタン残りフレーム数
+
+    // マウス操作（左クリック長押し移動）関連
+    bool   m_isMouseMoving = false;
+    int    m_mouseTargetX = 0;
+    int    m_mouseTargetY = 0;
+
 public:
     Player3D(const VECTOR& pos);
     virtual ~Player3D() = default;
@@ -68,7 +83,11 @@ public:
     void Draw2D() override;
 
     MuscleState GetMuscleState() const { return m_state; }
-    float GetCurrentSpeed() const { return m_isPouncing ? GetPounceSpeed() : m_speed; }
+    float GetCurrentSpeed() const {
+        if (m_isTackling) return GetTackleSpeed();
+        if (m_isPouncing) return GetPounceSpeed();
+        return (m_stunTimer > 0) ? 0.0f : m_speed;
+    }
     bool IsSkillChecking() const { return m_isSkillChecking; }
     int GetRepCount() const { return m_repCount; }
     float GetSorenessRemainingSeconds() const { return static_cast<float>(m_sorenessTimer) / 60.0f; }
@@ -103,16 +122,69 @@ public:
         return 28.0f;
     }
 
+    // ========================================================================
+    // ★ タックル（Eキー）パラメータ動的算出（初期から使用可能、Repで強化）
+    // ========================================================================
+    // 突進速度
+    float GetTackleSpeed() const {
+        return 8.0f + static_cast<float>(m_repCount) * 0.9f;
+    }
+
+    // 持続フレーム（突進距離：Rep0=14f, Rep4=20f, Rep8=26f）
+    int GetTackleDuration() const {
+        return 14 + m_repCount * 2;
+    }
+
+    // クールダウン最大値（約1.5秒）
+    int GetTackleCooldownMax() const {
+        int cd = 90 - m_repCount * 3;
+        return (cd < 50) ? 50 : cd;
+    }
+
+    // 判定範囲（Rep0=22.0f 〜 Rep8=38.0f）
+    float GetTackleRadius() const {
+        return 22.0f + static_cast<float>(m_repCount) * 2.0f;
+    }
+
+    // ネズミに与えるスタンフレーム数（Rep0: 2.0秒=120f 〜 Rep5: 3.5秒=210f）
+    int GetMouseStunDuration() const {
+        return 120 + m_repCount * 25;
+    }
+
     float GetRadius() const override {
-        return m_isPouncing ? GetPounceRadius() : m_radius;
+        if (m_isTackling) return GetTackleRadius();
+        if (m_isPouncing) return GetPounceRadius();
+        return m_radius;
     }
 
     bool IsPouncing() const { return m_isPouncing; }
     bool CanPounce() const {
-        return (m_repCount >= 4) && (m_state != MuscleState::Soreness) && !m_isSkillChecking && (m_pounceCooldown <= 0);
+        return (m_repCount >= 4) && (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isTackling && (m_pounceCooldown <= 0);
     }
     float GetPounceCooldownRatio() const {
         int maxCd = GetPounceCooldownMax();
         return (m_pounceCooldown > 0) ? (static_cast<float>(m_pounceCooldown) / static_cast<float>(maxCd)) : 0.0f;
     }
+
+    // タックル状態確認
+    bool IsTackling() const { return m_isTackling; }
+    bool CanTackle() const {
+        return (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isPouncing && !m_isTackling && (m_tackleCooldown <= 0);
+    }
+    float GetTackleCooldownRatio() const {
+        int maxCd = GetTackleCooldownMax();
+        return (m_tackleCooldown > 0) ? (static_cast<float>(m_tackleCooldown) / static_cast<float>(maxCd)) : 0.0f;
+    }
+
+    // 猫のスタン状態確認・適用
+    bool IsStunned() const { return m_stunTimer > 0; }
+    void ApplyStun(int frames) {
+        if (frames > m_stunTimer) m_stunTimer = frames;
+        m_isTackling = false;
+        m_isPouncing = false;
+    }
+    float GetCatStunRemainingSeconds() const { return static_cast<float>(m_stunTimer) / 60.0f; }
+
+    // スタンエフェクト描画
+    void DrawStunEffect();
 };

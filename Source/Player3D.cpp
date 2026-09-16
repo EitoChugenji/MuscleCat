@@ -26,7 +26,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
     m_animTime += 1.0f / 60.0f;
 
     // ------------------------------------------------------------------------
-    // キー入力受付（筋トレ: SPACE/Z、飛びつき: SHIFT/X/C）
+    // キー入力受付（筋トレ: SPACE/Z、飛びつき: SHIFT/X/C、タックル: E）
     // ------------------------------------------------------------------------
     bool currentTriggerKey = (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_Z));
     bool isTriggerJustPressed = currentTriggerKey && !m_prevTriggerKey;
@@ -37,11 +37,18 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
     bool isPounceJustPressed = currentPounceKey && !m_prevPounceKey;
     m_prevPounceKey = currentPounceKey;
 
+    bool currentTackleKey = CheckHitKey(KEY_INPUT_E);
+    bool isTackleJustPressed = currentTackleKey && !m_prevTackleKey;
+    m_prevTackleKey = currentTackleKey;
+
     if (m_resultShowTimer > 0) {
         m_resultShowTimer--;
     }
     if (m_pounceCooldown > 0) {
         m_pounceCooldown--;
+    }
+    if (m_tackleCooldown > 0) {
+        m_tackleCooldown--;
     }
 
     // 残像トレイルのフェードアウト処理
@@ -52,6 +59,39 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
         } else {
             ++it;
         }
+    }
+
+    // ========================================================================
+    // スタン（壁・家具激突）処理
+    // ========================================================================
+    if (m_stunTimer > 0) {
+        m_stunTimer--;
+        m_isTackling = false;
+        m_isPouncing = false;
+        m_pos.y = 0.0f;
+        return;
+    }
+
+    // ========================================================================
+    // タックル（Tackle）アクション実行中処理
+    // ========================================================================
+    if (m_isTackling) {
+        m_tackleTimer--;
+
+        // 残像記録
+        m_trails.push_back({ m_pos, m_rotY, m_repCount, 220 });
+
+        // 地面を滑るような超高速直進
+        float tSpeed = GetTackleSpeed();
+        m_pos.x += m_tackleDir.x * tSpeed;
+        m_pos.z += m_tackleDir.z * tSpeed;
+        m_pos.y = 0.0f;
+
+        if (m_tackleTimer <= 0) {
+            m_isTackling = false;
+            m_tackleCooldown = GetTackleCooldownMax();
+        }
+        return;
     }
 
     // ========================================================================
@@ -119,6 +159,14 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
             }
 
             if (!m_isSkillChecking) {
+                // ★【初期から使用可能】タックル発動チェック（Eキー）
+                if (CanTackle() && isTackleJustPressed) {
+                    m_isTackling = true;
+                    m_tackleTimer = GetTackleDuration();
+                    m_tackleDir = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+                    return;
+                }
+
                 // ★【4 Rep以上特権】飛びつき発動チェック
                 if (CanPounce() && isPounceJustPressed) {
                     m_isPouncing = true;
@@ -129,7 +177,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
                     return;
                 }
 
-                // 移動入力処理 (WASD / 矢印キー) - カメラのXZ平面基準
+                // 移動入力処理 (WASD / 矢印キー / マウス左クリック長押し) - カメラのXZ平面基準
                 VECTOR forwardXZ = camera.GetForwardXZ();
                 VECTOR rightXZ   = camera.GetRightXZ();
                 VECTOR moveDir   = VGet(0.0f, 0.0f, 0.0f);
@@ -145,6 +193,43 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
                 }
                 if (CheckHitKey(KEY_INPUT_A) || CheckHitKey(KEY_INPUT_LEFT)) {
                     moveDir = VSub(moveDir, rightXZ);
+                }
+
+                // ★ マウス左クリック長押しによる移動
+                // 猫の画面上の位置から見てマウスカーソルがある方向に進む
+                m_isMouseMoving = false;
+                if ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0) {
+                    int mx = 0, my = 0;
+                    GetMousePoint(&mx, &my);
+                    m_mouseTargetX = mx;
+                    m_mouseTargetY = my;
+
+                    VECTOR catScreen = ConvWorldPosToScreenPos(m_pos);
+                    // カメラ前方（描画範囲内）にあるかチェック
+                    if (catScreen.z > 0.0f) {
+                        float dx = static_cast<float>(mx) - catScreen.x;
+                        float dy = static_cast<float>(my) - catScreen.y;
+                        float distSq = dx * dx + dy * dy;
+
+                        // 猫の足元から15ピクセル以上離れていれば移動（真上近辺での小刻みな揺れを防止）
+                        if (distSq > 15.0f * 15.0f) {
+                            m_isMouseMoving = true;
+                            float dist = std::sqrt(distSq);
+                            float ndx = dx / dist;
+                            float ndy = dy / dist;
+
+                            // スクリーン空間: 上(-dy)はカメラ奥(forwardXZ)、右(+dx)はカメラ右(rightXZ)
+                            VECTOR mouseMoveDir = VAdd(VScale(rightXZ, ndx), VScale(forwardXZ, -ndy));
+                            mouseMoveDir.y = 0.0f;
+
+                            float keyLenSq = moveDir.x * moveDir.x + moveDir.z * moveDir.z;
+                            if (keyLenSq < 0.0001f) {
+                                moveDir = mouseMoveDir;
+                            } else {
+                                moveDir = VAdd(moveDir, mouseMoveDir);
+                            }
+                        }
+                    }
                 }
 
                 float inputLengthSq = moveDir.x * moveDir.x + moveDir.z * moveDir.z;
@@ -232,8 +317,38 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
     }
 }
 
+void Player3D::DrawStunEffect() {
+    if (!IsStunned()) return;
+
+    // 猫の頭上で回転する星・気絶マーク（大きな星と光輪）
+    float headY = m_pos.y + 34.0f;
+    float spinSpeed = m_animTime * 12.0f;
+    float ringRadius = 16.0f;
+
+    // くるくる回る4つの星
+    for (int i = 0; i < 4; ++i) {
+        float angle = spinSpeed + static_cast<float>(i) * (MathHelper::PI * 0.5f);
+        float starX = m_pos.x + std::cos(angle) * ringRadius;
+        float starZ = m_pos.z + std::sin(angle) * ringRadius;
+        float starY = headY + std::sin(angle * 2.5f) * 3.5f;
+
+        VECTOR starPos = VGet(starX, starY, starZ);
+        DrawSphere3D(starPos, 3.5f, 8, GetColor(255, 220, 50), GetColor(255, 240, 120), TRUE);
+    }
+
+    // 気絶リング
+    int ringSegments = 20;
+    for (int i = 0; i < ringSegments; ++i) {
+        float a1 = static_cast<float>(i) * (2.0f * MathHelper::PI / ringSegments);
+        float a2 = static_cast<float>(i + 1) * (2.0f * MathHelper::PI / ringSegments);
+        VECTOR p1 = VGet(m_pos.x + std::cos(a1) * ringRadius, headY, m_pos.z + std::sin(a1) * ringRadius);
+        VECTOR p2 = VGet(m_pos.x + std::cos(a2) * ringRadius, headY, m_pos.z + std::sin(a2) * ringRadius);
+        DrawLine3D(p1, p2, GetColor(255, 230, 80));
+    }
+}
+
 void Player3D::Draw3D() {
-    // 1. 飛びつき残像の描画
+    // 1. 飛びつき・タックル残像の描画
     for (const auto& trail : m_trails) {
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, trail.alpha);
         ModelManager::GetInstance().DrawFallbackCat(trail.pos, trail.rotY, trail.repCount, false, true, m_animTime);
@@ -246,8 +361,17 @@ void Player3D::Draw3D() {
             ModelConfig::CAT_MODEL_PATH, m_pos, m_rotY + ModelConfig::CAT_MODEL_ROT_Y,
             ModelConfig::CAT_MODEL_SCALE)) {
         ModelManager::GetInstance().DrawFallbackCat(
-            m_pos, m_rotY, m_repCount, isSoreness, m_isPouncing, m_animTime);
+            m_pos, m_rotY, m_repCount, isSoreness, (m_isPouncing || m_isTackling), m_animTime);
     }
+
+    // 3. タックル突進オーラエフェクト
+    if (m_isTackling) {
+        float r = GetTackleRadius();
+        DrawSphere3D(VGet(m_pos.x, m_pos.y + 15.0f, m_pos.z), r, 12, GetColor(255, 160, 40), GetColor(255, 220, 80), FALSE);
+    }
+
+    // 4. 猫のスタンエフェクト
+    DrawStunEffect();
 }
 
 void Player3D::Draw2D() {
@@ -309,5 +433,33 @@ void Player3D::Draw2D() {
             DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 100, Config::SCREEN_HEIGHT / 2 - 40, GetColor(255, 220, 50), font24, "PUMP UP!! +1 REP (%d Rep)", m_repCount);
         }
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    }
+
+    // ------------------------------------------------------------------------
+    // 猫の激突スタン通知テキスト
+    // ------------------------------------------------------------------------
+    if (m_stunTimer > 0) {
+        int alpha = (m_stunTimer % 10 < 5) ? 255 : 180;
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+        DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 130, Config::SCREEN_HEIGHT / 2 - 65, GetColor(255, 220, 40), font24, "★ STUNNED!! 残り%.1fs ★", GetCatStunRemainingSeconds());
+        DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 110, Config::SCREEN_HEIGHT / 2 - 35, "壁・家具に激突して気絶中！", GetColor(255, 240, 120), font16);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    }
+
+    // ------------------------------------------------------------------------
+    // マウス左クリック長押し移動時の方向ガイドライン＆マーカー
+    // ------------------------------------------------------------------------
+    if (m_isMouseMoving && m_state != MuscleState::Soreness && m_stunTimer <= 0) {
+        VECTOR catScreen = ConvWorldPosToScreenPos(m_pos);
+        if (catScreen.z > 0.0f) {
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 160);
+            // 猫の足元からマウスカーソルへの方向ガイドライン
+            DrawLine(static_cast<int>(catScreen.x), static_cast<int>(catScreen.y),
+                     m_mouseTargetX, m_mouseTargetY, GetColor(100, 220, 255), 2);
+            // マウスカーソル位置のガイドターゲット円
+            DrawCircle(m_mouseTargetX, m_mouseTargetY, 12, GetColor(100, 220, 255), FALSE);
+            DrawCircle(m_mouseTargetX, m_mouseTargetY, 4, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        }
     }
 }

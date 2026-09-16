@@ -31,43 +31,43 @@ void GameManager::StartGame() {
     m_camera.Init(player->GetPos());
 
     // ========================================================================
-    // 3Dジム風障害物の配置（広域3Dステージレイアウト）
+    // 3Dお部屋の家具・インテリア配置（リビングルームレイアウト）
     // ========================================================================
-    // 1. 左上: ベンチプレス台
+    // 1. 左上: 2人掛けソファー
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(-220.0f, 0.0f, 160.0f), 70.0f, 25.0f, 45.0f,
-        "BENCH PRESS", ModelConfig::BENCH_PRESS_MODEL_PATH,
-        GetColor(60, 65, 75), GetColor(160, 170, 190)));
+        VGet(-220.0f, 0.0f, 160.0f), 80.0f, 22.0f, 48.0f,
+        "SOFA", ModelConfig::BENCH_PRESS_MODEL_PATH,
+        GetColor(75, 115, 135), GetColor(110, 155, 175)));
 
-    // 2. 右上: ダンベルラック
+    // 2. 右上: キャットタワー
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(220.0f, 0.0f, 160.0f), 70.0f, 25.0f, 45.0f,
-        "DUMBBELLS", ModelConfig::DUMBBELL_RACK_MODEL_PATH,
-        GetColor(90, 45, 45), GetColor(210, 100, 100)));
+        VGet(220.0f, 0.0f, 160.0f), 50.0f, 40.0f, 50.0f,
+        "CAT TOWER", ModelConfig::DUMBBELL_RACK_MODEL_PATH,
+        GetColor(215, 195, 160), GetColor(160, 135, 95)));
 
-    // 3. 左下: プロテインバー
+    // 3. 左下: 本棚（ブックシェルフ）
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(-220.0f, 0.0f, -160.0f), 70.0f, 25.0f, 45.0f,
-        "PROTEIN BAR", ModelConfig::PROTEIN_BAR_MODEL_PATH,
-        GetColor(45, 75, 55), GetColor(100, 190, 120)));
+        VGet(-220.0f, 0.0f, -160.0f), 70.0f, 42.0f, 35.0f,
+        "BOOKSHELF", ModelConfig::PROTEIN_BAR_MODEL_PATH,
+        GetColor(130, 85, 55), GetColor(180, 125, 85)));
 
-    // 4. 右下: パワーラック
+    // 4. 右下: 収納チェスト・キャビネット
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(220.0f, 0.0f, -160.0f), 70.0f, 35.0f, 45.0f,
-        "POWER RACK", ModelConfig::POWER_RACK_MODEL_PATH,
-        GetColor(45, 55, 85), GetColor(100, 140, 210)));
+        VGet(220.0f, 0.0f, -160.0f), 65.0f, 30.0f, 42.0f,
+        "CHEST", ModelConfig::POWER_RACK_MODEL_PATH,
+        GetColor(145, 95, 60), GetColor(200, 140, 95)));
 
-    // 5. 中央上: スミスマシン
+    // 5. 中央奥: テレビボード＆薄型TV
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(0.0f, 0.0f, 210.0f), 60.0f, 35.0f, 40.0f,
-        "SMITH MACHINE", ModelConfig::SMITH_MACHINE_MODEL_PATH,
-        GetColor(75, 60, 45), GetColor(220, 160, 90)));
+        VGet(0.0f, 0.0f, 210.0f), 85.0f, 24.0f, 38.0f,
+        "TV BOARD", ModelConfig::SMITH_MACHINE_MODEL_PATH,
+        GetColor(50, 45, 45), GetColor(140, 140, 150)));
 
-    // 6. 中央下: トレッドミル台
+    // 6. 中央手前: ローテーブル（ラグ上）
     m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(0.0f, 0.0f, -210.0f), 55.0f, 20.0f, 70.0f,
-        "TREADMILL", ModelConfig::TREADMILL_MODEL_PATH,
-        GetColor(65, 45, 75), GetColor(180, 120, 210)));
+        VGet(0.0f, 0.0f, -60.0f), 70.0f, 18.0f, 50.0f,
+        "TABLE", ModelConfig::TREADMILL_MODEL_PATH,
+        GetColor(165, 115, 75), GetColor(215, 165, 115)));
 
     // ========================================================================
     // ネズミの生成（広域エリアに分散配置）
@@ -110,7 +110,7 @@ void GameManager::Update() {
             StartGame();
         }
     } else if (m_state == GameState::Playing) {
-        SetMouseDispFlag(FALSE); // ゲーム中はカーソル非表示
+        SetMouseDispFlag(TRUE); // ゲーム中もカーソル表示（マウス移動操作用）
         auto player = m_objManager.GetPlayer();
         if (player) {
             m_camera.Update(player->GetPos(), player->GetRotY(), true);
@@ -203,17 +203,18 @@ void GameManager::Draw() {
         }
 
         // 操作説明パネル
-        int panelX = (Config::SCREEN_WIDTH - 600) / 2;
-        int panelY = 440;
-        DrawBox(panelX, panelY, panelX + 600, panelY + 200, GetColor(30, 35, 48), TRUE);
-        DrawBox(panelX, panelY, panelX + 600, panelY + 200, GetColor(100, 120, 160), FALSE);
+        int panelX = (Config::SCREEN_WIDTH - 640) / 2;
+        int panelY = 430;
+        DrawBox(panelX, panelY, panelX + 640, panelY + 220, GetColor(30, 35, 48), TRUE);
+        DrawBox(panelX, panelY, panelX + 640, panelY + 220, GetColor(100, 120, 160), FALSE);
 
-        DrawStringToHandle(panelX + 20, panelY + 20, "【操作方法】", yellow, font18);
-        DrawStringToHandle(panelX + 30, panelY + 55, "・移動: WASD キー （W:奥, S:手前, A:左, D:右）", white, font16);
-        DrawStringToHandle(panelX + 30, panelY + 85, "・筋トレ: [SPACE] キー （タイミングよく押してRep獲得＆加速！）", GetColor(255, 210, 80), font16);
-        DrawStringToHandle(panelX + 30, panelY + 115, "・飛びつき: [SHIFT] または [X] キー （4 Rep以上で跳躍突進！）", GetColor(255, 140, 60), font16);
-        DrawStringToHandle(panelX + 30, panelY + 145, "・視点: ステージ全体俯瞰固定ビュー", cyan, font16);
-        DrawStringToHandle(panelX + 30, panelY + 170, "※ 筋トレ失敗で5秒間筋肉痛（停止） / 10秒放置で筋肉減衰", GetColor(255, 120, 120), font13);
+        DrawStringToHandle(panelX + 20, panelY + 15, "【操作方法】", yellow, font18);
+        DrawStringToHandle(panelX + 30, panelY + 45, "・移動: WASD キー または [マウス左クリック長押し]", white, font16);
+        DrawStringToHandle(panelX + 30, panelY + 73, "・筋トレ: [SPACE] キー （タイミングよく押してRep獲得＆加速！）", GetColor(255, 210, 80), font16);
+        DrawStringToHandle(panelX + 30, panelY + 101, "・タックル: [E] キー （ネズミ気絶！/壁激突で猫スタン・筋トレで強化）", GetColor(255, 160, 50), font16);
+        DrawStringToHandle(panelX + 30, panelY + 129, "・飛びつき: [SHIFT] または [X] キー （4 Rep以上で跳躍突進！）", GetColor(255, 110, 50), font16);
+        DrawStringToHandle(panelX + 30, panelY + 157, "・視点: ステージ全体俯瞰固定ビュー", cyan, font16);
+        DrawStringToHandle(panelX + 30, panelY + 185, "※ 筋トレ失敗で5秒間筋肉痛（停止） / 10秒放置で筋肉減衰", GetColor(255, 120, 120), font13);
 
     } else if (m_state == GameState::Playing) {
         // ====================================================================
@@ -236,7 +237,11 @@ void GameManager::Draw() {
             float mouseSpeed = m_objManager.GetCurrentMouseSpeed();
             int caught = m_objManager.GetCaughtCount();
 
-            if (player->IsPouncing()) {
+            if (player->IsStunned()) {
+                DrawFormatStringToHandle(22, 62, GetColor(255, 90, 90), font16, "猫速度: 0.0 [激突気絶中!! 残り%.1fs]", player->GetCatStunRemainingSeconds());
+            } else if (player->IsTackling()) {
+                DrawFormatStringToHandle(22, 62, GetColor(255, 140, 30), font16, "猫速度: %.1f [%d Rep タックル突進中!!]", speed, reps);
+            } else if (player->IsPouncing()) {
                 DrawFormatStringToHandle(22, 62, GetColor(255, 80, 0), font16, "猫速度: %.1f [%d Rep 飛びつき突進中!!]", speed, reps);
             } else if (ms == MuscleState::Soreness) {
                 DrawFormatStringToHandle(22, 62, GetColor(100, 180, 255), font16, "猫速度: 0.0 [筋肉痛!! 残り%.1fs]", player->GetSorenessRemainingSeconds());
@@ -253,16 +258,17 @@ void GameManager::Draw() {
 
         // 画面下の操作ヒント枠
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, 180);
-        DrawBox(10, Config::SCREEN_HEIGHT - 72, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 8, GetColor(15, 20, 30), TRUE);
-        DrawBox(10, Config::SCREEN_HEIGHT - 72, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 8, GetColor(60, 70, 95), FALSE);
+        DrawBox(10, Config::SCREEN_HEIGHT - 76, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 8, GetColor(15, 20, 30), TRUE);
+        DrawBox(10, Config::SCREEN_HEIGHT - 76, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 8, GetColor(60, 70, 95), FALSE);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
         if (player && player->GetRepCount() >= 4 && player->GetMuscleState() != MuscleState::Soreness) {
-            DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 66, GetColor(255, 230, 80), font16, "★ 飛びつき: [SHIFT] または [X] (%d Rep跳躍突進！)", player->GetRepCount());
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 45, "移動: WASD キー", white, font16);
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 25, "筋トレ: [SPACE] でさらにRep追加！ (10秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
+            DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 70, GetColor(255, 230, 80), font16, "★ 飛びつき: [SHIFT] または [X] (%d Rep跳躍突進！) | タックル: [E] (ネズミ気絶！壁激突注意)", player->GetRepCount());
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 48, "移動: WASD キー / [マウス左クリック長押し]", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でさらにRep追加！ (10秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         } else {
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 55, "移動: WASD キー", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 70, "タックル: [E] キー (ネズミを気絶スタン！壁や家具激突で猫スタン)", GetColor(255, 200, 80), font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 48, "移動: WASD キー / [マウス左クリック長押し]", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でRep追加！ (10秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         }
 

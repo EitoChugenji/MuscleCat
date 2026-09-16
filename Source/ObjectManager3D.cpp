@@ -99,6 +99,7 @@ void ObjectManager3D::CheckCollisions() {
 
     VECTOR pPos = m_player->GetPos();
     float pRadius = m_player->GetRadius();
+    bool isTackling = m_player->IsTackling();
 
     for (auto& obj : m_objects) {
         if (!obj->IsAlive()) continue;
@@ -113,10 +114,19 @@ void ObjectManager3D::CheckCollisions() {
             float totalR = pRadius + mRadius;
 
             if (distSq <= totalR * totalR) {
-                // 【捕獲成功】
-                obj->SetAlive(false);
-                m_caughtCount++;
-                ApplyMouseSpeedBonus();
+                if (isTackling) {
+                    // ★【タックル時】ネズミは捕まえられないが、スタン状態にする！
+                    auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
+                    if (mouse) {
+                        int stunDuration = m_player->GetMouseStunDuration();
+                        mouse->ApplyStun(stunDuration);
+                    }
+                } else {
+                    // 【通常接触時】捕獲成功（スタン中のネズミも通常接触で捕獲可能！）
+                    obj->SetAlive(false);
+                    m_caughtCount++;
+                    ApplyMouseSpeedBonus();
+                }
             }
         }
     }
@@ -127,14 +137,26 @@ void ObjectManager3D::CheckObstacleAndStageCollisions() {
     if (m_player && m_player->IsAlive()) {
         VECTOR pPos = m_player->GetPos();
         float pRadius = m_player->GetRadius();
+        bool collided = false;
 
-        // 障害物との押し出し
+        // 障害物との押し出し判定
         for (const auto& obs : m_obstacles) {
-            obs->ResolveCollision(pPos, pRadius);
+            if (obs->ResolveCollision(pPos, pRadius)) {
+                collided = true;
+            }
         }
 
-        // ステージ壁との押し出し
-        m_stage.ClampToBounds(pPos, pRadius);
+        // ステージ壁との押し出し判定
+        if (m_stage.ClampToBounds(pPos, pRadius)) {
+            collided = true;
+        }
+
+        // ★【タックル中に壁や家具に当たったら猫がスタンする！】
+        if (collided && m_player->IsTackling()) {
+            // 猫が1.5秒（90フレーム）気絶スタン
+            m_player->ApplyStun(90);
+        }
+
         m_player->SetPos(pPos);
     }
 
