@@ -11,7 +11,7 @@ class MouseBase3D : public GameObject3D {
 protected:
     float m_vx = 0.0f;
     float m_vz = 0.0f;
-    float m_baseSpeed = 3.6f;
+    float m_baseSpeed = 2.4f;
     float m_speedBonus = 0.0f; // 仲間の被捕食数 * 0.1f
     float m_animTime = 0.0f;
 
@@ -50,7 +50,7 @@ class FastMouse3D : public MouseBase3D {
 private:
     std::shared_ptr<Player3D> m_targetPlayer;
     float m_fleeDistance = 140.0f;
-    float m_fleeSpeed    = 3.8f;
+    float m_fleeSpeed    = 2.6f;
     int   m_wanderTimer  = 0;
 
 public:

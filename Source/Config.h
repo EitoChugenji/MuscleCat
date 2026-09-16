@@ -11,8 +11,8 @@ namespace Config {
     constexpr const char* TITLE = "マッスルねこ 3D (Muscle Cat 3D)";
 
     // ゲームバランス設定
-    constexpr int NORMAL_MOUSE_COUNT = 7; // 通常ネズミの配置数
-    constexpr int FAST_MOUSE_COUNT   = 4; // 高速逃走ネズミの配置数
+    constexpr int NORMAL_MOUSE_COUNT = 3; // 通常ネズミの配置数（合計5匹）
+    constexpr int FAST_MOUSE_COUNT   = 2; // 高速逃走ネズミの配置数
 
     // 3Dステージ設定（広々としたジム空間）
     constexpr float STAGE_HALF_WIDTH  = 500.0f; // X方向の半幅 (-500 〜 +500)

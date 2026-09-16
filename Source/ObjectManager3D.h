@@ -42,6 +42,6 @@ public:
 
     int GetRemainingMouseCount() const;
     int GetCaughtCount() const { return m_caughtCount; }
-    float GetCurrentMouseSpeed() const { return 3.6f + static_cast<float>(m_caughtCount) * 0.15f; }
+    float GetCurrentMouseSpeed() const { return 2.4f + static_cast<float>(m_caughtCount) * 0.15f; }
     void ApplyMouseSpeedBonus();
 };
