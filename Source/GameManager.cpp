@@ -209,10 +209,10 @@ void GameManager::Draw() {
         DrawBox(panelX, panelY, panelX + 600, panelY + 200, GetColor(100, 120, 160), FALSE);
 
         DrawStringToHandle(panelX + 20, panelY + 20, "【操作方法】", yellow, font18);
-        DrawStringToHandle(panelX + 30, panelY + 55, "・移動: WASD キー （カメラの向き基準で3D移動）", white, font16);
+        DrawStringToHandle(panelX + 30, panelY + 55, "・移動: WASD キー （W:奥, S:手前, A:左, D:右）", white, font16);
         DrawStringToHandle(panelX + 30, panelY + 85, "・筋トレ: [SPACE] キー （タイミングよく押してRep獲得＆加速！）", GetColor(255, 210, 80), font16);
         DrawStringToHandle(panelX + 30, panelY + 115, "・飛びつき: [SHIFT] または [X] キー （4 Rep以上で跳躍突進！）", GetColor(255, 140, 60), font16);
-        DrawStringToHandle(panelX + 30, panelY + 145, "・視点操作: [Q] / [E] キー または [マウス右ボタンドラッグ]", cyan, font16);
+        DrawStringToHandle(panelX + 30, panelY + 145, "・視点: ステージ全体俯瞰固定ビュー", cyan, font16);
         DrawStringToHandle(panelX + 30, panelY + 170, "※ 筋トレ失敗で5秒間筋肉痛（停止） / 10秒放置で筋肉減衰", GetColor(255, 120, 120), font13);
 
     } else if (m_state == GameState::Playing) {
@@ -259,10 +259,10 @@ void GameManager::Draw() {
 
         if (player && player->GetRepCount() >= 4 && player->GetMuscleState() != MuscleState::Soreness) {
             DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 66, GetColor(255, 230, 80), font16, "★ 飛びつき: [SHIFT] または [X] (%d Rep跳躍突進！)", player->GetRepCount());
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 45, "移動: WASD  /  視点旋回: Q / E または 右ドラッグ", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 45, "移動: WASD キー", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 25, "筋トレ: [SPACE] でさらにRep追加！ (10秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         } else {
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 55, "移動: WASD  /  視点旋回: Q / E または 右ドラッグ", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 55, "移動: WASD キー", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でRep追加！ (10秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         }
 

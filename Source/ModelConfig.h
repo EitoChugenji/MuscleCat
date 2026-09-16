@@ -12,21 +12,21 @@ namespace ModelConfig {
     // プレイヤー（マッスルねこ）
     // ------------------------------------------------------------------------
     constexpr const char* CAT_MODEL_PATH = "Resource/Models/cat.mv1";
-    constexpr float       CAT_MODEL_SCALE = 1.0f;
+    constexpr float       CAT_MODEL_SCALE = 1.6f;
     constexpr float       CAT_MODEL_ROT_Y = 0.0f; // モデル初期向き補正（ラジアン）
 
     // ------------------------------------------------------------------------
     // 通常ネズミ
     // ------------------------------------------------------------------------
     constexpr const char* MOUSE_NORMAL_MODEL_PATH = "Resource/Models/mouse_normal.mv1";
-    constexpr float       MOUSE_NORMAL_MODEL_SCALE = 0.8f;
+    constexpr float       MOUSE_NORMAL_MODEL_SCALE = 1.5f;
     constexpr float       MOUSE_NORMAL_MODEL_ROT_Y = 0.0f;
 
     // ------------------------------------------------------------------------
     // 高速逃走ネズミ
     // ------------------------------------------------------------------------
     constexpr const char* MOUSE_FAST_MODEL_PATH = "Resource/Models/mouse_fast.mv1";
-    constexpr float       MOUSE_FAST_MODEL_SCALE = 0.7f;
+    constexpr float       MOUSE_FAST_MODEL_SCALE = 1.3f;
     constexpr float       MOUSE_FAST_MODEL_ROT_Y = 0.0f;
 
     // ------------------------------------------------------------------------

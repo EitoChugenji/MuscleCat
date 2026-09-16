@@ -68,8 +68,8 @@ void ModelManager::DrawFallbackCat(const VECTOR& pos, float rotY, int repCount, 
     }
 
     // マッチョ度に応じたスケール増分
-    float muscleBonus = static_cast<float>(repCount) * 0.4f;
-    if (muscleBonus > 4.0f) muscleBonus = 4.0f;
+    float muscleBonus = static_cast<float>(repCount) * 0.6f;
+    if (muscleBonus > 6.0f) muscleBonus = 6.0f;
 
     // 前方向ベクトル・右方向ベクトル計算
     float sinR = std::sin(rotY);
@@ -78,44 +78,44 @@ void ModelManager::DrawFallbackCat(const VECTOR& pos, float rotY, int repCount, 
     VECTOR right   = VGet(cosR, 0.0f, -sinR);
 
     // 1. 体（マッチョな胴体）
-    VECTOR bodyPos = VGet(pos.x, pos.y + 12.0f + muscleBonus * 0.5f, pos.z);
-    float bodyRadius = 9.0f + muscleBonus;
+    VECTOR bodyPos = VGet(pos.x, pos.y + 18.0f + muscleBonus * 0.5f, pos.z);
+    float bodyRadius = 14.0f + muscleBonus;
     DrawSphere3D(bodyPos, bodyRadius, 16, bodyColor, bodyColor, TRUE);
 
     // 2. 頭部
-    VECTOR headPos = VAdd(bodyPos, VAdd(VScale(forward, 6.0f), VGet(0.0f, 8.0f, 0.0f)));
-    DrawSphere3D(headPos, 7.5f, 16, bodyColor, bodyColor, TRUE);
+    VECTOR headPos = VAdd(bodyPos, VAdd(VScale(forward, 9.0f), VGet(0.0f, 12.0f, 0.0f)));
+    DrawSphere3D(headPos, 11.5f, 16, bodyColor, bodyColor, TRUE);
 
     // 3. 猫耳（左右の円錐）
-    VECTOR leftEarPos  = VAdd(headPos, VAdd(VScale(right, -3.8f), VGet(0.0f, 5.5f, 0.0f)));
-    VECTOR rightEarPos = VAdd(headPos, VAdd(VScale(right, 3.8f), VGet(0.0f, 5.5f, 0.0f)));
-    DrawCone3D(leftEarPos, VAdd(leftEarPos, VGet(0.0f, 4.5f, 0.0f)), 3.0f, 8, earColor, earColor, TRUE);
-    DrawCone3D(rightEarPos, VAdd(rightEarPos, VGet(0.0f, 4.5f, 0.0f)), 3.0f, 8, earColor, earColor, TRUE);
+    VECTOR leftEarPos  = VAdd(headPos, VAdd(VScale(right, -6.0f), VGet(0.0f, 8.5f, 0.0f)));
+    VECTOR rightEarPos = VAdd(headPos, VAdd(VScale(right, 6.0f), VGet(0.0f, 8.5f, 0.0f)));
+    DrawCone3D(leftEarPos, VAdd(leftEarPos, VGet(0.0f, 7.0f, 0.0f)), 4.5f, 8, earColor, earColor, TRUE);
+    DrawCone3D(rightEarPos, VAdd(rightEarPos, VGet(0.0f, 7.0f, 0.0f)), 4.5f, 8, earColor, earColor, TRUE);
 
     // 4. 目
-    VECTOR leftEyePos  = VAdd(headPos, VAdd(VScale(forward, 6.5f), VAdd(VScale(right, -2.5f), VGet(0.0f, 1.5f, 0.0f))));
-    VECTOR rightEyePos = VAdd(headPos, VAdd(VScale(forward, 6.5f), VAdd(VScale(right, 2.5f), VGet(0.0f, 1.5f, 0.0f))));
-    DrawSphere3D(leftEyePos, 1.4f, 8, eyeColor, eyeColor, TRUE);
-    DrawSphere3D(rightEyePos, 1.4f, 8, eyeColor, eyeColor, TRUE);
+    VECTOR leftEyePos  = VAdd(headPos, VAdd(VScale(forward, 10.0f), VAdd(VScale(right, -4.0f), VGet(0.0f, 2.2f, 0.0f))));
+    VECTOR rightEyePos = VAdd(headPos, VAdd(VScale(forward, 10.0f), VAdd(VScale(right, 4.0f), VGet(0.0f, 2.2f, 0.0f))));
+    DrawSphere3D(leftEyePos, 2.2f, 8, eyeColor, eyeColor, TRUE);
+    DrawSphere3D(rightEyePos, 2.2f, 8, eyeColor, eyeColor, TRUE);
 
     // 5. マッチョな腕（両脇の力こぶ）
-    float armArmOffset = 9.0f + muscleBonus * 1.2f;
+    float armArmOffset = 14.0f + muscleBonus * 1.5f;
     float armAngleSwing = std::sin(animTime * 12.0f) * 0.2f;
-    VECTOR leftArmPos = VAdd(bodyPos, VAdd(VScale(right, -armArmOffset), VGet(0.0f, 2.0f, 0.0f)));
-    VECTOR rightArmPos = VAdd(bodyPos, VAdd(VScale(right, armArmOffset), VGet(0.0f, 2.0f, 0.0f)));
-    DrawSphere3D(leftArmPos, 4.5f + muscleBonus * 0.7f, 12, bodyColor, bodyColor, TRUE);
-    DrawSphere3D(rightArmPos, 4.5f + muscleBonus * 0.7f, 12, bodyColor, bodyColor, TRUE);
+    VECTOR leftArmPos = VAdd(bodyPos, VAdd(VScale(right, -armArmOffset), VGet(0.0f, 3.0f, 0.0f)));
+    VECTOR rightArmPos = VAdd(bodyPos, VAdd(VScale(right, armArmOffset), VGet(0.0f, 3.0f, 0.0f)));
+    DrawSphere3D(leftArmPos, 7.0f + muscleBonus * 0.9f, 12, bodyColor, bodyColor, TRUE);
+    DrawSphere3D(rightArmPos, 7.0f + muscleBonus * 0.9f, 12, bodyColor, bodyColor, TRUE);
 
     // ダンベル所持（マッチョ時）
     if (repCount > 0) {
-        DrawCapsule3D(VAdd(leftArmPos, VGet(0.0f, -5.0f, 0.0f)), VAdd(leftArmPos, VGet(0.0f, 5.0f, 0.0f)), 2.8f, 8, dumbbellColor, dumbbellColor, TRUE);
-        DrawCapsule3D(VAdd(rightArmPos, VGet(0.0f, -5.0f, 0.0f)), VAdd(rightArmPos, VGet(0.0f, 5.0f, 0.0f)), 2.8f, 8, dumbbellColor, dumbbellColor, TRUE);
+        DrawCapsule3D(VAdd(leftArmPos, VGet(0.0f, -8.0f, 0.0f)), VAdd(leftArmPos, VGet(0.0f, 8.0f, 0.0f)), 4.2f, 8, dumbbellColor, dumbbellColor, TRUE);
+        DrawCapsule3D(VAdd(rightArmPos, VGet(0.0f, -8.0f, 0.0f)), VAdd(rightArmPos, VGet(0.0f, 8.0f, 0.0f)), 4.2f, 8, dumbbellColor, dumbbellColor, TRUE);
     }
 
     // 6. 尻尾
-    VECTOR tailBase = VSub(bodyPos, VScale(forward, 7.0f));
-    VECTOR tailTip  = VAdd(tailBase, VAdd(VScale(forward, -6.0f), VGet(0.0f, 8.0f + std::sin(animTime * 8.0f) * 2.0f, 0.0f)));
-    DrawCapsule3D(tailBase, tailTip, 2.2f, 8, bodyColor, bodyColor, TRUE);
+    VECTOR tailBase = VSub(bodyPos, VScale(forward, 11.0f));
+    VECTOR tailTip  = VAdd(tailBase, VAdd(VScale(forward, -9.0f), VGet(0.0f, 12.0f + std::sin(animTime * 8.0f) * 3.0f, 0.0f)));
+    DrawCapsule3D(tailBase, tailTip, 3.5f, 8, bodyColor, bodyColor, TRUE);
 
     // 飛びつき時オーラエフェクト
     if (isPouncing) {
@@ -134,29 +134,29 @@ void ModelManager::DrawFallbackNormalMouse(const VECTOR& pos, float rotY, float 
     VECTOR right   = VGet(cosR, 0.0f, -sinR);
 
     // 1. 体
-    VECTOR bodyPos = VGet(pos.x, pos.y + 4.5f, pos.z);
-    DrawSphere3D(bodyPos, 4.8f, 12, bodyColor, bodyColor, TRUE);
+    VECTOR bodyPos = VGet(pos.x, pos.y + 7.0f, pos.z);
+    DrawSphere3D(bodyPos, 7.5f, 12, bodyColor, bodyColor, TRUE);
 
     // 2. 頭部
-    VECTOR headPos = VAdd(bodyPos, VScale(forward, 3.5f));
-    DrawSphere3D(headPos, 3.5f, 12, bodyColor, bodyColor, TRUE);
+    VECTOR headPos = VAdd(bodyPos, VScale(forward, 5.5f));
+    DrawSphere3D(headPos, 5.5f, 12, bodyColor, bodyColor, TRUE);
 
     // 3. 大きな耳
-    VECTOR leftEarPos  = VAdd(headPos, VAdd(VScale(right, -2.5f), VGet(0.0f, 3.0f, 0.0f)));
-    VECTOR rightEarPos = VAdd(headPos, VAdd(VScale(right, 2.5f), VGet(0.0f, 3.0f, 0.0f)));
-    DrawSphere3D(leftEarPos, 2.0f, 8, earColor, earColor, TRUE);
-    DrawSphere3D(rightEarPos, 2.0f, 8, earColor, earColor, TRUE);
+    VECTOR leftEarPos  = VAdd(headPos, VAdd(VScale(right, -4.0f), VGet(0.0f, 4.8f, 0.0f)));
+    VECTOR rightEarPos = VAdd(headPos, VAdd(VScale(right, 4.0f), VGet(0.0f, 4.8f, 0.0f)));
+    DrawSphere3D(leftEarPos, 3.2f, 8, earColor, earColor, TRUE);
+    DrawSphere3D(rightEarPos, 3.2f, 8, earColor, earColor, TRUE);
 
     // 4. 目
-    VECTOR leftEyePos  = VAdd(headPos, VAdd(VScale(forward, 2.8f), VAdd(VScale(right, -1.5f), VGet(0.0f, 1.0f, 0.0f))));
-    VECTOR rightEyePos = VAdd(headPos, VAdd(VScale(forward, 2.8f), VAdd(VScale(right, 1.5f), VGet(0.0f, 1.0f, 0.0f))));
-    DrawSphere3D(leftEyePos, 0.8f, 6, eyeColor, eyeColor, TRUE);
-    DrawSphere3D(rightEyePos, 0.8f, 6, eyeColor, eyeColor, TRUE);
+    VECTOR leftEyePos  = VAdd(headPos, VAdd(VScale(forward, 4.2f), VAdd(VScale(right, -2.4f), VGet(0.0f, 1.5f, 0.0f))));
+    VECTOR rightEyePos = VAdd(headPos, VAdd(VScale(forward, 4.2f), VAdd(VScale(right, 2.4f), VGet(0.0f, 1.5f, 0.0f))));
+    DrawSphere3D(leftEyePos, 1.3f, 6, eyeColor, eyeColor, TRUE);
+    DrawSphere3D(rightEyePos, 1.3f, 6, eyeColor, eyeColor, TRUE);
 
     // 5. 尻尾
-    VECTOR tailBase = VSub(bodyPos, VScale(forward, 4.0f));
-    VECTOR tailTip  = VAdd(tailBase, VAdd(VScale(forward, -4.5f), VGet(0.0f, 2.0f + std::sin(animTime * 15.0f) * 1.5f, 0.0f)));
-    DrawCapsule3D(tailBase, tailTip, 1.0f, 6, earColor, earColor, TRUE);
+    VECTOR tailBase = VSub(bodyPos, VScale(forward, 6.5f));
+    VECTOR tailTip  = VAdd(tailBase, VAdd(VScale(forward, -7.0f), VGet(0.0f, 3.0f + std::sin(animTime * 15.0f) * 2.0f, 0.0f)));
+    DrawCapsule3D(tailBase, tailTip, 1.6f, 6, earColor, earColor, TRUE);
 }
 
 void ModelManager::DrawFallbackFastMouse(const VECTOR& pos, float rotY, float animTime) {
@@ -170,32 +170,32 @@ void ModelManager::DrawFallbackFastMouse(const VECTOR& pos, float rotY, float an
     VECTOR right   = VGet(cosR, 0.0f, -sinR);
 
     // 1. 体
-    VECTOR bodyPos = VGet(pos.x, pos.y + 4.2f, pos.z);
-    DrawSphere3D(bodyPos, 4.2f, 12, bodyColor, bodyColor, TRUE);
+    VECTOR bodyPos = VGet(pos.x, pos.y + 6.5f, pos.z);
+    DrawSphere3D(bodyPos, 6.8f, 12, bodyColor, bodyColor, TRUE);
 
     // 2. 頭部
-    VECTOR headPos = VAdd(bodyPos, VScale(forward, 3.8f));
-    DrawSphere3D(headPos, 3.2f, 12, bodyColor, bodyColor, TRUE);
+    VECTOR headPos = VAdd(bodyPos, VScale(forward, 5.8f));
+    DrawSphere3D(headPos, 5.0f, 12, bodyColor, bodyColor, TRUE);
 
     // 3. 耳
-    VECTOR leftEarPos  = VAdd(headPos, VAdd(VScale(right, -2.2f), VGet(0.0f, 2.8f, 0.0f)));
-    VECTOR rightEarPos = VAdd(headPos, VAdd(VScale(right, 2.2f), VGet(0.0f, 2.8f, 0.0f)));
-    DrawSphere3D(leftEarPos, 1.8f, 8, earColor, earColor, TRUE);
-    DrawSphere3D(rightEarPos, 1.8f, 8, earColor, earColor, TRUE);
+    VECTOR leftEarPos  = VAdd(headPos, VAdd(VScale(right, -3.5f), VGet(0.0f, 4.5f, 0.0f)));
+    VECTOR rightEarPos = VAdd(headPos, VAdd(VScale(right, 3.5f), VGet(0.0f, 4.5f, 0.0f)));
+    DrawSphere3D(leftEarPos, 2.8f, 8, earColor, earColor, TRUE);
+    DrawSphere3D(rightEarPos, 2.8f, 8, earColor, earColor, TRUE);
 
     // 4. 目（赤く光る）
-    VECTOR leftEyePos  = VAdd(headPos, VAdd(VScale(forward, 2.6f), VAdd(VScale(right, -1.3f), VGet(0.0f, 0.9f, 0.0f))));
-    VECTOR rightEyePos = VAdd(headPos, VAdd(VScale(forward, 2.6f), VAdd(VScale(right, 1.3f), VGet(0.0f, 0.9f, 0.0f))));
-    DrawSphere3D(leftEyePos, 0.9f, 6, eyeColor, eyeColor, TRUE);
-    DrawSphere3D(rightEyePos, 0.9f, 6, eyeColor, eyeColor, TRUE);
+    VECTOR leftEyePos  = VAdd(headPos, VAdd(VScale(forward, 4.0f), VAdd(VScale(right, -2.0f), VGet(0.0f, 1.4f, 0.0f))));
+    VECTOR rightEyePos = VAdd(headPos, VAdd(VScale(forward, 4.0f), VAdd(VScale(right, 2.0f), VGet(0.0f, 1.4f, 0.0f))));
+    DrawSphere3D(leftEyePos, 1.4f, 6, eyeColor, eyeColor, TRUE);
+    DrawSphere3D(rightEyePos, 1.4f, 6, eyeColor, eyeColor, TRUE);
 
     // 5. 尻尾
-    VECTOR tailBase = VSub(bodyPos, VScale(forward, 3.8f));
-    VECTOR tailTip  = VAdd(tailBase, VAdd(VScale(forward, -5.0f), VGet(0.0f, 2.5f + std::sin(animTime * 20.0f) * 2.0f, 0.0f)));
-    DrawCapsule3D(tailBase, tailTip, 1.0f, 6, earColor, earColor, TRUE);
+    VECTOR tailBase = VSub(bodyPos, VScale(forward, 6.0f));
+    VECTOR tailTip  = VAdd(tailBase, VAdd(VScale(forward, -7.5f), VGet(0.0f, 3.8f + std::sin(animTime * 20.0f) * 3.0f, 0.0f)));
+    DrawCapsule3D(tailBase, tailTip, 1.6f, 6, earColor, earColor, TRUE);
 
     // 高速移動スピードエフェクトライン
-    VECTOR backPos = VSub(pos, VScale(forward, 7.0f));
+    VECTOR backPos = VSub(pos, VScale(forward, 11.0f));
     DrawLine3D(pos, backPos, GetColor(255, 230, 100));
 }
 

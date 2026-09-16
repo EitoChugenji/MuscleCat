@@ -93,7 +93,7 @@ void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDis
 // NormalMouse3D 実装
 // ============================================================================
 NormalMouse3D::NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
-    : MouseBase3D(pos, 8.0f, ObjectType::NormalMouse, 2.4f)
+    : MouseBase3D(pos, 12.0f, ObjectType::NormalMouse, 2.4f)
     , m_targetPlayer(player) {
 }
 
@@ -149,7 +149,7 @@ void NormalMouse3D::Draw3D() {
 // FastMouse3D 実装
 // ============================================================================
 FastMouse3D::FastMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
-    : MouseBase3D(pos, 7.5f, ObjectType::FastMouse, 2.2f)
+    : MouseBase3D(pos, 11.0f, ObjectType::FastMouse, 2.2f)
     , m_targetPlayer(player) {
 }
 

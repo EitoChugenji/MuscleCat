@@ -9,7 +9,7 @@
 #include <cstdlib>
 
 Player3D::Player3D(const VECTOR& pos)
-    : GameObject3D(pos, 12.0f, ObjectType::Player)
+    : GameObject3D(pos, 18.0f, ObjectType::Player)
     , m_speed(SPEED_INITIAL)
     , m_state(MuscleState::Normal)
     , m_repCount(0)
@@ -167,11 +167,12 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
                     m_isSkillChecking = true;
                     m_scCursor = 0.0f;
                     m_wasDecayed = false;
+                    m_scStoppedTimer = 0;
 
-                    // 難易度に応じたゾーン設定（Rep数が増えるほどゾーンが狭く・速くなる）
-                    float zoneWidth = 0.30f - static_cast<float>(m_repCount) * 0.02f;
-                    if (zoneWidth < 0.12f) zoneWidth = 0.12f;
-                    m_scZoneStart = 0.45f + static_cast<float>(rand() % 25) / 100.0f;
+                    // 難易度を緩和（初期ゾーン幅を0.38fと大幅に広くし、高Repでも最低0.20fを保証）
+                    float zoneWidth = 0.38f - static_cast<float>(m_repCount) * 0.02f;
+                    if (zoneWidth < 0.20f) zoneWidth = 0.20f;
+                    m_scZoneStart = 0.40f + static_cast<float>(rand() % 20) / 100.0f;
                     if (m_scZoneStart + zoneWidth > 0.95f) {
                         m_scZoneStart = 0.95f - zoneWidth;
                     }
@@ -181,35 +182,50 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
                 // ============================================================
                 // スキルチェックQTE実行中（針の移動とタイミング判定）
                 // ============================================================
-                float cursorSpeed = 0.022f + static_cast<float>(m_repCount) * 0.003f;
-                m_scCursor += cursorSpeed;
+                if (m_scStoppedTimer > 0) {
+                    // ★ キーを押した瞬間に針をピタッと止めて確認できる演出（約0.3秒）
+                    m_scStoppedTimer--;
+                    if (m_scStoppedTimer <= 0) {
+                        m_isSkillChecking = false;
+                        if (!m_lastResultSuccess) {
+                            m_state = MuscleState::Soreness;
+                            m_sorenessTimer = 300; // 5秒
+                            m_repCount = 0;
+                            m_resultShowTimer = 90;
+                        }
+                    }
+                } else {
+                    // 基本速度は押しやすい0.014f、レベル（Rep）が上がるごとに約1.2倍ずつ速くなる
+                    float speedMultiplier = std::pow(1.20f, static_cast<float>(m_repCount));
+                    if (speedMultiplier > 2.8f) speedMultiplier = 2.8f; // 上限リミット
+                    float cursorSpeed = 0.014f * speedMultiplier;
+                    m_scCursor += cursorSpeed;
 
-                if (isTriggerJustPressed) {
-                    // タイミング判定
-                    if (m_scCursor >= m_scZoneStart && m_scCursor <= m_scZoneEnd) {
-                        // 【成功】Rep追加 & 10秒タイマーリセット
-                        m_repCount++;
-                        m_pumpDecayTimer = 600; // 10秒
-                        m_isSkillChecking = false;
-                        m_lastResultSuccess = true;
-                        m_resultShowTimer = 60;
-                    } else {
-                        // 【失敗】筋肉痛ペナルティ (5秒停止)
-                        m_isSkillChecking = false;
-                        m_state = MuscleState::Soreness;
-                        m_sorenessTimer = 300; // 5秒
-                        m_repCount = 0;
+                    if (isTriggerJustPressed) {
+                        // ★ キーを押した瞬間の座標で即座にピタッと止める
+                        if (m_scCursor > 1.0f) m_scCursor = 1.0f;
+
+                        // タイミング判定
+                        if (m_scCursor >= m_scZoneStart && m_scCursor <= m_scZoneEnd) {
+                            // 【成功】Rep追加 & 10秒タイマーリセット
+                            m_repCount++;
+                            m_pumpDecayTimer = 600; // 10秒
+                            m_lastResultSuccess = true;
+                            m_resultShowTimer = 60;
+                            m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
+                        } else {
+                            // 【失敗】針を止めて位置を確認させてから筋肉痛へ
+                            m_lastResultSuccess = false;
+                            m_resultShowTimer = 90;
+                            m_scStoppedTimer = 22; // 約0.36秒間針を止めて失敗位置を表示
+                        }
+                    } else if (m_scCursor >= 1.0f) {
+                        // 【タイムアウト見逃し失敗】
+                        m_scCursor = 1.0f;
                         m_lastResultSuccess = false;
                         m_resultShowTimer = 90;
+                        m_scStoppedTimer = 18;
                     }
-                } else if (m_scCursor >= 1.0f) {
-                    // 【タイムアウト見逃し失敗】
-                    m_isSkillChecking = false;
-                    m_state = MuscleState::Soreness;
-                    m_sorenessTimer = 300;
-                    m_repCount = 0;
-                    m_lastResultSuccess = false;
-                    m_resultShowTimer = 90;
                 }
             }
         }
@@ -258,12 +274,24 @@ void Player3D::Draw2D() {
         int zoneX2 = barX + static_cast<int>(m_scZoneEnd * barW);
         DrawBox(zoneX1, barY, zoneX2, barY + barH, GetColor(60, 220, 90), TRUE);
 
-        // 針（赤色）
+        // 針（通常時は赤、停止確定時は判定結果色）
         int cursorX = barX + static_cast<int>(m_scCursor * barW);
-        DrawBox(cursorX - 3, barY - 6, cursorX + 3, barY + barH + 6, GetColor(255, 60, 60), TRUE);
+        unsigned int needleColor = GetColor(255, 60, 60);
+        if (m_scStoppedTimer > 0) {
+            needleColor = m_lastResultSuccess ? GetColor(255, 255, 50) : GetColor(255, 40, 40);
+        }
+        DrawBox(cursorX - 4, barY - 8, cursorX + 4, barY + barH + 8, needleColor, TRUE);
 
         // ガイドテキスト
-        DrawStringToHandle(barX + 60, barY - 28, "緑のゾーンで [SPACE] を押せ！", GetColor(255, 240, 80), font16);
+        if (m_scStoppedTimer > 0) {
+            if (m_lastResultSuccess) {
+                DrawStringToHandle(barX + 110, barY - 28, "★ NICE PUMP!! ★", GetColor(255, 240, 60), font18);
+            } else {
+                DrawStringToHandle(barX + 120, barY - 28, "× MISS! ×", GetColor(255, 80, 80), font18);
+            }
+        } else {
+            DrawStringToHandle(barX + 60, barY - 28, "緑のゾーンで [SPACE] を押せ！", GetColor(255, 240, 80), font16);
+        }
     }
 
     // ------------------------------------------------------------------------

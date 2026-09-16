@@ -48,6 +48,7 @@ private:
     int   m_resultShowTimer = 0;
     bool  m_lastResultSuccess = false;
     bool  m_wasDecayed = false;
+    int   m_scStoppedTimer = 0;      // キーを押した瞬間に針を止めて結果を見せる演出タイマー
 
     // 飛びつき（Pounce）関連
     bool   m_isPouncing = false;
