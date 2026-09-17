@@ -44,11 +44,19 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
     if (m_resultShowTimer > 0) {
         m_resultShowTimer--;
     }
-    if (m_pounceCooldown > 0) {
-        m_pounceCooldown--;
-    }
-    if (m_tackleCooldown > 0) {
-        m_tackleCooldown--;
+    if (m_cheatNoCooldown) {
+        m_pounceCooldown = 0;
+        m_tackleCooldown = 0;
+        m_stunTimer = 0;
+        m_sorenessTimer = 0;
+        m_pumpDecayTimer = PUMP_DECAY_FRAMES;
+    } else {
+        if (m_pounceCooldown > 0) {
+            m_pounceCooldown--;
+        }
+        if (m_tackleCooldown > 0) {
+            m_tackleCooldown--;
+        }
     }
 
     // 残像トレイルのフェードアウト処理
@@ -138,7 +146,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
                 m_speed = SPEED_INITIAL;
             }
         } else {
-            // ★【10秒間何もしなければ 0 Rep に戻る減衰処理】
+            // ★【15秒間何もしなければ 0 Rep に戻る減衰処理】
             if (m_repCount > 0 && !m_isSkillChecking) {
                 if (--m_pumpDecayTimer <= 0) {
                     m_pumpDecayTimer = 0;
@@ -151,7 +159,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
             }
 
             if (m_repCount > 0) {
-                m_speed = SPEED_INITIAL + static_cast<float>(m_repCount) * 0.15f;
+                m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.15f;
                 m_state = MuscleState::Muscular;
             } else {
                 m_speed = SPEED_INITIAL;
@@ -292,9 +300,9 @@ void Player3D::UpdateWithCamera(const Camera3D& camera) {
 
                         // タイミング判定
                         if (m_scCursor >= m_scZoneStart && m_scCursor <= m_scZoneEnd) {
-                            // 【成功】Rep追加 & 10秒タイマーリセット
+                            // 【成功】Rep追加 & 15秒タイマーリセット
                             m_repCount++;
-                            m_pumpDecayTimer = 600; // 10秒
+                            m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒
                             m_lastResultSuccess = true;
                             m_resultShowTimer = 60;
                             m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
@@ -364,13 +372,49 @@ void Player3D::Draw3D() {
             m_pos, m_rotY, m_repCount, isSoreness, (m_isPouncing || m_isTackling), m_animTime);
     }
 
-    // 3. タックル突進オーラエフェクト
-    if (m_isTackling) {
-        float r = GetTackleRadius();
-        DrawSphere3D(VGet(m_pos.x, m_pos.y + 15.0f, m_pos.z), r, 12, GetColor(255, 160, 40), GetColor(255, 220, 80), FALSE);
+    // 3. バカゲー風コミカル・マッスル湯気＆マッチョオーラ（3D）
+    if (m_state == MuscleState::Muscular && m_repCount > 0) {
+        // コミカルな白い湯気（肩や背中からポフポフ立ち昇る）
+        for (int i = 0; i < 4; ++i) {
+            float phase = m_animTime * 6.0f + static_cast<float>(i) * 1.57f;
+            float puffY = m_pos.y + 20.0f + std::fmod(phase * 12.0f, 24.0f);
+            float offsetX = std::sin(phase * 2.0f) * 10.0f;
+            float offsetZ = std::cos(phase * 2.0f) * 10.0f;
+            float puffRadius = 3.0f + std::fmod(phase * 4.0f, 6.0f);
+            int puffAlpha = static_cast<int>(180.0f * (1.0f - (puffY - m_pos.y - 20.0f) / 24.0f));
+            if (puffAlpha > 0) {
+                SetDrawBlendMode(DX_BLENDMODE_ALPHA, puffAlpha);
+                DrawSphere3D(VGet(m_pos.x + offsetX, puffY, m_pos.z + offsetZ), puffRadius, 8,
+                             GetColor(255, 255, 255), GetColor(240, 240, 255), TRUE);
+                SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+            }
+        }
+
+        // Lv15以上：バカゲー神マッスル黄金オーラ（激しいスパークリング）
+        if (m_repCount >= MAX_EFFECTIVE_REP) {
+            float auraR = 24.0f + std::sin(m_animTime * 15.0f) * 3.0f;
+            DrawSphere3D(VGet(m_pos.x, m_pos.y + 16.0f, m_pos.z), auraR, 10,
+                         GetColor(255, 215, 0), GetColor(255, 255, 100), FALSE);
+
+            // 四方に飛び散る黄金スパーク星
+            for (int k = 0; k < 6; ++k) {
+                float aAngle = m_animTime * 8.0f + static_cast<float>(k) * (MathHelper::PI / 3.0f);
+                float spkX = m_pos.x + std::cos(aAngle) * (auraR + 4.0f);
+                float spkZ = m_pos.z + std::sin(aAngle) * (auraR + 4.0f);
+                float spkY = m_pos.y + 12.0f + std::sin(aAngle * 3.0f) * 8.0f;
+                DrawSphere3D(VGet(spkX, spkY, spkZ), 2.5f, 6, GetColor(255, 240, 50), GetColor(255, 255, 180), TRUE);
+            }
+        }
     }
 
-    // 4. 猫のスタンエフェクト
+    // 4. タックル突進オーラエフェクト
+    if (m_isTackling) {
+        float r = GetTackleRadius();
+        DrawSphere3D(VGet(m_pos.x, m_pos.y + 15.0f, m_pos.z), r, 12, GetColor(255, 120, 20), GetColor(255, 220, 50), FALSE);
+        DrawSphere3D(VGet(m_pos.x, m_pos.y + 15.0f, m_pos.z), r * 0.7f, 10, GetColor(255, 180, 40), GetColor(255, 240, 100), FALSE);
+    }
+
+    // 5. 猫のスタンエフェクト
     DrawStunEffect();
 }
 
@@ -384,53 +428,66 @@ void Player3D::Draw2D() {
     // スキルチェックQTEバー（画面中央下部に表示）
     // ------------------------------------------------------------------------
     if (m_isSkillChecking) {
-        int barW = 320;
-        int barH = 26;
+        int barW = 340;
+        int barH = 30;
         int barX = (Config::SCREEN_WIDTH - barW) / 2;
-        int barY = Config::SCREEN_HEIGHT - 120;
+        int barY = Config::SCREEN_HEIGHT - 125;
 
-        // バー背景
-        DrawBox(barX - 4, barY - 4, barX + barW + 4, barY + barH + 4, GetColor(20, 20, 30), TRUE);
-        DrawBox(barX, barY, barX + barW, barY + barH, GetColor(60, 60, 70), TRUE);
+        // ポップな極太枠付きバー背景（バカゲー風）
+        DrawBox(barX - 6, barY - 6, barX + barW + 6, barY + barH + 6, GetColor(0, 0, 0), TRUE);
+        DrawBox(barX - 3, barY - 3, barX + barW + 3, barY + barH + 3, GetColor(255, 220, 50), TRUE);
+        DrawBox(barX, barY, barX + barW, barY + barH, GetColor(40, 40, 50), TRUE);
 
-        // 成功ゾーン（緑色）
+        // 成功ゾーン（ビビッドグリーン）
         int zoneX1 = barX + static_cast<int>(m_scZoneStart * barW);
         int zoneX2 = barX + static_cast<int>(m_scZoneEnd * barW);
-        DrawBox(zoneX1, barY, zoneX2, barY + barH, GetColor(60, 220, 90), TRUE);
+        DrawBox(zoneX1, barY, zoneX2, barY + barH, GetColor(40, 240, 100), TRUE);
+        DrawBox(zoneX1, barY, zoneX2, barY + barH, GetColor(255, 255, 255), FALSE);
 
-        // 針（通常時は赤、停止確定時は判定結果色）
+        // 針（通常時はビビッドレッド、停止確定時は判定結果色）
         int cursorX = barX + static_cast<int>(m_scCursor * barW);
-        unsigned int needleColor = GetColor(255, 60, 60);
+        unsigned int needleColor = GetColor(255, 40, 40);
         if (m_scStoppedTimer > 0) {
-            needleColor = m_lastResultSuccess ? GetColor(255, 255, 50) : GetColor(255, 40, 40);
+            needleColor = m_lastResultSuccess ? GetColor(255, 255, 50) : GetColor(255, 30, 30);
         }
-        DrawBox(cursorX - 4, barY - 8, cursorX + 4, barY + barH + 8, needleColor, TRUE);
+        DrawBox(cursorX - 5, barY - 10, cursorX + 5, barY + barH + 10, GetColor(0, 0, 0), TRUE);
+        DrawBox(cursorX - 3, barY - 8, cursorX + 3, barY + barH + 8, needleColor, TRUE);
 
         // ガイドテキスト
         if (m_scStoppedTimer > 0) {
             if (m_lastResultSuccess) {
-                DrawStringToHandle(barX + 110, barY - 28, "★ NICE PUMP!! ★", GetColor(255, 240, 60), font18);
+                DrawStringToHandle(barX + 90, barY - 32, "★ NICE PUMP!! ★", GetColor(255, 255, 50), font24);
             } else {
-                DrawStringToHandle(barX + 120, barY - 28, "× MISS! ×", GetColor(255, 80, 80), font18);
+                DrawStringToHandle(barX + 115, barY - 32, "× MISS! ×", GetColor(255, 60, 60), font24);
             }
         } else {
-            DrawStringToHandle(barX + 60, barY - 28, "緑のゾーンで [SPACE] を押せ！", GetColor(255, 240, 80), font16);
+            DrawStringToHandle(barX + 45, barY - 30, "緑のゾーンで [SPACE] をキメろ！", GetColor(255, 255, 80), font18);
         }
     }
 
     // ------------------------------------------------------------------------
-    // スキルチェック結果・筋肉痛・減衰通知テキスト
+    // スキルチェック結果・筋肉痛・減衰通知テキスト（バカゲー風ポップ装飾）
     // ------------------------------------------------------------------------
     if (m_resultShowTimer > 0) {
         int alpha = (m_resultShowTimer > 20) ? 255 : (m_resultShowTimer * 255 / 20);
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
 
         if (m_wasDecayed) {
-            DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 40, "10秒放置: 筋肉が減衰した！ (0 Rep)", GetColor(180, 180, 220), font18);
+            DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 140, Config::SCREEN_HEIGHT / 2 - 45,
+                               "15秒放置: 筋肉が減衰した！ (0 Rep)", GetColor(180, 200, 255), font18);
         } else if (m_state == MuscleState::Soreness) {
-            DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 140, Config::SCREEN_HEIGHT / 2 - 40, "FAIL! 筋肉痛で5秒間動けない！", GetColor(255, 70, 70), font24);
+            DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 160, Config::SCREEN_HEIGHT / 2 - 45,
+                               "FAIL! 筋肉痛で5秒間動けない！", GetColor(255, 70, 70), font24);
         } else if (m_lastResultSuccess) {
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 100, Config::SCREEN_HEIGHT / 2 - 40, GetColor(255, 220, 50), font24, "PUMP UP!! +1 REP (%d Rep)", m_repCount);
+            if (m_repCount >= MAX_EFFECTIVE_REP) {
+                DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 180, Config::SCREEN_HEIGHT / 2 - 45,
+                                         GetColor(255, 215, 0), font24,
+                                         "★ GOD MUSCLE MAX!! ★ +1 REP (Lv.%d)", m_repCount);
+            } else {
+                DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 45,
+                                         GetColor(255, 230, 40), font24,
+                                         "PUMP UP!! +1 REP (Lv.%d)", m_repCount);
+            }
         }
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
@@ -441,8 +498,8 @@ void Player3D::Draw2D() {
     if (m_stunTimer > 0) {
         int alpha = (m_stunTimer % 10 < 5) ? 255 : 180;
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
-        DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 130, Config::SCREEN_HEIGHT / 2 - 65, GetColor(255, 220, 40), font24, "★ STUNNED!! 残り%.1fs ★", GetCatStunRemainingSeconds());
-        DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 110, Config::SCREEN_HEIGHT / 2 - 35, "壁・家具に激突して気絶中！", GetColor(255, 240, 120), font16);
+        DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 140, Config::SCREEN_HEIGHT / 2 - 70, GetColor(255, 230, 40), font24, "★ STUNNED!! 残り%.1fs ★", GetCatStunRemainingSeconds());
+        DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 40, "壁・家具に激突して気絶中！", GetColor(255, 240, 120), font16);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 
@@ -462,4 +519,13 @@ void Player3D::Draw2D() {
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         }
     }
+}
+
+void Player3D::AddRep(int amount) {
+    m_repCount += amount;
+    m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒リセット
+    m_state = MuscleState::Muscular;
+    m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.15f;
+    m_lastResultSuccess = true;
+    m_resultShowTimer = 60;
 }

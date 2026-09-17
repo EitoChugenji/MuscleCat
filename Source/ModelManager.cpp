@@ -56,20 +56,23 @@ void ModelManager::DrawFallbackCat(const VECTOR& pos, float rotY, int repCount, 
     unsigned int dumbbellColor = GetColor(50, 50, 60);
 
     if (isSoreness) {
-        bodyColor = GetColor(100, 160, 230); // 筋肉痛: 青ざめた色
+        bodyColor = GetColor(90, 180, 255);  // 筋肉痛: コミカルな青ざめ水色
     } else if (isPouncing) {
-        bodyColor = GetColor(255, 90, 40);   // 飛びつき: 赤熱オレンジ
+        bodyColor = GetColor(255, 80, 20);   // 飛びつき: ド派手なフレイムレッド
+    } else if (repCount >= 15) {
+        bodyColor = GetColor(255, 220, 0);   // 15 Rep以上: カンスト神マッスルゴールド
     } else if (repCount >= 4) {
-        bodyColor = GetColor(255, 170, 40);  // 4 Rep以上: 黄金マッチョ
+        bodyColor = GetColor(255, 175, 20);  // 4 Rep以上: 黄金マッチョ
     } else if (repCount > 0) {
-        bodyColor = GetColor(250, 195, 120); // 1-3 Rep: パンプアップ色
+        bodyColor = GetColor(255, 195, 80);  // 1-3 Rep: パンプアップオレンジ
     } else {
-        bodyColor = GetColor(240, 200, 150); // 0 Rep: 通常の茶白猫色
+        bodyColor = GetColor(255, 210, 140); // 0 Rep: 明るいアニメ茶白猫
     }
 
-    // マッチョ度に応じたスケール増分
-    float muscleBonus = static_cast<float>(repCount) * 0.6f;
-    if (muscleBonus > 6.0f) muscleBonus = 6.0f;
+    // マッチョ度に応じたスケール増分（最大Lv15で頭打ち）
+    int effRep = (repCount > 15) ? 15 : repCount;
+    float muscleBonus = static_cast<float>(effRep) * 0.6f;
+    if (muscleBonus > 8.0f) muscleBonus = 8.0f;
 
     // 前方向ベクトル・右方向ベクトル計算
     float sinR = std::sin(rotY);
@@ -92,11 +95,16 @@ void ModelManager::DrawFallbackCat(const VECTOR& pos, float rotY, int repCount, 
     DrawCone3D(leftEarPos, VAdd(leftEarPos, VGet(0.0f, 7.0f, 0.0f)), 4.5f, 8, earColor, earColor, TRUE);
     DrawCone3D(rightEarPos, VAdd(rightEarPos, VGet(0.0f, 7.0f, 0.0f)), 4.5f, 8, earColor, earColor, TRUE);
 
-    // 4. 目
+    // 4. アニメ調のパッチリ目（黒目＋白ハイライト）
     VECTOR leftEyePos  = VAdd(headPos, VAdd(VScale(forward, 10.0f), VAdd(VScale(right, -4.0f), VGet(0.0f, 2.2f, 0.0f))));
     VECTOR rightEyePos = VAdd(headPos, VAdd(VScale(forward, 10.0f), VAdd(VScale(right, 4.0f), VGet(0.0f, 2.2f, 0.0f))));
-    DrawSphere3D(leftEyePos, 2.2f, 8, eyeColor, eyeColor, TRUE);
-    DrawSphere3D(rightEyePos, 2.2f, 8, eyeColor, eyeColor, TRUE);
+    DrawSphere3D(leftEyePos, 2.4f, 8, eyeColor, eyeColor, TRUE);
+    DrawSphere3D(rightEyePos, 2.4f, 8, eyeColor, eyeColor, TRUE);
+    // キラッと光るハイライト
+    VECTOR leftHi  = VAdd(leftEyePos, VAdd(VScale(forward, 1.0f), VGet(0.0f, 0.8f, 0.0f)));
+    VECTOR rightHi = VAdd(rightEyePos, VAdd(VScale(forward, 1.0f), VGet(0.0f, 0.8f, 0.0f)));
+    DrawSphere3D(leftHi, 0.9f, 6, GetColor(255, 255, 255), GetColor(255, 255, 255), TRUE);
+    DrawSphere3D(rightHi, 0.9f, 6, GetColor(255, 255, 255), GetColor(255, 255, 255), TRUE);
 
     // 5. マッチョな腕（両脇の力こぶ）
     float armArmOffset = 14.0f + muscleBonus * 1.5f;
@@ -260,9 +268,9 @@ void ModelManager::DrawFallbackStage(float halfW, float halfD, float wallH) {
     // ------------------------------------------------------------------------
     const float plankW = 25.0f; // フローリング板の幅
     const float plankL = 95.0f; // 板の長さ
-    unsigned int woodBase1 = GetColor(228, 192, 148); // 明るいオーク材
-    unsigned int woodBase2 = GetColor(218, 178, 134); // 木目バリエーション
-    unsigned int woodJoint = GetColor(185, 145, 105); // 板の目地ライン
+    unsigned int woodBase1 = GetColor(250, 222, 175); // 明るいアニメ調のゴールデンメープル
+    unsigned int woodBase2 = GetColor(240, 208, 158); // 木目バリエーション
+    unsigned int woodJoint = GetColor(190, 150, 105); // 板の目地ライン
 
     for (float x = -halfW; x < halfW; x += plankW) {
         float x2 = (x + plankW > halfW) ? halfW : (x + plankW);
@@ -292,12 +300,12 @@ void ModelManager::DrawFallbackStage(float halfW, float halfD, float wallH) {
     }
 
     // ------------------------------------------------------------------------
-    // 2. リビングの中央ラグマット（お部屋らしさを演出）
+    // 2. リビングの中央ラグマット（アニメ調のポップなパステルカラー）
     // ------------------------------------------------------------------------
     float rugW = 340.0f;
     float rugD = 240.0f;
-    unsigned int rugColor = GetColor(170, 205, 190);     // 優しいセージグリーン
-    unsigned int rugBorderColor = GetColor(245, 240, 225); // アイボリーのフチ
+    unsigned int rugColor = GetColor(120, 215, 210);       // 鮮やかなアニメ調ミントターコイズ
+    unsigned int rugBorderColor = GetColor(255, 235, 90);  // ポップなイエローのフチ
     VECTOR r0 = VGet(-rugW * 0.5f, 0.3f, -rugD * 0.5f);
     VECTOR r1 = VGet( rugW * 0.5f, 0.3f, -rugD * 0.5f);
     VECTOR r2 = VGet( rugW * 0.5f, 0.3f,  rugD * 0.5f);
@@ -310,11 +318,11 @@ void ModelManager::DrawFallbackStage(float halfW, float halfD, float wallH) {
     DrawLine3D(r3, r0, rugBorderColor);
 
     // ------------------------------------------------------------------------
-    // 3. お部屋の壁・巾木（ホワイト系クロスの腰壁と上品な木製巾木）
+    // 3. お部屋の壁・巾木（明るいアニメ調ホワイト壁）
     // ------------------------------------------------------------------------
-    unsigned int wallBaseColor = GetColor(246, 242, 235); // 落ち着いたアイボリーホワイトの壁
-    unsigned int skirtingBoardColor = GetColor(160, 115, 80); // 濃いブラウンの木製巾木
-    unsigned int wallTrimColor = GetColor(190, 150, 110);     // 笠木トリムライン
+    unsigned int wallBaseColor = GetColor(255, 252, 245); // 明るいアニメホワイト
+    unsigned int skirtingBoardColor = GetColor(180, 125, 75); // ポップな木製巾木
+    unsigned int wallTrimColor = GetColor(120, 80, 50);       // クッキリ枠線ライン
 
     float skirtH = 7.0f; // 巾木の高さ
 

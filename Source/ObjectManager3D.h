@@ -19,6 +19,7 @@ private:
     std::shared_ptr<Player3D>                  m_player;
     Stage3D                                    m_stage;
     int                                        m_caughtCount = 0;
+    bool                                       m_isTimeFrozen = false;
 
 public:
     ObjectManager3D() = default;
@@ -32,6 +33,13 @@ public:
 
     void AddObject(std::shared_ptr<GameObject3D> obj);
     void AddObstacle(std::shared_ptr<Obstacle3D> obs);
+
+    // デバッグチート用メソッド
+    void SetTimeFrozen(bool frozen) { m_isTimeFrozen = frozen; }
+    bool IsTimeFrozen() const { return m_isTimeFrozen; }
+    void ToggleTimeFrozen() { m_isTimeFrozen = !m_isTimeFrozen; }
+    void SpawnNormalMouse();
+    void SpawnFastMouse();
 
     void Update(const Camera3D& camera);
     void Draw3D();

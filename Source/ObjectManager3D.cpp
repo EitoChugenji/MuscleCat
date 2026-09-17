@@ -13,6 +13,7 @@ void ObjectManager3D::Clear() {
     m_obstacles.clear();
     m_player.reset();
     m_caughtCount = 0;
+    m_isTimeFrozen = false;
 }
 
 void ObjectManager3D::InitStage() {
@@ -31,16 +32,32 @@ void ObjectManager3D::AddObstacle(std::shared_ptr<Obstacle3D> obs) {
     m_obstacles.push_back(obs);
 }
 
+void ObjectManager3D::SpawnNormalMouse() {
+    float x = static_cast<float>(-380 + rand() % 760);
+    float z = static_cast<float>(100 + rand() % 220);
+    if (rand() % 2 == 0) z = -z;
+    AddObject(std::make_shared<NormalMouse3D>(VGet(x, 0.0f, z), m_player));
+}
+
+void ObjectManager3D::SpawnFastMouse() {
+    float x = static_cast<float>(-380 + rand() % 760);
+    float z = static_cast<float>(120 + rand() % 200);
+    if (rand() % 2 == 0) z = -z;
+    AddObject(std::make_shared<FastMouse3D>(VGet(x, 0.0f, z), m_player));
+}
+
 void ObjectManager3D::Update(const Camera3D& camera) {
     // プレイヤー更新（TPSカメラ基準）
     if (m_player && m_player->IsAlive()) {
         m_player->UpdateWithCamera(camera);
     }
 
-    // ネズミ等オブジェクト更新
-    for (auto& obj : m_objects) {
-        if (obj->IsAlive()) {
-            obj->Update();
+    // ネズミ等オブジェクト更新（時間停止中は更新スキップ）
+    if (!m_isTimeFrozen) {
+        for (auto& obj : m_objects) {
+            if (obj->IsAlive()) {
+                obj->Update();
+            }
         }
     }
 
@@ -86,6 +103,13 @@ void ObjectManager3D::Draw2D() {
     // 障害物の頭上UI
     for (auto& obs : m_obstacles) {
         obs->Draw2D();
+    }
+
+    // ネズミ等の2D UI（スタン頭上アイコン・残り時間表示等）
+    for (auto& obj : m_objects) {
+        if (obj->IsAlive()) {
+            obj->Draw2D();
+        }
     }
 
     // プレイヤーの2D UI（QTEバー、状態通知等）

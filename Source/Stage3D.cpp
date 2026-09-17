@@ -12,20 +12,20 @@ Stage3D::Stage3D()
 }
 
 void Stage3D::Init() {
-    // 画面クリア背景色（落ち着いた部屋の壁・室内トーン）
-    SetBackgroundColor(240, 235, 225);
+    // 画面クリア背景色（アニメ調の明るいパステルブルー・空色）
+    SetBackgroundColor(175, 218, 252);
 
-    // 3Dライティング設定（あたたかみのあるリビング風ライト）
+    // 3Dライティング設定（アニメ・セルルック風：明るい環境光と高コントラスト）
     SetUseLighting(TRUE);
-    SetGlobalAmbientLight(GetColorF(0.78f, 0.76f, 0.72f, 1.0f));
-    ChangeLightTypeDir(VGet(0.3f, -0.9f, 0.35f));
-    SetLightDifColor(GetColorF(1.0f, 0.98f, 0.92f, 1.0f));
-    SetLightSpcColor(GetColorF(0.4f, 0.4f, 0.35f, 1.0f));
+    SetGlobalAmbientLight(GetColorF(0.86f, 0.86f, 0.88f, 1.0f));
+    ChangeLightTypeDir(VGet(0.35f, -0.85f, 0.4f));
+    SetLightDifColor(GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
+    SetLightSpcColor(GetColorF(0.7f, 0.7f, 0.7f, 1.0f));
 
-    // フォグ設定（やわらかな室内の空気感）
+    // フォグ設定（アニメ調の澄んだ空気感）
     SetFogEnable(TRUE);
-    SetFogColor(240, 235, 225);
-    SetFogStartEnd(1400.0f, 3500.0f);
+    SetFogColor(175, 218, 252);
+    SetFogStartEnd(1800.0f, 4200.0f);
 }
 
 void Stage3D::Draw3D() {
