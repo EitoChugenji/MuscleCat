@@ -3,36 +3,56 @@
 #include "Common.h"
 #include <cmath>
 
-void ModelManager::Init() {
+void ModelManager::Init()
+{
     Release();
 }
 
-void ModelManager::Release() {
-    for (auto& pair : m_modelHandles) {
-        if (pair.second != -1) {
+void ModelManager::Release()
+{
+    for (auto& pair : m_modelHandles)
+    {
+        if (pair.second != -1)
+        {
             MV1DeleteModel(pair.second);
         }
     }
+
     m_modelHandles.clear();
 }
 
-int ModelManager::LoadModelHandle(const std::string& path) {
-    if (path.empty()) return -1;
+int ModelManager::LoadModelHandle(const std::string& path)
+{
+    if (path.empty())
+    {
+        return -1;
+    }
 
     auto it = m_modelHandles.find(path);
-    if (it != m_modelHandles.end()) {
+    if (it != m_modelHandles.end())
+    {
         return it->second;
     }
 
     // モデルファイル読み込み試行
     int handle = MV1LoadModel(path.c_str());
     m_modelHandles[path] = handle;
+
     return handle;
 }
 
-bool ModelManager::DrawModelIfLoaded(const std::string& path, const VECTOR& pos, float rotY, float scale, float rotX, float rotZ) {
+bool ModelManager::DrawModelIfLoaded(
+    const std::string& path,
+    const VECTOR& pos,
+    float rotY,
+    float scale,
+    float rotX,
+    float rotZ
+)
+{
     int handle = LoadModelHandle(path);
-    if (handle == -1) {
+    if (handle == -1)
+    {
         return false; // モデル未ロード/存在しないためフォールバック描画へ
     }
 
@@ -41,38 +61,58 @@ bool ModelManager::DrawModelIfLoaded(const std::string& path, const VECTOR& pos,
     MV1SetRotationXYZ(handle, VGet(rotX, rotY, rotZ));
     MV1SetScale(handle, VGet(scale, scale, scale));
     MV1DrawModel(handle);
+
     return true;
 }
 
-// ----------------------------------------------------------------------------
 // プロシージャル3Dフォールバック描画
-// ----------------------------------------------------------------------------
-
-void ModelManager::DrawFallbackCat(const VECTOR& pos, float rotY, int repCount, bool isSoreness, bool isPouncing, float animTime) {
+void ModelManager::DrawFallbackCat(
+    const VECTOR& pos,
+    float rotY,
+    int repCount,
+    bool isSoreness,
+    bool isPouncing,
+    float animTime
+)
+{
     // 猫の基本カラー設定（Rep数・筋肉痛・飛びつきで変化）
     unsigned int bodyColor;
     unsigned int earColor = GetColor(255, 180, 190);
     unsigned int eyeColor = GetColor(20, 20, 20);
     unsigned int dumbbellColor = GetColor(50, 50, 60);
 
-    if (isSoreness) {
+    if (isSoreness)
+    {
         bodyColor = GetColor(90, 180, 255);  // 筋肉痛: コミカルな青ざめ水色
-    } else if (isPouncing) {
+    }
+    else if (isPouncing)
+    {
         bodyColor = GetColor(255, 80, 20);   // 飛びつき: ド派手なフレイムレッド
-    } else if (repCount >= 15) {
+    }
+    else if (repCount >= 15)
+    {
         bodyColor = GetColor(255, 220, 0);   // 15 Rep以上: カンスト神マッスルゴールド
-    } else if (repCount >= 4) {
+    }
+    else if (repCount >= 4)
+    {
         bodyColor = GetColor(255, 175, 20);  // 4 Rep以上: 黄金マッチョ
-    } else if (repCount > 0) {
+    }
+    else if (repCount > 0)
+    {
         bodyColor = GetColor(255, 195, 80);  // 1-3 Rep: パンプアップオレンジ
-    } else {
+    }
+    else
+    {
         bodyColor = GetColor(255, 210, 140); // 0 Rep: 明るいアニメ茶白猫
     }
 
     // マッチョ度に応じたスケール増分（最大Lv15で頭打ち）
     int effRep = (repCount > 15) ? 15 : repCount;
     float muscleBonus = static_cast<float>(effRep) * 0.6f;
-    if (muscleBonus > 8.0f) muscleBonus = 8.0f;
+    if (muscleBonus > 8.0f)
+    {
+        muscleBonus = 8.0f;
+    }
 
     // 前方向ベクトル・右方向ベクトル計算
     float sinR = std::sin(rotY);
@@ -100,6 +140,7 @@ void ModelManager::DrawFallbackCat(const VECTOR& pos, float rotY, int repCount, 
     VECTOR rightEyePos = VAdd(headPos, VAdd(VScale(forward, 10.0f), VAdd(VScale(right, 4.0f), VGet(0.0f, 2.2f, 0.0f))));
     DrawSphere3D(leftEyePos, 2.4f, 8, eyeColor, eyeColor, TRUE);
     DrawSphere3D(rightEyePos, 2.4f, 8, eyeColor, eyeColor, TRUE);
+
     // キラッと光るハイライト
     VECTOR leftHi  = VAdd(leftEyePos, VAdd(VScale(forward, 1.0f), VGet(0.0f, 0.8f, 0.0f)));
     VECTOR rightHi = VAdd(rightEyePos, VAdd(VScale(forward, 1.0f), VGet(0.0f, 0.8f, 0.0f)));
@@ -115,7 +156,8 @@ void ModelManager::DrawFallbackCat(const VECTOR& pos, float rotY, int repCount, 
     DrawSphere3D(rightArmPos, 7.0f + muscleBonus * 0.9f, 12, bodyColor, bodyColor, TRUE);
 
     // ダンベル所持（マッチョ時）
-    if (repCount > 0) {
+    if (repCount > 0)
+    {
         DrawCapsule3D(VAdd(leftArmPos, VGet(0.0f, -8.0f, 0.0f)), VAdd(leftArmPos, VGet(0.0f, 8.0f, 0.0f)), 4.2f, 8, dumbbellColor, dumbbellColor, TRUE);
         DrawCapsule3D(VAdd(rightArmPos, VGet(0.0f, -8.0f, 0.0f)), VAdd(rightArmPos, VGet(0.0f, 8.0f, 0.0f)), 4.2f, 8, dumbbellColor, dumbbellColor, TRUE);
     }
@@ -126,10 +168,12 @@ void ModelManager::DrawFallbackCat(const VECTOR& pos, float rotY, int repCount, 
     DrawCapsule3D(tailBase, tailTip, 3.5f, 8, bodyColor, bodyColor, TRUE);
 
     // 飛びつき時オーラエフェクト
-    if (isPouncing) {
+    if (isPouncing)
+    {
         DrawSphere3D(bodyPos, bodyRadius * 1.6f, 12, GetColor(255, 120, 0), GetColor(255, 200, 0), FALSE);
     }
 }
+
 
 void ModelManager::DrawFallbackNormalMouse(const VECTOR& pos, float rotY, float animTime) {
     unsigned int bodyColor = GetColor(160, 160, 170); // 灰色

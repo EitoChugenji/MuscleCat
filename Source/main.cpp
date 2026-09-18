@@ -6,10 +6,9 @@
 #include <cstdlib>
 #include <ctime>
 
-// ============================================================================
 // メイン関数 (WinMain)
-// ============================================================================
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow) {
+int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
+{
     srand(static_cast<unsigned int>(time(nullptr)));
 
     // 文字コード形式をUTF-8に設定
@@ -25,7 +24,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SetMainWindowText(Config::TITLE);
 
     // DxLibの初期化
-    if (DxLib_Init() == -1) {
+    if (DxLib_Init() == -1)
+    {
         return -1;
     }
 
@@ -53,8 +53,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     const LONGLONG targetFrameMicroseconds = 1000000 / 60; // 16666μs
 
     // メインループ
-    while (ProcessMessage() == 0 && ClearDrawScreen() == 0) {
-        if (CheckHitKey(KEY_INPUT_ESCAPE)) {
+    while (ProcessMessage() == 0 && ClearDrawScreen() == 0)
+    {
+        if (CheckHitKey(KEY_INPUT_ESCAPE))
+        {
             break;
         }
 
@@ -73,14 +75,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         ScreenFlip();
 
         // 60FPSフレーム調停
-        while (GetNowHiPerformanceCount() - prevFrameTime < targetFrameMicroseconds) {
+        while (GetNowHiPerformanceCount() - prevFrameTime < targetFrameMicroseconds)
+        {
             LONGLONG remain = targetFrameMicroseconds - (GetNowHiPerformanceCount() - prevFrameTime);
-            if (remain > 2000) {
+
+            if (remain > 2000)
+            {
                 Sleep(1);
-            } else {
+            }
+            
+            else
+            {
                 Sleep(0);
             }
         }
+
         prevFrameTime = GetNowHiPerformanceCount();
     }
 

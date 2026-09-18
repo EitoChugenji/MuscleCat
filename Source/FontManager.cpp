@@ -1,7 +1,8 @@
 #include "FontManager.h"
 #include "DxLib.h"
 
-void FontManager::Init() {
+void FontManager::Init()
+{
     Release();
 
     m_font13 = CreateFontToHandle("MS Gothic", 13, 1, DX_FONTTYPE_NORMAL);
@@ -12,11 +13,41 @@ void FontManager::Init() {
     m_font48 = CreateFontToHandle("MS Gothic", 48, 5, DX_FONTTYPE_NORMAL);
 }
 
-void FontManager::Release() {
-    if (m_font13 != -1) { DeleteFontToHandle(m_font13); m_font13 = -1; }
-    if (m_font16 != -1) { DeleteFontToHandle(m_font16); m_font16 = -1; }
-    if (m_font18 != -1) { DeleteFontToHandle(m_font18); m_font18 = -1; }
-    if (m_font24 != -1) { DeleteFontToHandle(m_font24); m_font24 = -1; }
-    if (m_font36 != -1) { DeleteFontToHandle(m_font36); m_font36 = -1; }
-    if (m_font48 != -1) { DeleteFontToHandle(m_font48); m_font48 = -1; }
+void FontManager::Release()
+{
+    if (m_font13 != -1)
+    {
+        DeleteFontToHandle(m_font13);
+        m_font13 = -1;
+    }
+
+    if (m_font16 != -1)
+    {
+        DeleteFontToHandle(m_font16);
+        m_font16 = -1;
+    }
+
+    if (m_font18 != -1)
+    {
+        DeleteFontToHandle(m_font18);
+        m_font18 = -1;
+    }
+
+    if (m_font24 != -1)
+    {
+        DeleteFontToHandle(m_font24);
+        m_font24 = -1;
+    }
+
+    if (m_font36 != -1)
+    {
+        DeleteFontToHandle(m_font36);
+        m_font36 = -1;
+    }
+
+    if (m_font48 != -1)
+    {
+        DeleteFontToHandle(m_font48);
+        m_font48 = -1;
+    }
 }

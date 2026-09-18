@@ -2,10 +2,9 @@
 #include "DxLib.h"
 #include <string>
 
-// ============================================================================
 // 3Dステージ管理クラス
-// ============================================================================
-class Stage3D {
+class Stage3D
+{
 private:
     float m_halfWidth;
     float m_halfDepth;
@@ -22,6 +21,13 @@ public:
     // プレイヤーやネズミがステージ外壁を越えないよう押し戻す
     bool ClampToBounds(VECTOR& outPos, float radius) const;
 
-    float GetHalfWidth() const { return m_halfWidth; }
-    float GetHalfDepth() const { return m_halfDepth; }
+    float GetHalfWidth() const
+    {
+        return m_halfWidth;
+    }
+    
+    float GetHalfDepth() const
+    {
+        return m_halfDepth;
+    }
 };

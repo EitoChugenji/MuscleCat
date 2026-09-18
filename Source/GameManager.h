@@ -2,19 +2,17 @@
 #include "ObjectManager3D.h"
 #include "Camera3D.h"
 
-// ============================================================================
 // ゲーム状態定義
-// ============================================================================
-enum class GameState {
+enum class GameState
+{
     Title,
     Playing,
     GameClear
 };
 
-// ============================================================================
 // GameManager クラス
-// ============================================================================
-class GameManager {
+class GameManager
+{
 private:
     ObjectManager3D m_objManager;
     Camera3D        m_camera;
@@ -56,5 +54,8 @@ public:
     void Update();
     void Draw();
 
-    void SetFrameProcessTime(float ms) { m_frameProcessTimeMs = ms; }
+    void SetFrameProcessTime(float ms)
+    {
+        m_frameProcessTimeMs = ms;
+    }
 };
