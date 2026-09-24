@@ -153,36 +153,88 @@ public:
     float GetPounceSpeed() const
     {
         int eff = GetEffectiveRep();
-        if (eff <= 4) return 7.5f;
-        if (eff == 5) return 9.5f;
-        if (eff == 6) return 12.0f;
+
+        if (eff <= 4)
+        {
+            return 7.5f;
+        }
+
+        if (eff == 5)
+        {
+            return 9.5f;
+        }
+
+        if (eff == 6)
+        {
+            return 12.0f;
+        }
+
         return 14.0f + static_cast<float>(eff - 7) * 1.0f;
     }
 
     int GetPounceDuration() const
     {
         int eff = GetEffectiveRep();
-        if (eff <= 4) return 12;
-        if (eff == 5) return 14;
-        if (eff == 6) return 16;
+
+        if (eff <= 4)
+        {
+            return 12;
+        }
+
+        if (eff == 5)
+        {
+            return 14;
+        }
+
+        if (eff == 6)
+        {
+            return 16;
+        }
+
         return 18;
     }
 
     int GetPounceCooldownMax() const
     {
         int eff = GetEffectiveRep();
-        if (eff <= 4) return 72; // 1.2秒
-        if (eff == 5) return 60; // 1.0秒
-        if (eff == 6) return 54; // 0.9秒
-        return 48;               // 0.8秒
+
+        if (eff <= 4)
+        {
+            return 72; // 1.2秒
+        }
+
+        if (eff == 5)
+        {
+            return 60; // 1.0秒
+        }
+
+        if (eff == 6)
+        {
+            return 54; // 0.9秒
+        }
+
+        return 48; // 0.8秒
     }
 
     float GetPounceRadius() const
     {
         int eff = GetEffectiveRep();
-        if (eff <= 4) return 18.0f;
-        if (eff == 5) return 21.0f;
-        if (eff == 6) return 24.0f;
+
+        if (eff <= 4)
+        {
+            return 18.0f;
+        }
+
+        if (eff == 5)
+        {
+            return 21.0f;
+        }
+
+        if (eff == 6)
+        {
+            return 24.0f;
+        }
+
         return 28.0f;
     }
 

@@ -128,10 +128,25 @@ void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDis
             float wallNormalX = 0.0f;
             float wallNormalZ = 0.0f;
 
-            if (nearLeft)  wallNormalX += (wallMargin - leftDist) / wallMargin;
-            if (nearRight) wallNormalX -= (wallMargin - rightDist) / wallMargin;
-            if (nearBack)  wallNormalZ += (wallMargin - backDist) / wallMargin;
-            if (nearFront) wallNormalZ -= (wallMargin - frontDist) / wallMargin;
+            if (nearLeft)
+            {
+                wallNormalX += (wallMargin - leftDist) / wallMargin;
+            }
+
+            if (nearRight)
+            {
+                wallNormalX -= (wallMargin - rightDist) / wallMargin;
+            }
+
+            if (nearBack)
+            {
+                wallNormalZ += (wallMargin - backDist) / wallMargin;
+            }
+
+            if (nearFront)
+            {
+                wallNormalZ -= (wallMargin - frontDist) / wallMargin;
+            }
 
             // 壁に押し付けられている場合、壁に沿った接線方向に横滑り
             if (nearLeft || nearRight)
@@ -168,10 +183,25 @@ void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDis
         // プレイヤーが近くにいない時でも、壁に近づきすぎたら自然に中央へ方向転換
         if (nearWall)
         {
-            if (nearLeft && m_vx < 0.0f)   m_vx = std::abs(m_vx);
-            if (nearRight && m_vx > 0.0f)  m_vx = -std::abs(m_vx);
-            if (nearBack && m_vz < 0.0f)   m_vz = std::abs(m_vz);
-            if (nearFront && m_vz > 0.0f)  m_vz = -std::abs(m_vz);
+            if (nearLeft && m_vx < 0.0f)
+            {
+                m_vx = std::abs(m_vx);
+            }
+
+            if (nearRight && m_vx > 0.0f)
+            {
+                m_vx = -std::abs(m_vx);
+            }
+
+            if (nearBack && m_vz < 0.0f)
+            {
+                m_vz = std::abs(m_vz);
+            }
+
+            if (nearFront && m_vz > 0.0f)
+            {
+                m_vz = -std::abs(m_vz);
+            }
         }
     }
 }

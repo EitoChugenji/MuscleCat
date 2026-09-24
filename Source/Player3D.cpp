@@ -345,14 +345,22 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
                 {
                     // 基本速度は押しやすい0.014f、レベル（Rep）が上がるごとに約1.2倍ずつ速くなる
                     float speedMultiplier = std::pow(1.20f, static_cast<float>(m_repCount));
-                    if (speedMultiplier > 2.8f) speedMultiplier = 2.8f; // 上限リミット
+
+                    if (speedMultiplier > 2.8f)
+                    {
+                        speedMultiplier = 2.8f; // 上限リミット
+                    }
+
                     float cursorSpeed = 0.014f * speedMultiplier;
                     m_scCursor += cursorSpeed;
 
                     if (isTriggerJustPressed)
                     {
                         // キーを押した瞬間の座標で即座にピタッと止める
-                        if (m_scCursor > 1.0f) m_scCursor = 1.0f;
+                        if (m_scCursor > 1.0f)
+                        {
+                            m_scCursor = 1.0f;
+                        }
 
                         // タイミング判定
                         if (m_scCursor >= m_scZoneStart && m_scCursor <= m_scZoneEnd)
@@ -390,7 +398,10 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
 
 void Player3D::DrawStunEffect()
 {
-    if (!IsStunned()) return;
+    if (!IsStunned())
+    {
+        return;
+    }
 
     // 猫の頭上で回転する星・気絶マーク（大きな星と光輪）
     float headY = m_pos.y + 34.0f;
