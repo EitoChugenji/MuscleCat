@@ -3,6 +3,7 @@
 #include "ModelConfig.h"
 #include "ModelManager.h"
 #include "FontManager.h"
+#include "EffectManager.h"
 #include "Config.h"
 #include "DxLib.h"
 #include <cmath>
@@ -200,6 +201,10 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
                     m_isTackling = true;
                     m_tackleTimer = GetTackleDuration();
                     m_tackleDir = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+
+                    // Effekseer タックル衝撃波リングエフェクト再生
+                    EffectManager::GetInstance().PlayTackleEffect(m_pos, m_tackleDir);
+
                     return;
                 }
 
@@ -371,6 +376,9 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
                             m_lastResultSuccess = true;
                             m_resultShowTimer = 60;
                             m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
+
+                            // Effekseer 筋トレ成功パンプアップ光柱エフェクト再生
+                            EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
                         }
                         
                         else
@@ -394,6 +402,12 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
             }
         }
     }
+
+    // Effekseer マッスルオーラの更新（QTE筋トレ中またはパンプアップ状態）
+    bool auraActive = ((m_isSkillChecking || (m_state == MuscleState::Muscular && m_repCount > 0)) &&
+                       m_state != MuscleState::Soreness && m_stunTimer <= 0);
+
+    EffectManager::GetInstance().UpdateMuscleAura(m_pos, auraActive, m_repCount);
 }
 
 void Player3D::DrawStunEffect()
@@ -638,4 +652,7 @@ void Player3D::AddRep(int amount)
     m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.15f;
     m_lastResultSuccess = true;
     m_resultShowTimer = 60;
+
+    // 筋トレ成功パンプアップエフェクト再生
+    EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
 }

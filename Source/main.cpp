@@ -2,6 +2,7 @@
 #include "GameManager.h"
 #include "FontManager.h"
 #include "ModelManager.h"
+#include "EffectManager.h"
 #include "Config.h"
 #include <cstdlib>
 #include <ctime>
@@ -40,9 +41,10 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SetWriteZBuffer3D(TRUE);
     SetUseBackCulling(TRUE);
 
-    // フォント・モデルマネージャー初期化
+    // フォント・モデル・エフェクトマネージャー初期化
     FontManager::GetInstance().Init();
     ModelManager::GetInstance().Init();
+    EffectManager::GetInstance().Init();
 
     // ゲームマネージャー初期化
     GameManager game;
@@ -94,6 +96,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // リソース解放
+    EffectManager::GetInstance().Release();
     FontManager::GetInstance().Release();
     ModelManager::GetInstance().Release();
 

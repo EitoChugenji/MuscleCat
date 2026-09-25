@@ -3,6 +3,7 @@
 #include "Mouse3D.h"
 #include "Obstacle3D.h"
 #include "FontManager.h"
+#include "EffectManager.h"
 #include "ModelConfig.h"
 #include "Config.h"
 #include "Common.h"
@@ -76,6 +77,7 @@ void GameManager::SetupTitle()
 {
     m_state = GameState::Title;
     m_objManager.Clear();
+    EffectManager::GetInstance().StopMuscleAura();
 
     // タイトル画面：猫だけを生成（ネズミは配置しない）
     auto player = std::make_shared<Player3D>(VGet(0.0f, 0.0f, 0.0f));
@@ -88,6 +90,7 @@ void GameManager::SetupTitle()
 void GameManager::StartGame()
 {
     m_objManager.Clear();
+    EffectManager::GetInstance().StopMuscleAura();
 
     // プレイヤー生成（原点）
     auto player = std::make_shared<Player3D>(VGet(0.0f, 0.0f, 0.0f));
@@ -262,14 +265,22 @@ void GameManager::Update()
             SetupTitle();
         }
     }
+
+    // 3Dエフェクトの更新
+    EffectManager::GetInstance().Update();
 }
 
-void GameManager::Draw() {
+void GameManager::Draw()
+{
     // 1. 3Dシーンの描画 (Zバッファ有効)
     SetUseZBuffer3D(TRUE);
     SetWriteZBuffer3D(TRUE);
 
     m_objManager.Draw3D();
+
+    // Effekseer 3Dエフェクト描画
+    EffectManager::GetInstance().SyncCamera();
+    EffectManager::GetInstance().Draw3D();
 
     // 2. 2D HUD / UI描画 (Zバッファ無効)
     SetUseZBuffer3D(FALSE);

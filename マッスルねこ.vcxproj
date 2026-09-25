@@ -112,7 +112,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\student\Desktop\2年次制作\マッスルねこ\EffekseerForDXLib;C:\Users\student\Desktop\2年次制作\マッスルねこ\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source;C:\Users\student\Desktop\2年次制作\マッスルねこ\EffekseerForDXLib\プロジェクトに追加すべきファイル_VC用;C:\Users\student\Desktop\2年次制作\マッスルねこ\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/utf-8 /wd4828 /wd4010 %(AdditionalOptions)</AdditionalOptions>
@@ -120,7 +120,7 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\student\Desktop\2年次制作\マッスルねこ\EffekseerForDXLib;C:\Users\student\Desktop\2年次制作\マッスルねこ\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Users\student\Desktop\2年次制作\マッスルねこ\EffekseerForDXLib\プロジェクトに追加すべきファイル_VC用;C:\Users\student\Desktop\2年次制作\マッスルねこ\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -131,7 +131,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
-      <AdditionalIncludeDirectories>C:\Users\student\Desktop\2年次制作\マッスルねこ\EffekseerForDXLib;C:\Users\student\Desktop\2年次制作\マッスルねこ\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(ProjectDir)Source;C:\Users\student\Desktop\2年次制作\マッスルねこ\EffekseerForDXLib\プロジェクトに追加すべきファイル_VC用;C:\Users\student\Desktop\2年次制作\マッスルねこ\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <LanguageStandard>stdcpp17</LanguageStandard>
       <AdditionalOptions>/utf-8 /wd4828 /wd4010 %(AdditionalOptions)</AdditionalOptions>
@@ -139,13 +139,14 @@
     <Link>
       <SubSystem>Windows</SubSystem>
       <GenerateDebugInformation>true</GenerateDebugInformation>
-      <AdditionalLibraryDirectories>C:\Users\student\Desktop\2年次制作\マッスルねこ\EffekseerForDXLib;C:\Users\student\Desktop\2年次制作\マッスルねこ\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalLibraryDirectories>C:\Users\student\Desktop\2年次制作\マッスルねこ\EffekseerForDXLib\プロジェクトに追加すべきファイル_VC用;C:\Users\student\Desktop\2年次制作\マッスルねこ\DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Source\Camera3D.h" />
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\Config.h" />
+    <ClInclude Include="Source\EffectManager.h" />
     <ClInclude Include="Source\FontManager.h" />
     <ClInclude Include="Source\GameManager.h" />
     <ClInclude Include="Source\GameObject3D.h" />
@@ -159,6 +160,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Camera3D.cpp" />
+    <ClCompile Include="Source\EffectManager.cpp" />
     <ClCompile Include="Source\FontManager.cpp" />
     <ClCompile Include="Source\GameManager.cpp" />
     <ClCompile Include="Source\main.cpp" />
