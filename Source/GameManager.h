@@ -40,6 +40,7 @@ private:
     bool  m_prevKey3  = false;
     bool  m_prevKey4  = false;
     bool  m_prevKey5  = false;
+    bool  m_prevKey6  = false;
     int   m_prevUpdateTime = 0;
 
     void SetupTitle();

@@ -17,6 +17,102 @@ Player3D::Player3D(const VECTOR& pos)
     , m_pumpDecayTimer(0)
 {
     m_rotY = 0.0f;
+
+    // 3Dモデルおよびアニメーションの初期化
+    InitModel();
+}
+
+Player3D::~Player3D()
+{
+    if (m_modelHandle != -1)
+    {
+        MV1DeleteModel(m_modelHandle);
+        m_modelHandle = -1;
+    }
+}
+
+void Player3D::InitModel()
+{
+    // ベースモデルを読み込み、アニメーション個別制御用に複製
+    int baseHandle = ModelManager::GetInstance().LoadModelHandle(ModelConfig::CAT_MODEL_PATH);
+
+    if (baseHandle != -1)
+    {
+        m_modelHandle = MV1DuplicateModel(baseHandle);
+
+        if (m_modelHandle != -1)
+        {
+            // 初期状態はアイドルアニメーション（Armature|04_Idol: インデックス 3）
+            m_currentAnimIndex = 3;
+            m_attachAnimIndex = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, -1, FALSE);
+            m_animPlayTime = 0.0f;
+        }
+    }
+}
+
+void Player3D::UpdateAnimation(bool isMoving)
+{
+    if (m_modelHandle == -1)
+    {
+        return;
+    }
+
+    // 再生すべきアニメーションの判定
+    // 優先度1: 攻撃（飛びつき・タックル: インデックス 1）
+    // 優先度2: スクワット（筋トレQTE中: インデックス 2）
+    // 優先度3: 走り（移動中: インデックス 0）
+    // 優先度4: 待機（アイドル: インデックス 3）
+    int targetAnim = 3; // デフォルト: Idol
+    float playSpeed = 0.5f;
+
+    if (m_isPouncing || m_isTackling)
+    {
+        targetAnim = 1; // Armature|02_Attack
+        playSpeed = 1.0f;
+    }
+    
+    else if (m_isSkillChecking)
+    {
+        targetAnim = 2; // Armature|03_squat
+        playSpeed = 1.0f;
+    }
+    
+    else if (isMoving)
+    {
+        targetAnim = 0; // Armature|01_Run
+        playSpeed = 0.7f + (m_speed / SPEED_INITIAL) * 0.4f;
+    }
+
+    // アニメーションの切り替え判定
+    if (m_currentAnimIndex != targetAnim)
+    {
+        if (m_attachAnimIndex != -1)
+        {
+            MV1DetachAnim(m_modelHandle, m_attachAnimIndex);
+            m_attachAnimIndex = -1;
+        }
+
+        m_currentAnimIndex = targetAnim;
+        m_attachAnimIndex = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, -1, FALSE);
+        m_animPlayTime = 0.0f;
+    }
+
+    // アニメーション再生時間の進行
+    if (m_attachAnimIndex != -1)
+    {
+        float totalTime = MV1GetAnimTotalTime(m_modelHandle, m_currentAnimIndex);
+        m_animPlayTime += playSpeed;
+
+        if (totalTime > 0.0f)
+        {
+            while (m_animPlayTime >= totalTime)
+            {
+                m_animPlayTime -= totalTime;
+            }
+        }
+
+        MV1SetAttachAnimTime(m_modelHandle, m_attachAnimIndex, m_animPlayTime);
+    }
 }
 
 void Player3D::Update()
@@ -28,6 +124,8 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
 {
     m_animFrame++;
     m_animTime += 1.0f / 60.0f;
+
+    bool isMoving = false;
 
     // キー入力受付（筋トレ: SPACE/Z、飛びつき: SHIFT/X/C、タックル: E）
     bool currentTriggerKey = (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_Z));
@@ -288,6 +386,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
                 float inputLengthSq = moveDir.x * moveDir.x + moveDir.z * moveDir.z;
                 if (inputLengthSq > 0.0001f)
                 {
+                    isMoving = true;
                     float inputLen = std::sqrt(inputLengthSq);
                     moveDir.x /= inputLen;
                     moveDir.z /= inputLen;
@@ -408,6 +507,9 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
                        m_state != MuscleState::Soreness && m_stunTimer <= 0);
 
     EffectManager::GetInstance().UpdateMuscleAura(m_pos, auraActive, m_repCount);
+
+    // 3Dモデルのアニメーション更新
+    UpdateAnimation(isMoving);
 }
 
 void Player3D::DrawStunEffect()
@@ -418,9 +520,10 @@ void Player3D::DrawStunEffect()
     }
 
     // 猫の頭上で回転する星・気絶マーク（大きな星と光輪）
-    float headY = m_pos.y + 34.0f;
+    float currentScale = (m_modelHandle != -1) ? (ModelConfig::CAT_MODEL_SCALE + static_cast<float>(GetEffectiveRep()) * 0.0025f) : 0.06f;
+    float headY = (m_modelHandle != -1) ? (m_pos.y + 435.4f * currentScale + 8.0f) : (m_pos.y + 34.0f);
     float spinSpeed = m_animTime * 12.0f;
-    float ringRadius = 16.0f;
+    float ringRadius = (m_modelHandle != -1) ? (20.0f * (currentScale / 0.12f)) : 16.0f;
 
     // くるくる回る4つの星
     for (int i = 0; i < 4; ++i)
@@ -448,21 +551,53 @@ void Player3D::DrawStunEffect()
 
 void Player3D::Draw3D()
 {
+    // マッチョ度（Rep数）に応じたモデル拡大率の計算（レベル15上限まで徐々にマッチョ化）
+    float effectiveRep = static_cast<float>(GetEffectiveRep());
+    float scale = ModelConfig::CAT_MODEL_SCALE + effectiveRep * 0.0025f;
+
+    // 足元接地高さ補正（モデル原点が足元にあるためオフセット0で地面接地）
+    float offsetY = 0.0f;
+
     // 1. 飛びつき・タックル残像の描画
     for (const auto& trail : m_trails)
     {
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, trail.alpha);
-        ModelManager::GetInstance().DrawFallbackCat(trail.pos, trail.rotY, trail.repCount, false, true, m_animTime);
+
+        if (m_modelHandle != -1)
+        {
+            int effectiveTrailRep = (trail.repCount > MAX_EFFECTIVE_REP) ? MAX_EFFECTIVE_REP : trail.repCount;
+            float trailScale = ModelConfig::CAT_MODEL_SCALE + static_cast<float>(effectiveTrailRep) * 0.0025f;
+            float trailOffsetY = 0.0f;
+            VECTOR trailPos = VGet(trail.pos.x, trail.pos.y + trailOffsetY, trail.pos.z);
+
+            MV1SetPosition(m_modelHandle, trailPos);
+            MV1SetRotationXYZ(m_modelHandle, VGet(0.0f, trail.rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
+            MV1SetScale(m_modelHandle, VGet(trailScale, trailScale, trailScale));
+            MV1DrawModel(m_modelHandle);
+        }
+        
+        else
+        {
+            ModelManager::GetInstance().DrawFallbackCat(trail.pos, trail.rotY, trail.repCount, false, true, m_animTime);
+        }
+
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 
-    // 2. プレイヤー本体の描画（3Dモデルまたはフォールバック）
+    // 2. プレイヤー本体の描画（3Dアニメーションモデルまたはフォールバック）
     bool isSoreness = (m_state == MuscleState::Soreness);
-    if (!ModelManager::GetInstance().DrawModelIfLoaded
-        (
-        ModelConfig::CAT_MODEL_PATH, m_pos, m_rotY + ModelConfig::CAT_MODEL_ROT_Y,
-        ModelConfig::CAT_MODEL_SCALE
-        ))
+
+    if (m_modelHandle != -1)
+    {
+        VECTOR drawPos = VGet(m_pos.x, m_pos.y + offsetY, m_pos.z);
+
+        MV1SetPosition(m_modelHandle, drawPos);
+        MV1SetRotationXYZ(m_modelHandle, VGet(0.0f, m_rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
+        MV1SetScale(m_modelHandle, VGet(scale, scale, scale));
+        MV1DrawModel(m_modelHandle);
+    }
+    
+    else
     {
         ModelManager::GetInstance().DrawFallbackCat
         (
@@ -474,14 +609,18 @@ void Player3D::Draw3D()
     if (m_state == MuscleState::Muscular && m_repCount > 0)
     {
         // コミカルな白い湯気（肩や背中からポフポフ立ち昇る）
+        float shoulderBaseY = (m_modelHandle != -1) ? (m_pos.y + 310.0f * scale) : (m_pos.y + 20.0f);
+        float puffRangeY = 30.0f * (scale / 0.12f);
+        float puffRadiusBase = 4.0f * (scale / 0.12f);
+
         for (int i = 0; i < 4; ++i)
         {
             float phase = m_animTime * 6.0f + static_cast<float>(i) * 1.57f;
-            float puffY = m_pos.y + 20.0f + std::fmod(phase * 12.0f, 24.0f);
-            float offsetX = std::sin(phase * 2.0f) * 10.0f;
-            float offsetZ = std::cos(phase * 2.0f) * 10.0f;
-            float puffRadius = 3.0f + std::fmod(phase * 4.0f, 6.0f);
-            int puffAlpha = static_cast<int>(180.0f * (1.0f - (puffY - m_pos.y - 20.0f) / 24.0f));
+            float puffY = shoulderBaseY + std::fmod(phase * 12.0f, puffRangeY);
+            float offsetX = std::sin(phase * 2.0f) * (12.0f * (scale / 0.12f));
+            float offsetZ = std::cos(phase * 2.0f) * (12.0f * (scale / 0.12f));
+            float puffRadius = puffRadiusBase + std::fmod(phase * 4.0f, 6.0f);
+            int puffAlpha = static_cast<int>(180.0f * (1.0f - (puffY - shoulderBaseY) / puffRangeY));
 
             if (puffAlpha > 0)
             {
@@ -495,8 +634,9 @@ void Player3D::Draw3D()
         // Lv15以上：バカゲー神マッスル黄金オーラ（激しいスパークリング）
         if (m_repCount >= MAX_EFFECTIVE_REP)
         {
-            float auraR = 24.0f + std::sin(m_animTime * 15.0f) * 3.0f;
-            DrawSphere3D(VGet(m_pos.x, m_pos.y + 16.0f, m_pos.z), auraR, 10,
+            float auraCenterY = (m_modelHandle != -1) ? (m_pos.y + 200.0f * scale) : (m_pos.y + 16.0f);
+            float auraR = (36.0f * (scale / 0.12f)) + std::sin(m_animTime * 15.0f) * 4.0f;
+            DrawSphere3D(VGet(m_pos.x, auraCenterY, m_pos.z), auraR, 10,
                          GetColor(255, 215, 0), GetColor(255, 255, 100), FALSE);
 
             // 四方に飛び散る黄金スパーク星

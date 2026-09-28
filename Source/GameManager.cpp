@@ -229,6 +229,16 @@ void GameManager::Update()
             }
 
             m_prevKey5 = key5;
+
+            // [6] エフェクト表示ON/OFF
+            bool key6 = (CheckHitKey(KEY_INPUT_6) != 0);
+
+            if (key6 && !m_prevKey6)
+            {
+                EffectManager::GetInstance().ToggleEffectEnabled();
+            }
+
+            m_prevKey6 = key6;
         }
 
         m_objManager.Update(m_camera);
@@ -441,15 +451,16 @@ void GameManager::Draw()
         {
             // 半透明背景
             SetDrawBlendMode(DX_BLENDMODE_ALPHA, 200);
-            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 220, GetColor(15, 15, 30), TRUE);
+            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 246, GetColor(15, 15, 30), TRUE);
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 220, GetColor(255, 80, 80), FALSE);
+            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 246, GetColor(255, 80, 80), FALSE);
 
             DrawStringToHandle(Config::SCREEN_WIDTH - 370, 48, "★ DEBUG CHEAT MODE ON ★", GetColor(255, 80, 80), font16);
 
             bool tf  = m_objManager.IsTimeFrozen();
             bool ncd = cheatPlayer ? cheatPlayer->IsNoCooldown() : false;
             int  rep = cheatPlayer ? cheatPlayer->GetRepCount() : 0;
+            bool eff = EffectManager::GetInstance().IsEffectEnabled();
 
             DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 76,  GetColor(180, 230, 255), font16,
                 "[1] 通常ネズミ追加  [2] 高速ネズミ追加");
@@ -463,9 +474,12 @@ void GameManager::Draw()
             DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 148, ncd ? GetColor(255, 240, 60) : GetColor(180, 230, 255), font16,
                 "[5] クールタイム無効: %s", ncd ? "ON (スタンも無効)" : "OFF");
 
-            DrawStringToHandle(Config::SCREEN_WIDTH - 370, 172, "[F1] チートOFF", GetColor(255, 120, 120), font16);
+            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 172, eff ? GetColor(255, 240, 60) : GetColor(180, 230, 255), font16,
+                "[6] エフェクト表示: %s", eff ? "ON" : "OFF");
+
+            DrawStringToHandle(Config::SCREEN_WIDTH - 370, 196, "[F1] チートOFF", GetColor(255, 120, 120), font16);
             
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 196, GetColor(140, 200, 140), font13,
+            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 220, GetColor(140, 200, 140), font13,
                 "ネズミ残り: %d 体", m_objManager.GetRemainingMouseCount());
         }
         

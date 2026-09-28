@@ -77,9 +77,18 @@ private:
     int    m_mouseTargetX = 0;
     int    m_mouseTargetY = 0;
 
+    // 3Dモデル & アニメーション関連（cat.mv1）
+    int    m_modelHandle = -1;
+    int    m_attachAnimIndex = -1;
+    int    m_currentAnimIndex = -1;
+    float  m_animPlayTime = 0.0f;
+
+    void InitModel();
+    void UpdateAnimation(bool isMoving);
+
 public:
     Player3D(const VECTOR& pos);
-    virtual ~Player3D() = default;
+    virtual ~Player3D();
 
     void Update() override;
     void UpdateWithCamera(const Camera3D& camera);

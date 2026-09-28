@@ -69,15 +69,41 @@ void EffectManager::SyncCamera()
     Effekseer_Sync3DSetting();
 }
 
+void EffectManager::SetEffectEnabled(bool enabled)
+{
+    m_effectEnabled = enabled;
+
+    if (!m_effectEnabled)
+    {
+        // エフェクト無効時は現在再生中のオーラを停止
+        StopMuscleAura();
+    }
+}
+
+bool EffectManager::IsEffectEnabled() const
+{
+    return m_effectEnabled;
+}
+
+void EffectManager::ToggleEffectEnabled()
+{
+    SetEffectEnabled(!m_effectEnabled);
+}
+
 void EffectManager::Draw3D()
 {
+    if (!m_effectEnabled)
+    {
+        return;
+    }
+
     // 3Dエフェクトの描画
     DrawEffekseer3D();
 }
 
 void EffectManager::PlayTackleEffect(const VECTOR& pos, const VECTOR& dir)
 {
-    if (m_tackleResHandle == -1)
+    if (!m_effectEnabled || m_tackleResHandle == -1)
     {
         return;
     }
@@ -97,7 +123,7 @@ void EffectManager::PlayTackleEffect(const VECTOR& pos, const VECTOR& dir)
 
 void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
 {
-    if (m_pumpSuccessResHandle == -1)
+    if (!m_effectEnabled || m_pumpSuccessResHandle == -1)
     {
         return;
     }
@@ -117,7 +143,7 @@ void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
 
 void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCount)
 {
-    if (!isActive || m_muscleAuraResHandle == -1)
+    if (!m_effectEnabled || !isActive || m_muscleAuraResHandle == -1)
     {
         StopMuscleAura();
         return;

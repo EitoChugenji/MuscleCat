@@ -16,6 +16,9 @@ private:
     // 再生中ハンドル（位置更新や停止用）
     int m_activeAuraHandle = -1;
 
+    // エフェクト有効/無効フラグ（デバッグチート切替用）
+    bool m_effectEnabled = true;
+
     EffectManager() = default;
     ~EffectManager() = default;
 
@@ -34,6 +37,11 @@ public:
     void Update();
     void SyncCamera();
     void Draw3D();
+
+    // エフェクト表示の有効/無効設定
+    void SetEffectEnabled(bool enabled);
+    bool IsEffectEnabled() const;
+    void ToggleEffectEnabled();
 
     // タックル突進エフェクト再生
     void PlayTackleEffect(const VECTOR& pos, const VECTOR& dir);
