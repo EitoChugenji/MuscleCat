@@ -69,4 +69,3 @@ public:
     // ステージ（床・壁）のフォールバック描画
     void DrawFallbackStage(float halfW, float halfD, float wallH);
 };
-

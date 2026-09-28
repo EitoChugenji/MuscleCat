@@ -114,4 +114,3 @@ bool Obstacle3D::ResolveCollision(VECTOR& outPos, float radius) const
 
     return false;
 }
-

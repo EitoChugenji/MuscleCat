@@ -9,8 +9,8 @@ class EffectManager
 {
 private:
     // エフェクトリソースハンドル
-    int m_tackleResHandle = -1;       // タックル用衝撃波リング
-    int m_pumpSuccessResHandle = -1;  // 筋トレ成功時のパンプアップ光柱
+    int m_tackleResHandle = -1;       // タックル突進エフェクト
+    int m_pumpSuccessResHandle = -1;  // 筋トレ成功エフェクト（モデル周囲の発光）
     int m_muscleAuraResHandle = -1;   // 筋トレ・マッスルオーラ
 
     // 再生中ハンドル（位置更新や停止用）
@@ -38,7 +38,7 @@ public:
     // タックル突進エフェクト再生
     void PlayTackleEffect(const VECTOR& pos, const VECTOR& dir);
 
-    // 筋トレ成功（パンプアップ）エフェクト再生
+    // 筋トレ成功（モデル周囲発光）エフェクト再生
     void PlayPumpSuccessEffect(const VECTOR& pos, int repCount);
 
     // 筋トレQTE中・マッチョ中のオーラエフェクト再生/追従

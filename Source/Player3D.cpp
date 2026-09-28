@@ -377,7 +377,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
                             m_resultShowTimer = 60;
                             m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
 
-                            // Effekseer 筋トレ成功パンプアップ光柱エフェクト再生
+                            // Effekseer 筋トレ成功エフェクト再生（モデル周囲の発光）
                             EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
                         }
                         
@@ -653,6 +653,6 @@ void Player3D::AddRep(int amount)
     m_lastResultSuccess = true;
     m_resultShowTimer = 60;
 
-    // 筋トレ成功パンプアップエフェクト再生
+    // 筋トレ成功エフェクト再生（モデル周囲の発光）
     EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
 }

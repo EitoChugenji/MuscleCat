@@ -87,4 +87,3 @@ public:
         return m_type == ObjectType::NormalMouse || m_type == ObjectType::FastMouse;
     }
 };
-

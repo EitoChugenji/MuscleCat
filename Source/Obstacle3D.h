@@ -57,4 +57,3 @@ public:
     // 円/球オブジェクトとの押し出し判定
     bool ResolveCollision(VECTOR& outPos, float radius) const;
 };
-

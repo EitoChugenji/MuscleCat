@@ -19,11 +19,11 @@ void EffectManager::Init()
     // 歪みエフェクトの初期化
     Effekseer_InitDistortion();
 
-    // 1. タックル用衝撃波エフェクト（進行方向に射出される衝撃波リング）
-    m_tackleResHandle = LoadEffekseerEffect("Resource/Effects/Attack/RightAttack.efk", 20.0f);
+    // 1. タックル突進エフェクト（進行方向に射出されるアタックエフェクト）
+    m_tackleResHandle = LoadEffekseerEffect("Resource/Effects/Attack/01_NextSoft01/RightAttack.efk", 20.0f);
 
-    // 2. 筋トレ成功パンプアップエフェクト（上空への激しい光柱）
-    m_pumpSuccessResHandle = LoadEffekseerEffect("Resource/Effects/Basic/Laser01.efkefc", 15.0f);
+    // 2. 筋トレ成功エフェクト（モデルの周囲を包み込んで輝く光のバリアエフェクト）
+    m_pumpSuccessResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Barrior01.efkefc", 16.0f);
 
     // 3. マッスルオーラエフェクト（足元から立ち昇るオーラ）
     m_muscleAuraResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Aura01.efkefc", 12.0f);
@@ -102,14 +102,15 @@ void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
         return;
     }
 
-    // Rep数に応じて光柱のスケールを強化（バカゲー風演出）
-    float scale = (14.0f + static_cast<float>(repCount) * 1.2f) * 0.3f;
+    // Rep数に応じて光のスケールを微調整（筋肉成長に合わせて自然に拡大）
+    float scale = 1.0f + static_cast<float>(repCount) * 0.05f;
 
     int playHandle = PlayEffekseer3DEffect(m_pumpSuccessResHandle);
 
     if (playHandle != -1)
     {
-        SetPosPlayingEffekseer3DEffect(playHandle, pos.x, pos.y, pos.z);
+        // 猫の胴体付近（中心高さ）を包み込むように配置して発光
+        SetPosPlayingEffekseer3DEffect(playHandle, pos.x, pos.y + 10.0f, pos.z);
         SetScalePlayingEffekseer3DEffect(playHandle, scale, scale, scale);
     }
 }
