@@ -29,6 +29,12 @@ Player3D::~Player3D()
         MV1DeleteModel(m_modelHandle);
         m_modelHandle = -1;
     }
+
+    if (m_barbellModelHandle != -1)
+    {
+        MV1DeleteModel(m_barbellModelHandle);
+        m_barbellModelHandle = -1;
+    }
 }
 
 void Player3D::InitModel()
@@ -46,7 +52,20 @@ void Player3D::InitModel()
             m_currentAnimIndex = 3;
             m_attachAnimIndex = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, -1, FALSE);
             m_animPlayTime = 0.0f;
+
+            // バーベル配置用の両手ボーンフレームを検索・キャッシュ
+            m_lHandFrame = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHand");
+            m_rHandFrame = MV1SearchFrame(m_modelHandle, "mixamorig:RightHand");
+            m_lHandKnuckleFrame = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHandMiddle1");
+            m_rHandKnuckleFrame = MV1SearchFrame(m_modelHandle, "mixamorig:RightHandMiddle1");
         }
+    }
+
+    // バーベルアクセサリモデルの読み込み
+    int barbellBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::BARBELL_MODEL_PATH);
+    if (barbellBase != -1)
+    {
+        m_barbellModelHandle = MV1DuplicateModel(barbellBase);
     }
 }
 
@@ -605,6 +624,12 @@ void Player3D::Draw3D()
         );
     }
 
+    // スクワット中（筋トレQTE中またはスクワットアニメーション中）に両手でバーベルを保持・描画
+    if (m_isSkillChecking || m_currentAnimIndex == 2)
+    {
+        DrawBarbell(scale);
+    }
+
     // 3. バカゲー風コミカル・マッスル湯気＆マッチョオーラ（3D）
     if (m_state == MuscleState::Muscular && m_repCount > 0)
     {
@@ -795,4 +820,101 @@ void Player3D::AddRep(int amount)
 
     // 筋トレ成功エフェクト再生（モデル周囲の発光）
     EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+}
+
+void Player3D::DrawBarbell(float catScale)
+{
+    // 3Dモデル版バーベル描画
+    if (m_barbellModelHandle != -1 && m_modelHandle != -1 && m_lHandFrame != -1 && m_rHandFrame != -1)
+    {
+        // 1. 猫の両手フレーム（手首および指付け根）の現在のワールド座標を取得
+        VECTOR posL = MV1GetFramePosition(m_modelHandle, m_lHandFrame);
+        VECTOR posR = MV1GetFramePosition(m_modelHandle, m_rHandFrame);
+
+        // 指の付け根位置（手首と指付け根の中間を手のひら・握り位置とする）
+        VECTOR handCenterL = posL;
+        VECTOR handCenterR = posR;
+
+        if (m_lHandKnuckleFrame != -1 && m_rHandKnuckleFrame != -1)
+        {
+            VECTOR posLKnuckle = MV1GetFramePosition(m_modelHandle, m_lHandKnuckleFrame);
+            VECTOR posRKnuckle = MV1GetFramePosition(m_modelHandle, m_rHandKnuckleFrame);
+            handCenterL = VAdd(posL, VScale(VSub(posLKnuckle, posL), 0.5f));
+            handCenterR = VAdd(posR, VScale(VSub(posRKnuckle, posR), 0.5f));
+        }
+
+        // 2. シャフト方向（左手から右手へ向かうベクトル）
+        VECTOR dir = VSub(handCenterR, handCenterL);
+        float dist = VSize(dir);
+
+        if (dist > 0.001f)
+        {
+            // バーベルのZ軸（長軸・シャフト方向）：左手から右手へ
+            VECTOR basisZ = VNorm(dir);
+
+            // 上方向の基準ベクトル
+            VECTOR upRef = VGet(0.0f, 1.0f, 0.0f);
+
+            // バーベルのX軸（水平直交）：Up × Z
+            VECTOR basisX = VCross(upRef, basisZ);
+            float lenX = VSize(basisX);
+            if (lenX < 0.001f)
+            {
+                basisX = VGet(1.0f, 0.0f, 0.0f);
+            }
+            else
+            {
+                basisX = VNorm(basisX);
+            }
+
+            // バーベルのY軸（垂直直交）：Z × X
+            VECTOR basisY = VNorm(VCross(basisZ, basisX));
+
+            // 3. 両手の中央位置（手のひらの中間）
+            VECTOR midPos = VScale(VAdd(handCenterL, handCenterR), 0.5f);
+
+            // 4. バーベルのスケール
+            // 基本両手距離 69.13f に対する比率でバーベルのスケールを自動調整
+            float barbellScale = (dist / 69.13f) * ModelConfig::BARBELL_BASE_SCALE;
+
+            // 各軸にスケールを適用
+            VECTOR sx = VScale(basisX, barbellScale);
+            VECTOR sy = VScale(basisY, barbellScale);
+            VECTOR sz = VScale(basisZ, barbellScale);
+
+            // 5. ワールド変換行列の構築 (行優先: Direct3D形式)
+            MATRIX mat = {};
+            mat.m[0][0] = sx.x; mat.m[0][1] = sx.y; mat.m[0][2] = sx.z; mat.m[0][3] = 0.0f;
+            mat.m[1][0] = sy.x; mat.m[1][1] = sy.y; mat.m[1][2] = sy.z; mat.m[1][3] = 0.0f;
+            mat.m[2][0] = sz.x; mat.m[2][1] = sz.y; mat.m[2][2] = sz.z; mat.m[2][3] = 0.0f;
+            mat.m[3][0] = midPos.x; mat.m[3][1] = midPos.y; mat.m[3][2] = midPos.z; mat.m[3][3] = 1.0f;
+
+            // 行列を設定してバーベルを描画
+            MV1SetMatrix(m_barbellModelHandle, mat);
+            MV1DrawModel(m_barbellModelHandle);
+        }
+    }
+    else
+    {
+        // フォールバック描画（モデル未読み込み時）
+        float forwardX = std::sin(m_rotY);
+        float forwardZ = std::cos(m_rotY);
+        float rightX = forwardZ;
+        float rightZ = -forwardX;
+
+        float barbellY = m_pos.y + 24.0f * (catScale / 0.12f);
+        float centerX = m_pos.x + forwardX * 18.0f * (catScale / 0.12f);
+        float centerZ = m_pos.z + forwardZ * 18.0f * (catScale / 0.12f);
+
+        float halfWidth = 36.0f * (catScale / 0.12f);
+        VECTOR p1 = VGet(centerX - rightX * halfWidth, barbellY, centerZ - rightZ * halfWidth);
+        VECTOR p2 = VGet(centerX + rightX * halfWidth, barbellY, centerZ + rightZ * halfWidth);
+
+        // シャフト（銀色）
+        DrawCapsule3D(p1, p2, 2.0f * (catScale / 0.12f), 8, GetColor(200, 205, 215), GetColor(220, 225, 235), TRUE);
+
+        // 両端のウェイトプレート（黒/濃紺）
+        DrawSphere3D(p1, 8.0f * (catScale / 0.12f), 8, GetColor(40, 45, 50), GetColor(60, 65, 75), TRUE);
+        DrawSphere3D(p2, 8.0f * (catScale / 0.12f), 8, GetColor(40, 45, 50), GetColor(60, 65, 75), TRUE);
+    }
 }

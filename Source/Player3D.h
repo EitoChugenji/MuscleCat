@@ -83,8 +83,18 @@ private:
     int    m_currentAnimIndex = -1;
     float  m_animPlayTime = 0.0f;
 
+    // 手のボーンフレーム（バーベル両手アタッチ用）
+    int    m_lHandFrame = -1;
+    int    m_rHandFrame = -1;
+    int    m_lHandKnuckleFrame = -1;
+    int    m_rHandKnuckleFrame = -1;
+
+    // アクセサリ（Barbell.mv1）
+    int    m_barbellModelHandle = -1;
+
     void InitModel();
     void UpdateAnimation(bool isMoving);
+    void DrawBarbell(float catScale);
 
 public:
     Player3D(const VECTOR& pos);

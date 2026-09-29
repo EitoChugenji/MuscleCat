@@ -10,6 +10,10 @@ namespace ModelConfig
     constexpr float       CAT_MODEL_SCALE = 0.24f;          // スケール2倍に拡大（0.12 → 0.24）
     constexpr float       CAT_MODEL_ROT_Y = 3.14159265f;    // 180度反転（反対向き補正）
 
+    // アクセサリ（バーベル）
+    constexpr const char* BARBELL_MODEL_PATH  = "Resource/Models/AccessoryModels/Barbell.mv1";
+    constexpr float       BARBELL_BASE_SCALE  = 18.0f;       // 基準スケール（両手幅に合わせて自動連動）
+
     // 通常ネズミ
     constexpr const char* MOUSE_NORMAL_MODEL_PATH = "Resource/Models/MouseModel/ネズミ.mv1";
     constexpr float       MOUSE_NORMAL_MODEL_SCALE = 7.0f;
