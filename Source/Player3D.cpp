@@ -8,6 +8,10 @@
 #include "DxLib.h"
 #include <cmath>
 #include <cstdlib>
+#include <string>
+#include <vector>
+#include <cctype>
+#include <algorithm>
 
 Player3D::Player3D(const VECTOR& pos)
     : GameObject3D(pos, 18.0f, ObjectType::Player)
@@ -48,8 +52,36 @@ void Player3D::InitModel()
 
         if (m_modelHandle != -1)
         {
-            // 初期状態はアイドルアニメーション（Armature|04_Idol: インデックス 3）
-            m_currentAnimIndex = 3;
+            // モデル内のアニメーション名から各インデックスを自動検出（大文字小文字問わず柔軟に検索）
+            auto findAnim = [this](const std::vector<std::string>& keywords, int fallbackIndex) -> int
+            {
+                int num = MV1GetAnimNum(m_modelHandle);
+                for (int i = 0; i < num; ++i)
+                {
+                    const char* name = MV1GetAnimName(m_modelHandle, i);
+                    if (!name) continue;
+                    std::string s(name);
+                    for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    for (const auto& kw : keywords)
+                    {
+                        if (s.find(kw) != std::string::npos)
+                        {
+                            return i;
+                        }
+                    }
+                }
+                return fallbackIndex;
+            };
+
+            m_animIndexRun      = findAnim({ "01_run", "run" }, 0);
+            m_animIndexAttack   = findAnim({ "02_attack", "attack" }, 1);
+            m_animIndexSquat    = findAnim({ "03_squat", "squat" }, 2);
+            m_animIndexIdol     = findAnim({ "04_idol", "idol", "idle" }, 3);
+            m_animIndexPush     = findAnim({ "05_push", "push" }, 4);
+            m_animIndexSoreness = findAnim({ "06_musclesoreness", "musclesorena", "soreness", "sore" }, 5);
+
+            // 初期状態はアイドルアニメーション
+            m_currentAnimIndex = m_animIndexIdol;
             m_attachAnimIndex = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, -1, FALSE);
             m_animPlayTime = 0.0f;
 
@@ -58,6 +90,31 @@ void Player3D::InitModel()
             m_rHandFrame = MV1SearchFrame(m_modelHandle, "mixamorig:RightHand");
             m_lHandKnuckleFrame = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHandMiddle1");
             m_rHandKnuckleFrame = MV1SearchFrame(m_modelHandle, "mixamorig:RightHandMiddle1");
+
+            // テクスチャ抜け防止および自動復旧
+            int texNum = MV1GetTextureNum(m_modelHandle);
+            for (int i = 0; i < texNum; ++i)
+            {
+                int grHandle = MV1GetTextureGraphHandle(m_modelHandle, i);
+                if (grHandle == -1)
+                {
+                    const char* candidatePaths[] = {
+                        "Resource/Models/CatModel/MascleCat.fbm/0.jpg",
+                        "Resource/Models/CatModel/cat.fbm/0.jpg",
+                        "Resource/Models/CatModel/0.jpg"
+                    };
+
+                    for (const char* cPath : candidatePaths)
+                    {
+                        int loadedGr = LoadGraph(cPath);
+                        if (loadedGr != -1)
+                        {
+                            MV1SetTextureGraphHandle(m_modelHandle, i, loadedGr, FALSE);
+                            break;
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -77,28 +134,38 @@ void Player3D::UpdateAnimation(bool isMoving)
     }
 
     // 再生すべきアニメーションの判定
-    // 優先度1: 攻撃（飛びつき・タックル: インデックス 1）
-    // 優先度2: スクワット（筋トレQTE中: インデックス 2）
-    // 優先度3: 走り（移動中: インデックス 0）
-    // 優先度4: 待機（アイドル: インデックス 3）
-    int targetAnim = 3; // デフォルト: Idol
+    // 優先度1: タックル（Eキー: Pushアニメーション）
+    // 優先度2: 飛びつき（SHIFT/X/Cキー: Attackアニメーション）
+    // 優先度3: 筋肉痛（QTE失敗時など: MuscleSorena / MuscleSorenessアニメーション）
+    // 優先度4: スクワット（筋トレQTE中: squatアニメーション）
+    // 優先度5: 走り（移動中: Runアニメーション）
+    // 優先度6: 待機（アイドル: Idolアニメーション）
+    int targetAnim = m_animIndexIdol;
     float playSpeed = 0.5f;
 
-    if (m_isPouncing || m_isTackling)
+    if (m_isTackling)
     {
-        targetAnim = 1; // Armature|02_Attack
+        targetAnim = m_animIndexPush;      // Armature|05_Push
         playSpeed = 1.0f;
     }
-    
+    else if (m_isPouncing)
+    {
+        targetAnim = m_animIndexAttack;    // Armature|02_Attack
+        playSpeed = 1.0f;
+    }
+    else if (m_state == MuscleState::Soreness)
+    {
+        targetAnim = m_animIndexSoreness;  // Armature|06_MuscleSoreness
+        playSpeed = 0.6f;
+    }
     else if (m_isSkillChecking)
     {
-        targetAnim = 2; // Armature|03_squat
+        targetAnim = m_animIndexSquat;     // Armature|03_squat
         playSpeed = 1.0f;
     }
-    
     else if (isMoving)
     {
-        targetAnim = 0; // Armature|01_Run
+        targetAnim = m_animIndexRun;       // Armature|01_Run
         playSpeed = 0.7f + (m_speed / SPEED_INITIAL) * 0.4f;
     }
 
@@ -139,7 +206,7 @@ void Player3D::Update()
     // 通常のUpdate（後方互換）
 }
 
-void Player3D::UpdateWithCamera(const Camera3D& camera)
+void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR>& targetPositions)
 {
     m_animFrame++;
     m_animTime += 1.0f / 60.0f;
@@ -187,10 +254,10 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
         }
     }
 
-    // 残像トレイルのフェードアウト処理
+    // 残像トレイルのフェードアウト処理（素早く抜けて本体を見えやすく）
     for (auto it = m_trails.begin(); it != m_trails.end(); )
     {
-        it->alpha -= 25;
+        it->alpha -= 35;
         if (it->alpha <= 0)
         {
             it = m_trails.erase(it);
@@ -209,6 +276,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
         m_isTackling = false;
         m_isPouncing = false;
         m_pos.y = 0.0f;
+        UpdateAnimation(false);
         return;
     }
 
@@ -217,8 +285,11 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
     {
         m_tackleTimer--;
 
-        // 残像記録
-        m_trails.push_back({ m_pos, m_rotY, m_repCount, 220 });
+        // 残像記録（半透明で控えめにし、本体のPushモーションを際立たせる）
+        if (m_tackleTimer % 2 == 0)
+        {
+            m_trails.push_back({ m_pos, m_rotY, m_repCount, 85 });
+        }
 
         // 地面を滑るような超高速直進
         float tSpeed = GetTackleSpeed();
@@ -231,6 +302,9 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
             m_isTackling = false;
             m_tackleCooldown = GetTackleCooldownMax();
         }
+
+        // タックル中のアニメーション（Push）を更新
+        UpdateAnimation(false);
         return;
     }
 
@@ -245,8 +319,46 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
         float currentY = std::sin(progress * MathHelper::PI) * jumpHeight;
         m_pos.y = currentY;
 
-        // 3D残像記録
-        m_trails.push_back({ m_pos, m_rotY, m_repCount, 180 });
+        // 3D残像記録（控えめな半透明）
+        if (m_pounceTimer % 2 == 0)
+        {
+            m_trails.push_back({ m_pos, m_rotY, m_repCount, 75 });
+        }
+
+        // 飛翔中の緩やかな追尾ステアリング（最寄りのネズミへ少し曲がる）
+        if (!targetPositions.empty())
+        {
+            float closestDistSq = 260.0f * 260.0f;
+            VECTOR steerTarget = VGet(0.0f, 0.0f, 0.0f);
+            bool steerFound = false;
+
+            for (const auto& tPos : targetPositions)
+            {
+                float dx = tPos.x - m_pos.x;
+                float dz = tPos.z - m_pos.z;
+                float distSq = dx * dx + dz * dz;
+                if (distSq < closestDistSq && distSq > 4.0f)
+                {
+                    float dist = std::sqrt(distSq);
+                    float dot = m_pounceDir.x * (dx / dist) + m_pounceDir.z * (dz / dist);
+                    // 前方約±75度以内のターゲット
+                    if (dot > 0.25f)
+                    {
+                        closestDistSq = distSq;
+                        steerTarget = tPos;
+                        steerFound = true;
+                    }
+                }
+            }
+
+            if (steerFound)
+            {
+                float targetAngle = std::atan2(steerTarget.x - m_pos.x, steerTarget.z - m_pos.z);
+                // 毎フレーム少しずつ滑らかにネズミの逃走方向へ誘導（自然なカーブ）
+                m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.12f);
+                m_pounceDir = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+            }
+        }
 
         // Rep数に応じた突進速度で直進
         float pSpeed = GetPounceSpeed();
@@ -322,6 +434,8 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
                     // Effekseer タックル衝撃波リングエフェクト再生
                     EffectManager::GetInstance().PlayTackleEffect(m_pos, m_tackleDir);
 
+                    // 即座にタックルアニメーション（Push）を開始
+                    UpdateAnimation(false);
                     return;
                 }
 
@@ -330,7 +444,47 @@ void Player3D::UpdateWithCamera(const Camera3D& camera)
                 {
                     m_isPouncing = true;
                     m_pounceTimer = GetPounceDuration();
-                    m_pounceDir = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+
+                    VECTOR currentFacing = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+
+                    // 前方の最寄りネズミを探索して発動方向をアシスト補正（多少の追尾）
+                    float bestDistSq = 260.0f * 260.0f;
+                    VECTOR bestTarget = VGet(0.0f, 0.0f, 0.0f);
+                    bool foundTarget = false;
+
+                    for (const auto& tPos : targetPositions)
+                    {
+                        float dx = tPos.x - m_pos.x;
+                        float dz = tPos.z - m_pos.z;
+                        float distSq = dx * dx + dz * dz;
+                        if (distSq < bestDistSq && distSq > 4.0f)
+                        {
+                            float dist = std::sqrt(distSq);
+                            float dot = currentFacing.x * (dx / dist) + currentFacing.z * (dz / dist);
+                            // 前方視野（約±70度）以内のネズミ
+                            if (dot > 0.35f)
+                            {
+                                bestDistSq = distSq;
+                                bestTarget = tPos;
+                                foundTarget = true;
+                            }
+                        }
+                    }
+
+                    if (foundTarget)
+                    {
+                        float targetAngle = std::atan2(bestTarget.x - m_pos.x, bestTarget.z - m_pos.z);
+                        // 発動時の向きをターゲット方向へ自然に補正（約55%引き寄せ）
+                        m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.55f);
+                        m_pounceDir = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+                    }
+                    else
+                    {
+                        m_pounceDir = currentFacing;
+                    }
+
+                    // 即座に飛びつきアニメーション（Attack）を開始
+                    UpdateAnimation(false);
                     return;
                 }
 
@@ -625,7 +779,7 @@ void Player3D::Draw3D()
     }
 
     // スクワット中（筋トレQTE中またはスクワットアニメーション中）に両手でバーベルを保持・描画
-    if (m_isSkillChecking || m_currentAnimIndex == 2)
+    if (m_isSkillChecking || m_currentAnimIndex == m_animIndexSquat)
     {
         DrawBarbell(scale);
     }
@@ -633,19 +787,19 @@ void Player3D::Draw3D()
     // 3. バカゲー風コミカル・マッスル湯気＆マッチョオーラ（3D）
     if (m_state == MuscleState::Muscular && m_repCount > 0)
     {
-        // コミカルな白い湯気（肩や背中からポフポフ立ち昇る）
+        // コミカルな白い湯気（猫の表情や筋肉が見えるよう薄く控えめに立ち昇る）
         float shoulderBaseY = (m_modelHandle != -1) ? (m_pos.y + 310.0f * scale) : (m_pos.y + 20.0f);
-        float puffRangeY = 30.0f * (scale / 0.12f);
-        float puffRadiusBase = 4.0f * (scale / 0.12f);
+        float puffRangeY = 24.0f * (scale / 0.12f);
+        float puffRadiusBase = 2.2f * (scale / 0.12f);
 
-        for (int i = 0; i < 4; ++i)
+        for (int i = 0; i < 3; ++i)
         {
-            float phase = m_animTime * 6.0f + static_cast<float>(i) * 1.57f;
-            float puffY = shoulderBaseY + std::fmod(phase * 12.0f, puffRangeY);
-            float offsetX = std::sin(phase * 2.0f) * (12.0f * (scale / 0.12f));
-            float offsetZ = std::cos(phase * 2.0f) * (12.0f * (scale / 0.12f));
-            float puffRadius = puffRadiusBase + std::fmod(phase * 4.0f, 6.0f);
-            int puffAlpha = static_cast<int>(180.0f * (1.0f - (puffY - shoulderBaseY) / puffRangeY));
+            float phase = m_animTime * 5.0f + static_cast<float>(i) * 2.09f;
+            float puffY = shoulderBaseY + std::fmod(phase * 10.0f, puffRangeY);
+            float offsetX = std::sin(phase * 2.0f) * (9.0f * (scale / 0.12f));
+            float offsetZ = std::cos(phase * 2.0f) * (9.0f * (scale / 0.12f));
+            float puffRadius = puffRadiusBase + std::fmod(phase * 2.5f, 3.5f);
+            int puffAlpha = static_cast<int>(50.0f * (1.0f - (puffY - shoulderBaseY) / puffRangeY));
 
             if (puffAlpha > 0)
             {
@@ -656,32 +810,59 @@ void Player3D::Draw3D()
             }
         }
 
-        // Lv15以上：バカゲー神マッスル黄金オーラ（激しいスパークリング）
+        // Lv15以上：バカゲー神マッスル黄金オーラ（猫本体を遮らない足元リング＆上品なスパーク）
         if (m_repCount >= MAX_EFFECTIVE_REP)
         {
-            float auraCenterY = (m_modelHandle != -1) ? (m_pos.y + 200.0f * scale) : (m_pos.y + 16.0f);
-            float auraR = (36.0f * (scale / 0.12f)) + std::sin(m_animTime * 15.0f) * 4.0f;
-            DrawSphere3D(VGet(m_pos.x, auraCenterY, m_pos.z), auraR, 10,
-                         GetColor(255, 215, 0), GetColor(255, 255, 100), FALSE);
-
-            // 四方に飛び散る黄金スパーク星
-            for (int k = 0; k < 6; ++k)
+            auto drawRingXZ = [](const VECTOR& center, float radius, unsigned int color, int segments = 16)
             {
-                float aAngle = m_animTime * 8.0f + static_cast<float>(k) * (MathHelper::PI / 3.0f);
-                float spkX = m_pos.x + std::cos(aAngle) * (auraR + 4.0f);
-                float spkZ = m_pos.z + std::sin(aAngle) * (auraR + 4.0f);
-                float spkY = m_pos.y + 12.0f + std::sin(aAngle * 3.0f) * 8.0f;
-                DrawSphere3D(VGet(spkX, spkY, spkZ), 2.5f, 6, GetColor(255, 240, 50), GetColor(255, 255, 180), TRUE);
+                for (int s = 0; s < segments; ++s)
+                {
+                    float a1 = static_cast<float>(s) * (2.0f * MathHelper::PI / static_cast<float>(segments));
+                    float a2 = static_cast<float>(s + 1) * (2.0f * MathHelper::PI / static_cast<float>(segments));
+                    VECTOR p1 = VGet(center.x + std::cos(a1) * radius, center.y, center.z + std::sin(a1) * radius);
+                    VECTOR p2 = VGet(center.x + std::cos(a2) * radius, center.y, center.z + std::sin(a2) * radius);
+                    DrawLine3D(p1, p2, color);
+                }
+            };
+
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 90);
+            float auraR = 24.0f * (scale / 0.12f);
+            drawRingXZ(VGet(m_pos.x, m_pos.y + 1.0f, m_pos.z), auraR, GetColor(255, 215, 0));
+            drawRingXZ(VGet(m_pos.x, m_pos.y + 1.0f, m_pos.z), auraR * 0.7f, GetColor(255, 235, 100));
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+            // 四方に小さく煌めく黄金スパーク星
+            for (int k = 0; k < 4; ++k)
+            {
+                float aAngle = m_animTime * 6.0f + static_cast<float>(k) * (MathHelper::PI / 2.0f);
+                float spkX = m_pos.x + std::cos(aAngle) * (auraR * 0.9f);
+                float spkZ = m_pos.z + std::sin(aAngle) * (auraR * 0.9f);
+                float spkY = m_pos.y + 6.0f + std::sin(aAngle * 2.5f) * 5.0f;
+                DrawSphere3D(VGet(spkX, spkY, spkZ), 1.8f, 6, GetColor(255, 240, 50), GetColor(255, 255, 180), TRUE);
             }
         }
     }
 
-    // 4. タックル突進オーラエフェクト
+    // 4. タックル突進オーラエフェクト（猫の体・Push動作を隠さないよう足元推進リングとして描画）
     if (m_isTackling)
     {
-        float r = GetTackleRadius();
-        DrawSphere3D(VGet(m_pos.x, m_pos.y + 15.0f, m_pos.z), r, 12, GetColor(255, 120, 20), GetColor(255, 220, 50), FALSE);
-        DrawSphere3D(VGet(m_pos.x, m_pos.y + 15.0f, m_pos.z), r * 0.7f, 10, GetColor(255, 180, 40), GetColor(255, 240, 100), FALSE);
+        auto drawRingXZ = [](const VECTOR& center, float radius, unsigned int color, int segments = 16)
+        {
+            for (int s = 0; s < segments; ++s)
+            {
+                float a1 = static_cast<float>(s) * (2.0f * MathHelper::PI / static_cast<float>(segments));
+                float a2 = static_cast<float>(s + 1) * (2.0f * MathHelper::PI / static_cast<float>(segments));
+                VECTOR p1 = VGet(center.x + std::cos(a1) * radius, center.y, center.z + std::sin(a1) * radius);
+                VECTOR p2 = VGet(center.x + std::cos(a2) * radius, center.y, center.z + std::sin(a2) * radius);
+                DrawLine3D(p1, p2, color);
+            }
+        };
+
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 110);
+        float r = GetTackleRadius() * 0.65f;
+        drawRingXZ(VGet(m_pos.x, m_pos.y + 1.0f, m_pos.z), r, GetColor(255, 130, 20));
+        drawRingXZ(VGet(m_pos.x, m_pos.y + 1.0f, m_pos.z), r * 0.5f, GetColor(255, 190, 40));
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 
     // 5. 猫のスタンエフェクト

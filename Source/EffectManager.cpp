@@ -19,14 +19,14 @@ void EffectManager::Init()
     // 歪みエフェクトの初期化
     Effekseer_InitDistortion();
 
-    // 1. タックル突進エフェクト（進行方向に射出されるアタックエフェクト）
-    m_tackleResHandle = LoadEffekseerEffect("Resource/Effects/Attack/01_NextSoft01/RightAttack.efk", 20.0f);
+    // 1. タックル突進エフェクト（進行方向に射出されるアタックエフェクト: スケールを調整して猫のPush動作を見えやすく）
+    m_tackleResHandle = LoadEffekseerEffect("Resource/Effects/Attack/01_NextSoft01/RightAttack.efk", 6.5f);
 
-    // 2. 筋トレ成功エフェクト（モデルの周囲を包み込んで輝く光のバリアエフェクト）
-    m_pumpSuccessResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Barrior01.efkefc", 16.0f);
+    // 2. 筋トレ成功エフェクト（モデル周囲の光バリア: 猫を覆い隠さない適切なスケールに調整）
+    m_pumpSuccessResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Barrior01.efkefc", 6.0f);
 
-    // 3. マッスルオーラエフェクト（足元から立ち昇るオーラ）
-    m_muscleAuraResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Aura01.efkefc", 12.0f);
+    // 3. マッスルオーラエフェクト（足元から立ち昇るオーラ: 猫の全身が黒煙に覆われないよう足元に調整）
+    m_muscleAuraResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Aura01.efkefc", 1.2f);
 }
 
 void EffectManager::Release()
@@ -111,12 +111,14 @@ void EffectManager::PlayTackleEffect(const VECTOR& pos, const VECTOR& dir)
     // タックル突進方向に合わせた角度を計算
     float rotY = std::atan2(dir.x, dir.z);
 
-    // 猫の足元より少し高い位置（胸部付近）に再生
+    // 猫自身（Pushモーション）を覆い隠さないよう、猫の手の前方（突進方向）に少し離して再生
     int playHandle = PlayEffekseer3DEffect(m_tackleResHandle);
 
     if (playHandle != -1)
     {
-        SetPosPlayingEffekseer3DEffect(playHandle, pos.x, pos.y + 12.0f, pos.z);
+        float frontX = pos.x + dir.x * 14.0f;
+        float frontZ = pos.z + dir.z * 14.0f;
+        SetPosPlayingEffekseer3DEffect(playHandle, frontX, pos.y + 7.0f, frontZ);
         SetRotationPlayingEffekseer3DEffect(playHandle, 0.0f, rotY, 0.0f);
     }
 }
@@ -128,15 +130,15 @@ void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
         return;
     }
 
-    // Rep数に応じて光のスケールを微調整（筋肉成長に合わせて自然に拡大）
-    float scale = 1.0f + static_cast<float>(repCount) * 0.05f;
+    // 猫が見えなくならないよう控えめな光に調整
+    float scale = 0.8f + static_cast<float>(repCount) * 0.02f;
 
     int playHandle = PlayEffekseer3DEffect(m_pumpSuccessResHandle);
 
     if (playHandle != -1)
     {
-        // 猫の胴体付近（中心高さ）を包み込むように配置して発光
-        SetPosPlayingEffekseer3DEffect(playHandle, pos.x, pos.y + 10.0f, pos.z);
+        // 猫の胴体付近を包み込むように配置して発光
+        SetPosPlayingEffekseer3DEffect(playHandle, pos.x, pos.y + 8.0f, pos.z);
         SetScalePlayingEffekseer3DEffect(playHandle, scale, scale, scale);
     }
 }
@@ -155,12 +157,12 @@ void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCo
         m_activeAuraHandle = PlayEffekseer3DEffect(m_muscleAuraResHandle);
     }
 
-    // 再生中のオーラ位置とサイズを猫の現在位置・Rep数に追従
+    // 再生中のオーラ位置とサイズを猫の現在位置・Rep数に追従（足元に上品に収まるスケール）
     if (m_activeAuraHandle != -1)
     {
         SetPosPlayingEffekseer3DEffect(m_activeAuraHandle, pos.x, pos.y, pos.z);
 
-        float auraScale = 10.0f + static_cast<float>(repCount) * 1.0f;
+        float auraScale = 0.8f + static_cast<float>(repCount) * 0.04f;
         SetScalePlayingEffekseer3DEffect(m_activeAuraHandle, auraScale, auraScale, auraScale);
     }
 }

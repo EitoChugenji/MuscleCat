@@ -352,7 +352,7 @@ void GameManager::Draw()
         DrawStringToHandle(panelX + 20, panelY + 15, "【操作方法】", yellow, font18);
         DrawStringToHandle(panelX + 30, panelY + 45, "・移動: WASD キー または [マウス左クリック長押し]", white, font16);
         DrawStringToHandle(panelX + 30, panelY + 73, "・筋トレ: [SPACE] キー （タイミングよく押してRep獲得＆加速！）", GetColor(255, 210, 80), font16);
-        DrawStringToHandle(panelX + 30, panelY + 101, "・タックル: [E] キー （ネズミ気絶！/壁激突で猫スタン・筋トレで強化）", GetColor(255, 160, 50), font16);
+        DrawStringToHandle(panelX + 30, panelY + 101, "・タックル: [E] キー （4 Rep以上で解放！ネズミ気絶/壁激突注意）", GetColor(255, 160, 50), font16);
         DrawStringToHandle(panelX + 30, panelY + 129, "・飛びつき: [SHIFT] または [X] キー （4 Rep以上で跳躍突進！）", GetColor(255, 110, 50), font16);
         DrawStringToHandle(panelX + 30, panelY + 157, "・視点: ステージ全体俯瞰固定ビュー", cyan, font16);
         DrawStringToHandle(panelX + 30, panelY + 185, "※ 筋トレ失敗で5秒間筋肉痛（停止） / 15秒放置で筋肉減衰", GetColor(255, 120, 120), font13);
@@ -409,7 +409,7 @@ void GameManager::Draw()
             
             else if (reps >= 4)
             {
-                DrawFormatStringToHandle(24, 62, GetColor(255, 150, 20), font16, "猫速度: %.1f [Lv.%d (飛びつき可! 残り%.1fs)]", speed, reps, player->GetPumpDecayRemainingSeconds());
+                DrawFormatStringToHandle(24, 62, GetColor(255, 150, 20), font16, "猫速度: %.1f [Lv.%d (攻撃解放! タックル[E]/飛びつき可 残り%.1fs)]", speed, reps, player->GetPumpDecayRemainingSeconds());
             }
             
             else if (reps > 0)
@@ -432,14 +432,14 @@ void GameManager::Draw()
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
         if (player && player->GetRepCount() >= 4 && player->GetMuscleState() != MuscleState::Soreness) {
-            DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 72, GetColor(255, 230, 80), font16, "★ 飛びつき: [SHIFT] または [X] (Lv.%d 跳躍突進！) | タックル: [E] (ネズミ気絶！壁激突注意)", player->GetRepCount());
+            DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 72, GetColor(255, 230, 80), font16, "★ タックル: [E] (Push突進！ネズミ気絶) | 飛びつき: [SHIFT]/[X] (Lv.%d 跳躍突進！)", player->GetRepCount());
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD キー / [マウス左クリック長押し]", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でさらにRep追加！ (15秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         }
         
         else
         {
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 72, "タックル: [E] キー (ネズミを気絶スタン！壁や家具激突で猫スタン)", GetColor(255, 200, 80), font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 72, "【Lv.4でタックル[E]＆飛びつき解放】 筋トレ: [SPACE] で筋肉をつけよう！", GetColor(255, 200, 80), font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD キー / [マウス左クリック長押し]", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でRep追加！ (15秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         }
