@@ -55,10 +55,23 @@ void ObjectManager3D::SpawnFastMouse()
 
 void ObjectManager3D::Update(const Camera3D& camera)
 {
-    // プレイヤー更新（TPSカメラ基準）
+    // プレイヤー更新（TPSカメラ基準・飛びつき追尾用ネズミ座標収集）
     if (m_player && m_player->IsAlive())
     {
-        m_player->UpdateWithCamera(camera);
+        std::vector<VECTOR> targets;
+        targets.reserve(m_objects.size());
+        for (const auto& obj : m_objects)
+        {
+            if (obj && obj->IsAlive())
+            {
+                ObjectType t = obj->GetType();
+                if (t == ObjectType::NormalMouse || t == ObjectType::FastMouse)
+                {
+                    targets.push_back(obj->GetPos());
+                }
+            }
+        }
+        m_player->UpdateWithCamera(camera, targets);
     }
 
     // ネズミ等オブジェクト更新（時間停止中は更新スキップ）

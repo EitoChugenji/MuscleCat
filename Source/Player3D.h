@@ -1,6 +1,7 @@
 #pragma once
 #include "GameObject3D.h"
 #include <deque>
+#include <vector>
 
 // プレイヤーの筋肉状態
 enum class MuscleState
@@ -83,6 +84,14 @@ private:
     int    m_currentAnimIndex = -1;
     float  m_animPlayTime = 0.0f;
 
+    // 各アニメーションのインデックス（cat.mv1）
+    int    m_animIndexRun = 0;       // Armature|01_Run (走り・移動)
+    int    m_animIndexAttack = 1;    // Armature|02_Attack (飛びつき)
+    int    m_animIndexSquat = 2;     // Armature|03_squat (筋トレQTE)
+    int    m_animIndexIdol = 3;      // Armature|04_Idol (待機)
+    int    m_animIndexPush = 4;      // Armature|05_Push (Eキー / タックル)
+    int    m_animIndexSoreness = 5;  // Armature|06_MuscleSoreness (筋肉痛)
+
     // 手のボーンフレーム（バーベル両手アタッチ用）
     int    m_lHandFrame = -1;
     int    m_rHandFrame = -1;
@@ -101,7 +110,7 @@ public:
     virtual ~Player3D();
 
     void Update() override;
-    void UpdateWithCamera(const Camera3D& camera);
+    void UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR>& targetPositions = {});
     void Draw3D() override;
     void Draw2D() override;
 
@@ -257,7 +266,7 @@ public:
         return 28.0f;
     }
 
-    // タックル（Eキー）パラメータ動的算出（初期から使用可能、Repで強化、最大Lv15で頭打ち）
+    // タックル（Eキー）パラメータ動的算出（4 Rep以上で使用可能、Repで強化、最大Lv15で頭打ち）
     float GetTackleSpeed() const
     {
         return 8.0f + static_cast<float>(GetEffectiveRep()) * 0.9f;
@@ -338,7 +347,7 @@ public:
             return !m_isTackling && !m_isPouncing;
         }
         
-        return (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isPouncing && !m_isTackling && (m_tackleCooldown <= 0);
+        return (m_repCount >= 4) && (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isPouncing && !m_isTackling && (m_tackleCooldown <= 0);
     }
     
     float GetTackleCooldownRatio() const

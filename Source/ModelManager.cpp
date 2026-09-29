@@ -36,6 +36,34 @@ int ModelManager::LoadModelHandle(const std::string& path)
 
     // モデルファイル読み込み試行
     int handle = MV1LoadModel(path.c_str());
+    if (handle != -1)
+    {
+        // テクスチャ抜け防止および自動復旧
+        int texNum = MV1GetTextureNum(handle);
+        for (int i = 0; i < texNum; ++i)
+        {
+            int grHandle = MV1GetTextureGraphHandle(handle, i);
+            if (grHandle == -1)
+            {
+                const char* candidatePaths[] = {
+                    "Resource/Models/CatModel/MascleCat.fbm/0.jpg",
+                    "Resource/Models/CatModel/cat.fbm/0.jpg",
+                    "Resource/Models/CatModel/0.jpg"
+                };
+
+                for (const char* cPath : candidatePaths)
+                {
+                    int loadedGr = LoadGraph(cPath);
+                    if (loadedGr != -1)
+                    {
+                        MV1SetTextureGraphHandle(handle, i, loadedGr, FALSE);
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
     m_modelHandles[path] = handle;
 
     return handle;
