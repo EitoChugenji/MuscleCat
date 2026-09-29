@@ -265,7 +265,7 @@ void GameManager::Update()
         m_camera.Apply();
 
         // リトライまたはタイトル
-        if (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_R))
+        if (CheckHitKey(KEY_INPUT_R))
         {
             StartGame();
         }
@@ -330,8 +330,8 @@ void GameManager::Draw()
         DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(10, 15, 25), TRUE);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        int titleW = GetDrawStringWidthToHandle("マッスルねこ 3D", static_cast<int>(std::string("マッスルねこ 3D").length()), font48);
-        DrawStringToHandle((Config::SCREEN_WIDTH - titleW) / 2, 160, "マッスルねこ 3D", yellow, font48);
+        int titleW = GetDrawStringWidthToHandle("マッスルにゃんこ", static_cast<int>(std::string("マッスルにゃんこ").length()), font48);
+        DrawStringToHandle((Config::SCREEN_WIDTH - titleW) / 2, 160, "マッスルにゃんこ", yellow, font48);
 
         int subW = GetDrawStringWidthToHandle("- MUSCLE CAT 3D CHASE -", static_cast<int>(std::string("- MUSCLE CAT 3D CHASE -").length()), font18);
         DrawStringToHandle((Config::SCREEN_WIDTH - subW) / 2, 225, "- MUSCLE CAT 3D CHASE -", white, font18);
@@ -535,7 +535,7 @@ void GameManager::Draw()
 
         DrawFormatStringToHandle(boxX + 130, boxY + 160, rankColor, font24, "ランク       : %s", rankText);
 
-        DrawStringToHandle(boxX + 130, boxY + 240, "[SPACE] または [R] キー: リトライ", GetColor(150, 255, 150), font18);
-        DrawStringToHandle(boxX + 130, boxY + 280, "[T] キー: タイトル画面へ戻る", cyan, font18);
+        DrawStringToHandle(boxX + 130, boxY + 240, "[R]: リトライ", GetColor(150, 255, 150), font18);
+        DrawStringToHandle(boxX + 130, boxY + 280, "[T] : タイトル", cyan, font18);
     }
 }
