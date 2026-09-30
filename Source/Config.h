@@ -7,7 +7,7 @@ namespace Config
     constexpr int SCREEN_WIDTH  = 1280;
     constexpr int SCREEN_HEIGHT = 720;
     constexpr int COLOR_DEPTH   = 32;
-    constexpr const char* TITLE = "マッスルねこ 3D (Muscle Cat 3D)";
+    constexpr const char* TITLE = "MuscleCat 3D";
 
     // ゲームバランス設定
     constexpr int NORMAL_MOUSE_COUNT = 3; // 通常ネズミの配置数（合計5匹）

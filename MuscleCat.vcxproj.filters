@@ -61,7 +61,7 @@
     <ClCompile Include="Source\GameManager.cpp">
       <Filter>ソースファイル</Filter>
     </ClCompile>
-    <ClCompile Include="Source\main.cpp">
+    <ClCompile Include="Source\Main.cpp">
       <Filter>ソースファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\ModelManager.cpp">

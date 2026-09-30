@@ -5,7 +5,7 @@
 // ファイルが存在しない場合はプロシージャルな3Dプリミティブで描画されます
 namespace ModelConfig
 {
-    // プレイヤー（マッスルねこ）
+    // プレイヤー（MuscleCat）
     constexpr const char* CAT_MODEL_PATH = "Resource/Models/CatModel/cat.mv1";
     constexpr float       CAT_MODEL_SCALE = 0.24f;          // スケール2倍に拡大（0.12 → 0.24）
     constexpr float       CAT_MODEL_ROT_Y = 3.14159265f;    // 180度反転（反対向き補正）
