@@ -18,8 +18,8 @@ namespace Config
     constexpr float STAGE_HALF_DEPTH  = 300.0f; // Z方向の半奥行 (-380 〜 +380)
     constexpr float WALL_HEIGHT       = 32.0f;  // 壁の高さ（視界を遮らないフェンス高）
 
-    // カメラ設定（ステージ全体俯瞰・固定見下ろし視点 - 程よい近さ）
-    constexpr float CAMERA_DISTANCE = 500.0f; // ステージ中心からの手前オフセット距離
-    constexpr float CAMERA_HEIGHT   = 480.0f; // 上空からの高さ
-    constexpr float CAMERA_TARGET_OFFSET_Y = 0.0f;
+    // カメラ設定（三人称視点 TPS - 猫の背後追従）
+    constexpr float CAMERA_DISTANCE = 160.0f; // 猫からの追従距離（程よい引き具合）
+    constexpr float CAMERA_HEIGHT   = 65.0f;  // カメラの高さ
+    constexpr float CAMERA_TARGET_OFFSET_Y = 18.0f; // 注視点のプレイヤー高さオフセット（猫の中心付近）
 }

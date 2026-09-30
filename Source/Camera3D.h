@@ -16,13 +16,23 @@ private:
     int    m_prevMouseX = 0;
     int    m_prevMouseY = 0;
     bool   m_isFirstFrame = true;
+    VECTOR m_prevPlayerPos = VGet(0.0f, 0.0f, 0.0f);
+    int    m_manualControlTimer = 0;
 
 public:
     Camera3D();
     ~Camera3D() = default;
 
-    void Init(const VECTOR& initialTargetPos);
-    void Update(const VECTOR& targetPlayerPos, float playerFacingAngle, bool enableMouseLook = true);
+    void Init(const VECTOR& initialTargetPos, float initialAngleH = 0.0f);
+    void Update(
+        const VECTOR& targetPlayerPos,
+        float playerFacingAngle,
+        bool enableMouseLook = true,
+        bool isFrontView = false,
+        int stageModelHandle = -1,
+        const VECTOR* minBounds = nullptr,
+        const VECTOR* maxBounds = nullptr
+    );
     void Apply() const;
 
     float GetAngleH() const { return m_angleH; }

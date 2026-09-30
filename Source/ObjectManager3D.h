@@ -34,6 +34,16 @@ public:
         return m_player;
     }
 
+    Stage3D& GetStage()
+    {
+        return m_stage;
+    }
+
+    const Stage3D& GetStage() const
+    {
+        return m_stage;
+    }
+
     void AddObject(std::shared_ptr<GameObject3D> obj);
     void AddObstacle(std::shared_ptr<Obstacle3D> obs);
 
