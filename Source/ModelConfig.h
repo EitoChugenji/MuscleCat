@@ -25,8 +25,8 @@ namespace ModelConfig
     constexpr float       MOUSE_FAST_MODEL_ROT_Y = 3.14159265f; // 180度反転（ラジアン）
 
     // 3Dステージ / ジムルーム
-    constexpr const char* STAGE_MODEL_PATH = "Resource/Models/stage.mv1";
-    constexpr float       STAGE_MODEL_SCALE = 1.0f;
+    constexpr const char* STAGE_MODEL_PATH = "Resource/Models/Maps/firstmap.mv1";
+    constexpr float       STAGE_MODEL_SCALE = 100.0f;
 
     // 障害物（トレーニング器具）
     constexpr const char* BENCH_PRESS_MODEL_PATH  = "Resource/Models/bench_press.mv1";

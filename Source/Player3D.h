@@ -308,6 +308,13 @@ public:
         return m_radius;
     }
 
+    // 壁や障害物との物理的な当たり判定用身体半径（タックルの巨大攻撃範囲とは分離）
+    float GetBodyRadius() const
+    {
+        return m_radius + static_cast<float>(GetEffectiveRep()) * 0.3f;
+    }
+
+
     bool IsPouncing() const
     {
         return m_isPouncing;

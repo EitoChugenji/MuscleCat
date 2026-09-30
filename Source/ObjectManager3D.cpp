@@ -214,7 +214,7 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
     if (m_player && m_player->IsAlive())
     {
         VECTOR pPos = m_player->GetPos();
-        float pRadius = m_player->GetRadius();
+        float pRadius = m_player->GetBodyRadius();
         bool collided = false;
 
         // 障害物との押し出し判定
@@ -226,8 +226,8 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
             }
         }
 
-        // ステージ壁との押し出し判定
-        if (m_stage.ClampToBounds(pPos, pRadius))
+        // ステージ壁との押し出し判定（マップモデルの壁ポリゴン対応）
+        if (m_stage.ResolveWallCollision(pPos, pRadius))
         {
             collided = true;
         }
@@ -258,7 +258,7 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
             obs->ResolveCollision(mPos, mRadius);
         }
 
-        m_stage.ClampToBounds(mPos, mRadius);
+        m_stage.ResolveWallCollision(mPos, mRadius);
         obj->SetPos(mPos);
     }
 }

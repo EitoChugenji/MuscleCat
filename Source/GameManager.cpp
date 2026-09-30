@@ -83,7 +83,7 @@ void GameManager::SetupTitle()
     auto player = std::make_shared<Player3D>(VGet(0.0f, 0.0f, 0.0f));
     m_objManager.SetPlayer(player);
 
-    m_camera.Init(player->GetPos());
+    m_camera.Init(player->GetPos(), player->GetRotY());
     SetupRoomObstacles();
 }
 
@@ -96,8 +96,8 @@ void GameManager::StartGame()
     auto player = std::make_shared<Player3D>(VGet(0.0f, 0.0f, 0.0f));
     m_objManager.SetPlayer(player);
 
-    // カメラ初期化
-    m_camera.Init(player->GetPos());
+    // カメラ初期化（猫の背後から開始）
+    m_camera.Init(player->GetPos(), player->GetRotY());
 
     // 部屋の家具配置
     SetupRoomObstacles();
@@ -163,7 +163,9 @@ void GameManager::Update()
         auto player = m_objManager.GetPlayer();
         if (player)
         {
-            m_camera.Update(player->GetPos(), player->GetRotY(), true);
+            bool isFrontView = player->IsSkillChecking();
+            const auto& stage = m_objManager.GetStage();
+            m_camera.Update(player->GetPos(), player->GetRotY(), true, isFrontView, stage.GetModelHandle(), &stage.GetMinBounds(), &stage.GetMaxBounds());
         }
 
         m_camera.Apply();
@@ -259,7 +261,8 @@ void GameManager::Update()
 
         if (player)
         {
-            m_camera.Update(player->GetPos(), player->GetRotY(), false);
+            const auto& stage = m_objManager.GetStage();
+            m_camera.Update(player->GetPos(), player->GetRotY(), false, false, stage.GetModelHandle(), &stage.GetMinBounds(), &stage.GetMaxBounds());
         }
 
         m_camera.Apply();
@@ -433,14 +436,14 @@ void GameManager::Draw()
 
         if (player && player->GetRepCount() >= 4 && player->GetMuscleState() != MuscleState::Soreness) {
             DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 72, GetColor(255, 230, 80), font16, "★ タックル: [E] (Push突進！ネズミ気絶) | 飛びつき: [SHIFT]/[X] (Lv.%d 跳躍突進！)", player->GetRepCount());
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD キー / [マウス左クリック長押し]", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD / [マウス左長押し] | カメラ: 背後自動追従 [右ドラッグで視点/ホイールで距離]", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でさらにRep追加！ (15秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         }
         
         else
         {
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 72, "【Lv.4でタックル[E]＆飛びつき解放】 筋トレ: [SPACE] で筋肉をつけよう！", GetColor(255, 200, 80), font16);
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD キー / [マウス左クリック長押し]", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD / [マウス左長押し] | カメラ: 背後自動追従 [右ドラッグで視点/ホイールで距離]", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でRep追加！ (15秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         }
 
