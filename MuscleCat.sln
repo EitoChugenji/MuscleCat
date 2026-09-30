@@ -1,9 +1,9 @@
-﻿
+
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.37328.6
+VisualStudioVersion = 17.14.37328.6 d17.14
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "マッスルねこ", "マッスルねこ.vcxproj", "{45AD52E7-EFEB-479D-81C6-E135C290C426}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "MuscleCat", "MuscleCat.vcxproj", "{45AD52E7-EFEB-479D-81C6-E135C290C426}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

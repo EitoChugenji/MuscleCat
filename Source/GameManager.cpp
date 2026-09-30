@@ -330,8 +330,8 @@ void GameManager::Draw()
         DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(10, 15, 25), TRUE);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        int titleW = GetDrawStringWidthToHandle("マッスルねこ 3D", static_cast<int>(std::string("マッスルねこ 3D").length()), font48);
-        DrawStringToHandle((Config::SCREEN_WIDTH - titleW) / 2, 160, "マッスルねこ 3D", yellow, font48);
+        int titleW = GetDrawStringWidthToHandle("MuscleCat 3D", static_cast<int>(std::string("MuscleCat 3D").length()), font48);
+        DrawStringToHandle((Config::SCREEN_WIDTH - titleW) / 2, 160, "MuscleCat 3D", yellow, font48);
 
         int subW = GetDrawStringWidthToHandle("- MUSCLE CAT 3D CHASE -", static_cast<int>(std::string("- MUSCLE CAT 3D CHASE -").length()), font18);
         DrawStringToHandle((Config::SCREEN_WIDTH - subW) / 2, 225, "- MUSCLE CAT 3D CHASE -", white, font18);

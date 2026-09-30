@@ -22,7 +22,7 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{45ad52e7-efeb-479d-81c6-e135c290c426}</ProjectGuid>
-    <RootNamespace>マッスルねこ</RootNamespace>
+    <RootNamespace>MuscleCat</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
@@ -167,7 +167,7 @@
     <ClCompile Include="Source\EffectManager.cpp" />
     <ClCompile Include="Source\FontManager.cpp" />
     <ClCompile Include="Source\GameManager.cpp" />
-    <ClCompile Include="Source\main.cpp" />
+    <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\ModelManager.cpp" />
     <ClCompile Include="Source\Mouse3D.cpp" />
     <ClCompile Include="Source\ObjectManager3D.cpp" />
