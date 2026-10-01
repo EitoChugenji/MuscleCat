@@ -19,7 +19,7 @@ namespace Config
     constexpr float WALL_HEIGHT       = 32.0f;  // 壁の高さ（視界を遮らないフェンス高）
 
     // カメラ設定（三人称視点 TPS - 猫の背後追従）
-    constexpr float CAMERA_DISTANCE = 160.0f; // 猫からの追従距離（程よい引き具合）
-    constexpr float CAMERA_HEIGHT   = 65.0f;  // カメラの高さ
+    constexpr float CAMERA_DISTANCE = 225.0f; // 猫からの追従距離（程よく離して周囲を見渡しやすく調整）
+    constexpr float CAMERA_HEIGHT   = 78.0f;  // カメラの高さ
     constexpr float CAMERA_TARGET_OFFSET_Y = 18.0f; // 注視点のプレイヤー高さオフセット（猫の中心付近）
 }

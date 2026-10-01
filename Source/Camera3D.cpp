@@ -91,7 +91,7 @@ void Camera3D::Update(
     if (wheelRot != 0)
     {
         m_distance -= static_cast<float>(wheelRot) * 15.0f;
-        m_distance = MathHelper::Clamp(m_distance, 90.0f, 260.0f);
+        m_distance = MathHelper::Clamp(m_distance, 110.0f, 360.0f);
     }
 
     if (m_manualControlTimer > 0)
@@ -116,12 +116,12 @@ void Camera3D::Update(
         float targetAngleFront = playerFacingAngle + MathHelper::PI;
         m_angleH = MathHelper::LerpAngle(m_angleH, targetAngleFront, 0.10f);
 
-        // 正面から表情・筋肉がよく見えるアングル＆距離
-        float targetAngleV = 16.0f * MathHelper::DEG_TO_RAD;
+        // 正面から表情・筋肉・バーベルが程よい引きで見えるアングル＆距離
+        float targetAngleV = 18.0f * MathHelper::DEG_TO_RAD;
         m_angleV = MathHelper::Lerp(m_angleV, targetAngleV, 0.08f);
 
-        // 少し寄って迫力アップ
-        currentTargetDist = MathHelper::Lerp(currentTargetDist, 115.0f, 0.08f);
+        // 少し寄って迫力アップ（程よく引きを保つ）
+        currentTargetDist = MathHelper::Lerp(currentTargetDist, 145.0f, 0.08f);
     }
     else
     {
