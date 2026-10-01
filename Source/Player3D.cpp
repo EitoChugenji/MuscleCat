@@ -488,27 +488,27 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                     return;
                 }
 
-                // 移動入力処理 (WASD / 矢印キー / マウス左クリック長押し) - カメラのXZ平面基準
+                // 移動入力処理 (WASDキー) - カメラのXZ平面基準
                 VECTOR forwardXZ = camera.GetForwardXZ();
                 VECTOR rightXZ   = camera.GetRightXZ();
                 VECTOR moveDir   = VGet(0.0f, 0.0f, 0.0f);
 
-                if (CheckHitKey(KEY_INPUT_W) || CheckHitKey(KEY_INPUT_UP))
+                if (CheckHitKey(KEY_INPUT_W))
                 {
                     moveDir = VAdd(moveDir, forwardXZ);
                 }
                 
-                if (CheckHitKey(KEY_INPUT_S) || CheckHitKey(KEY_INPUT_DOWN))
+                if (CheckHitKey(KEY_INPUT_S))
                 {
                     moveDir = VSub(moveDir, forwardXZ);
                 }
                 
-                if (CheckHitKey(KEY_INPUT_D) || CheckHitKey(KEY_INPUT_RIGHT))
+                if (CheckHitKey(KEY_INPUT_D))
                 {
                     moveDir = VAdd(moveDir, rightXZ);
                 }
                 
-                if (CheckHitKey(KEY_INPUT_A) || CheckHitKey(KEY_INPUT_LEFT))
+                if (CheckHitKey(KEY_INPUT_A))
                 {
                     moveDir = VSub(moveDir, rightXZ);
                 }

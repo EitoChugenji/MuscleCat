@@ -143,13 +143,14 @@ void GameManager::Update()
 
         SetCameraPositionAndTarget_UpVecY(camPos, center);
 
-        // ゲームスタート判定：Enterキー または マウス左クリックのみ
+        // ゲームスタート判定：Enterキー または SPACEキー または マウス左クリック
         bool isEnter = (CheckHitKey(KEY_INPUT_RETURN) != 0);
+        bool isSpace = (CheckHitKey(KEY_INPUT_SPACE) != 0);
         bool isLeftClick = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
         bool isMouseTrigger = isLeftClick && !m_prevMouseLeft;
         m_prevMouseLeft = isLeftClick;
 
-        if (isEnter || isMouseTrigger)
+        if (isEnter || isSpace || isMouseTrigger)
         {
             StartGame();
         }
@@ -342,8 +343,8 @@ void GameManager::Draw()
         // スタート促進点滅表示
         if ((GetNowCount() / 400) % 2 == 0)
         {
-            int startW = GetDrawStringWidthToHandle("[ PRESS ENTER or CLICK TO START ]", static_cast<int>(std::string("[ PRESS ENTER or CLICK TO START ]").length()), font24);
-            DrawStringToHandle((Config::SCREEN_WIDTH - startW) / 2, 360, "[ PRESS ENTER or CLICK TO START ]", cyan, font24);
+            int startW = GetDrawStringWidthToHandle("[ PRESS ENTER or SPACE TO START ]", static_cast<int>(std::string("[ PRESS ENTER or SPACE TO START ]").length()), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - startW) / 2, 360, "[ PRESS ENTER or SPACE TO START ]", cyan, font24);
         }
 
         // 操作説明パネル
@@ -352,12 +353,12 @@ void GameManager::Draw()
         DrawBox(panelX, panelY, panelX + 640, panelY + 220, GetColor(30, 35, 48), TRUE);
         DrawBox(panelX, panelY, panelX + 640, panelY + 220, GetColor(100, 120, 160), FALSE);
 
-        DrawStringToHandle(panelX + 20, panelY + 15, "【操作方法】", yellow, font18);
-        DrawStringToHandle(panelX + 30, panelY + 45, "・移動: WASD キー または [マウス左クリック長押し]", white, font16);
-        DrawStringToHandle(panelX + 30, panelY + 73, "・筋トレ: [SPACE] キー （タイミングよく押してRep獲得＆加速！）", GetColor(255, 210, 80), font16);
-        DrawStringToHandle(panelX + 30, panelY + 101, "・タックル: [E] キー （4 Rep以上で解放！ネズミ気絶/壁激突注意）", GetColor(255, 160, 50), font16);
-        DrawStringToHandle(panelX + 30, panelY + 129, "・飛びつき: [SHIFT] または [X] キー （4 Rep以上で跳躍突進！）", GetColor(255, 110, 50), font16);
-        DrawStringToHandle(panelX + 30, panelY + 157, "・視点: ステージ全体俯瞰固定ビュー", cyan, font16);
+        DrawStringToHandle(panelX + 20, panelY + 15, "【操作方法（キーボード対応）】", yellow, font18);
+        DrawStringToHandle(panelX + 30, panelY + 45, "・移動: WASD キー", white, font16);
+        DrawStringToHandle(panelX + 30, panelY + 73, "・カメラ回転: 矢印キー [←→↑↓] または [Q][R] / 視点リセット [F]", cyan, font16);
+        DrawStringToHandle(panelX + 30, panelY + 101, "・筋トレ: [SPACE] キー （タイミングよく押してRep獲得＆加速！）", GetColor(255, 210, 80), font16);
+        DrawStringToHandle(panelX + 30, panelY + 129, "・タックル: [E] キー （4 Rep以上で解放！ネズミ気絶/壁激突注意）", GetColor(255, 160, 50), font16);
+        DrawStringToHandle(panelX + 30, panelY + 157, "・飛びつき: [SHIFT] または [X] キー （4 Rep以上で跳躍突進！）", GetColor(255, 110, 50), font16);
         DrawStringToHandle(panelX + 30, panelY + 185, "※ 筋トレ失敗で5秒間筋肉痛（停止） / 15秒放置で筋肉減衰", GetColor(255, 120, 120), font13);
 
     }
@@ -434,16 +435,17 @@ void GameManager::Draw()
         DrawBox(10, Config::SCREEN_HEIGHT - 78, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 6, GetColor(255, 210, 50), FALSE);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        if (player && player->GetRepCount() >= 4 && player->GetMuscleState() != MuscleState::Soreness) {
+        if (player && player->GetRepCount() >= 4 && player->GetMuscleState() != MuscleState::Soreness)
+        {
             DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 72, GetColor(255, 230, 80), font16, "★ タックル: [E] (Push突進！ネズミ気絶) | 飛びつき: [SHIFT]/[X] (Lv.%d 跳躍突進！)", player->GetRepCount());
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD / [マウス左長押し] | カメラ: 背後自動追従 [右ドラッグで視点/ホイールで距離]", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD | カメラ: 矢印キー [←→↑↓] または [Q][R] | 視点リセット: [F]", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でさらにRep追加！ (15秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         }
         
         else
         {
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 72, "【Lv.4でタックル[E]＆飛びつき解放】 筋トレ: [SPACE] で筋肉をつけよう！", GetColor(255, 200, 80), font16);
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD / [マウス左長押し] | カメラ: 背後自動追従 [右ドラッグで視点/ホイールで距離]", white, font16);
+            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD | カメラ: 矢印キー [←→↑↓] または [Q][R] | 視点リセット: [F]", white, font16);
             DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] でRep追加！ (15秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
         }
 

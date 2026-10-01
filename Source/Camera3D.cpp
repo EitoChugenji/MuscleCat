@@ -8,7 +8,7 @@ Camera3D::Camera3D()
     : m_targetPos(VGet(0.0f, Config::CAMERA_TARGET_OFFSET_Y, 0.0f))
     , m_currentPos(VGet(0.0f, Config::CAMERA_HEIGHT, -Config::CAMERA_DISTANCE))
     , m_angleH(0.0f)
-    , m_angleV(24.0f * MathHelper::DEG_TO_RAD)
+    , m_angleV(38.0f * MathHelper::DEG_TO_RAD)
     , m_distance(Config::CAMERA_DISTANCE)
     , m_height(Config::CAMERA_HEIGHT)
     , m_prevMouseX(0)
@@ -24,7 +24,7 @@ void Camera3D::Init(const VECTOR& initialTargetPos, float initialAngleH)
     m_distance = Config::CAMERA_DISTANCE;
     m_height   = Config::CAMERA_HEIGHT;
     m_angleH   = initialAngleH;
-    m_angleV   = 24.0f * MathHelper::DEG_TO_RAD;
+    m_angleV   = 38.0f * MathHelper::DEG_TO_RAD;
     m_isFirstFrame = true;
     m_prevPlayerPos = initialTargetPos;
     m_manualControlTimer = 0;
@@ -51,15 +51,46 @@ void Camera3D::Update(
 )
 {
     // ------------------------------------------------------------------------
-    // 1. 手動カメラ操作（マウス右ボタンドラッグ / マウスホイール / Qキー補助）
+    // 1. キーボードによるカメラ操作（矢印キー、Q/Rキー、Fキーで視点リセット）
     // ------------------------------------------------------------------------
+    const float rotSpeedH = 0.045f; // 水平旋回スピード（キビキビ動いて酔いにくい）
+    const float rotSpeedV = 0.030f; // 垂直仰角スピード
+
+    // [←] または [Q] : カメラ左旋回
+    if (CheckHitKey(KEY_INPUT_LEFT) || CheckHitKey(KEY_INPUT_Q))
+    {
+        m_angleH -= rotSpeedH;
+    }
+
+    // [→] または [R] : カメラ右旋回
+    if (CheckHitKey(KEY_INPUT_RIGHT) || CheckHitKey(KEY_INPUT_R))
+    {
+        m_angleH += rotSpeedH;
+    }
+
+    // [↑] : 見下ろし角度を上げる（上空からの俯瞰へ）
+    if (CheckHitKey(KEY_INPUT_UP))
+    {
+        m_angleV += rotSpeedV;
+    }
+
+    // [↓] : 見下ろし角度を下げる（水平近くへ）
+    if (CheckHitKey(KEY_INPUT_DOWN))
+    {
+        m_angleV -= rotSpeedV;
+    }
+
+    // [F] キー : 視点リセット（猫の背後へスッと戻す）
+    if (CheckHitKey(KEY_INPUT_F))
+    {
+        m_angleH = MathHelper::LerpAngle(m_angleH, playerFacingAngle, 0.25f);
+    }
+
+    // マウス右ボタンドラッグ操作（マウス使用時の互換性）
     int mouseX = 0, mouseY = 0;
     GetMousePoint(&mouseX, &mouseY);
 
-    bool isManualRotating = false;
-
-    // 筋トレ中（正面視点）でなければ手動回転可能
-    if (!isFrontView && enableMouseLook && ((GetMouseInput() & MOUSE_INPUT_RIGHT) != 0))
+    if (enableMouseLook && ((GetMouseInput() & MOUSE_INPUT_RIGHT) != 0))
     {
         if (!m_isFirstFrame)
         {
@@ -70,74 +101,40 @@ void Camera3D::Update(
             {
                 m_angleH += static_cast<float>(dx) * 0.006f;
                 m_angleV += static_cast<float>(dy) * 0.006f;
-                isManualRotating = true;
-                m_manualControlTimer = 40; // 手動操作後しばらく手動アングルを維持
             }
         }
     }
+
     m_prevMouseX = mouseX;
     m_prevMouseY = mouseY;
-
-    // Qキーでのカメラ旋回補助（筋トレ中以外）
-    if (!isFrontView && CheckHitKey(KEY_INPUT_Q))
-    {
-        m_angleH -= 0.035f;
-        isManualRotating = true;
-        m_manualControlTimer = 40;
-    }
 
     // マウスホイールでのカメラ距離（ズーム）調整
     int wheelRot = GetMouseWheelRotVol();
     if (wheelRot != 0)
     {
         m_distance -= static_cast<float>(wheelRot) * 15.0f;
-        m_distance = MathHelper::Clamp(m_distance, 90.0f, 260.0f);
+        m_distance = MathHelper::Clamp(m_distance, 110.0f, 340.0f);
     }
 
-    if (m_manualControlTimer > 0)
+    // ------------------------------------------------------------------------
+    // 2. 視点角度の制限（移動時の遅延自動旋回は酔い防止のため完全停止）
+    // ------------------------------------------------------------------------
+    // 垂直角度の制限（地面へのめり込み防止〜急角度見下ろしまで）
+    m_angleV = MathHelper::Clamp(m_angleV, 12.0f * MathHelper::DEG_TO_RAD, 65.0f * MathHelper::DEG_TO_RAD);
+
+    if (m_isFirstFrame)
     {
-        m_manualControlTimer--;
+        m_angleH = playerFacingAngle;
     }
-
-    // ------------------------------------------------------------------------
-    // 2. 猫の移動検知 & 視点自動追従（通常は背後、筋トレ中は正面）
-    // ------------------------------------------------------------------------
-    float pDx = targetPlayerPos.x - m_prevPlayerPos.x;
-    float pDz = targetPlayerPos.z - m_prevPlayerPos.z;
-    float moveDistSq = pDx * pDx + pDz * pDz;
-    bool isCatMoving = (moveDistSq > 0.005f);
-    m_prevPlayerPos = targetPlayerPos;
 
     float currentTargetDist = m_distance;
 
     if (isFrontView)
     {
-        // ★ 筋トレ（SPACE）中: 猫の正面からスクワット姿を映すドラマチックカメラ
-        float targetAngleFront = playerFacingAngle + MathHelper::PI;
-        m_angleH = MathHelper::LerpAngle(m_angleH, targetAngleFront, 0.10f);
-
-        // 正面から表情・筋肉がよく見えるアングル＆距離
-        float targetAngleV = 16.0f * MathHelper::DEG_TO_RAD;
+        // 筋トレ（SPACE）中: 視点を急旋回させず安定を保ちつつ、少し寄ってスクワットを映す
+        float targetAngleV = 24.0f * MathHelper::DEG_TO_RAD;
         m_angleV = MathHelper::Lerp(m_angleV, targetAngleV, 0.08f);
-
-        // 少し寄って迫力アップ
-        currentTargetDist = MathHelper::Lerp(currentTargetDist, 115.0f, 0.08f);
-    }
-    else
-    {
-        // 通常プレイ中: 垂直角度の制限（見下ろし角度: 地面へのめり込み防止〜急角度見下ろしまで）
-        m_angleV = MathHelper::Clamp(m_angleV, 8.0f * MathHelper::DEG_TO_RAD, 58.0f * MathHelper::DEG_TO_RAD);
-
-        if (m_isFirstFrame)
-        {
-            m_angleH = playerFacingAngle;
-        }
-        else if (!isManualRotating && m_manualControlTimer <= 0)
-        {
-            // 猫の後ろ（playerFacingAngle）へ常に滑らかに追尾旋回
-            float followRate = isCatMoving ? 0.075f : 0.035f;
-            m_angleH = MathHelper::LerpAngle(m_angleH, playerFacingAngle, followRate);
-        }
+        currentTargetDist = MathHelper::Lerp(currentTargetDist, 160.0f, 0.08f);
     }
 
     // ------------------------------------------------------------------------
@@ -151,9 +148,10 @@ void Camera3D::Update(
     }
     else
     {
-        m_targetPos.x = MathHelper::Lerp(m_targetPos.x, desiredTarget.x, 0.22f);
-        m_targetPos.y = MathHelper::Lerp(m_targetPos.y, desiredTarget.y, 0.22f);
-        m_targetPos.z = MathHelper::Lerp(m_targetPos.z, desiredTarget.z, 0.22f);
+        // キビキビと追従させて遅延揺れ・フワフワ酔いを防止
+        m_targetPos.x = MathHelper::Lerp(m_targetPos.x, desiredTarget.x, 0.35f);
+        m_targetPos.y = MathHelper::Lerp(m_targetPos.y, desiredTarget.y, 0.35f);
+        m_targetPos.z = MathHelper::Lerp(m_targetPos.z, desiredTarget.z, 0.35f);
     }
 
     // ------------------------------------------------------------------------
@@ -245,9 +243,10 @@ void Camera3D::Update(
     }
     else
     {
-        m_currentPos.x = MathHelper::Lerp(m_currentPos.x, desiredCamX, 0.25f);
-        m_currentPos.y = MathHelper::Lerp(m_currentPos.y, desiredCamY, 0.25f);
-        m_currentPos.z = MathHelper::Lerp(m_currentPos.z, desiredCamZ, 0.25f);
+        // カメラ追従の遅延を抑えて安定した視界を維持
+        m_currentPos.x = MathHelper::Lerp(m_currentPos.x, desiredCamX, 0.35f);
+        m_currentPos.y = MathHelper::Lerp(m_currentPos.y, desiredCamY, 0.35f);
+        m_currentPos.z = MathHelper::Lerp(m_currentPos.z, desiredCamZ, 0.35f);
     }
 }
 
