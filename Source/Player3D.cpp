@@ -158,7 +158,7 @@ void Player3D::UpdateAnimation(bool isMoving)
         targetAnim = m_animIndexSoreness;  // Armature|06_MuscleSoreness
         playSpeed = 0.6f;
     }
-    else if (m_isSkillChecking)
+    else if (m_isSkillChecking || m_isTitleSquat)
     {
         targetAnim = m_animIndexSquat;     // Armature|03_squat
         playSpeed = 1.0f;
@@ -216,6 +216,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
     // キー入力受付（筋トレ: SPACE/Z、飛びつき: SHIFT/X/C、タックル: E）
     bool currentTriggerKey = (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_Z));
     bool isTriggerJustPressed = currentTriggerKey && !m_prevTriggerKey;
+    bool isTriggerJustReleased = !currentTriggerKey && m_prevTriggerKey;
     m_prevTriggerKey = currentTriggerKey;
 
     bool currentPounceKey = (CheckHitKey(KEY_INPUT_LSHIFT) || CheckHitKey(KEY_INPUT_RSHIFT) ||
@@ -631,9 +632,10 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                     float cursorSpeed = 0.014f * speedMultiplier;
                     m_scCursor += cursorSpeed;
 
-                    if (isTriggerJustPressed)
+                    // タイミングよくキーを離した瞬間にバーをピタッと止めて判定！
+                    if (isTriggerJustReleased)
                     {
-                        // キーを押した瞬間の座標で即座にピタッと止める
+                        // キーを離した瞬間の座標で即座にピタッと止める
                         if (m_scCursor > 1.0f)
                         {
                             m_scCursor = 1.0f;
@@ -764,10 +766,26 @@ void Player3D::Draw3D()
     {
         VECTOR drawPos = VGet(m_pos.x, m_pos.y + offsetY, m_pos.z);
 
+        if (isSoreness)
+        {
+            // 筋肉痛時：少しだけ青ざめた青色にティント（青スケール強調＋ほのかな青エミッシブ）
+            MV1SetDifColorScale(m_modelHandle, GetColorF(0.55f, 0.65f, 1.30f, 1.0f));
+            MV1SetAmbColorScale(m_modelHandle, GetColorF(0.50f, 0.60f, 1.35f, 1.0f));
+            MV1SetEmiColorScale(m_modelHandle, GetColorF(0.08f, 0.12f, 0.35f, 1.0f));
+        }
+
         MV1SetPosition(m_modelHandle, drawPos);
         MV1SetRotationXYZ(m_modelHandle, VGet(0.0f, m_rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
         MV1SetScale(m_modelHandle, VGet(scale, scale, scale));
         MV1DrawModel(m_modelHandle);
+
+        if (isSoreness)
+        {
+            // 通常カラーに復帰
+            MV1SetDifColorScale(m_modelHandle, GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
+            MV1SetAmbColorScale(m_modelHandle, GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
+            MV1SetEmiColorScale(m_modelHandle, GetColorF(0.0f, 0.0f, 0.0f, 1.0f));
+        }
     }
     
     else
@@ -921,7 +939,7 @@ void Player3D::Draw2D()
         
         else
         {
-            DrawStringToHandle(barX + 45, barY - 30, "緑のゾーンで [SPACE] をキメろ！", GetColor(255, 255, 80), font18);
+            DrawStringToHandle(barX + 35, barY - 30, "緑のゾーンで [SPACE] を離せ！", GetColor(255, 255, 80), font18);
         }
     }
 

@@ -15,6 +15,11 @@ protected:
     float m_animTime = 0.0f;
     int   m_stunTimer = 0;     // スタン残りフレーム数
 
+    // 建物徘徊・パトロール用
+    VECTOR m_targetWaypoint = VGet(0.0f, 0.0f, 0.0f);
+    int    m_patrolTimer = 0;
+    bool   m_isFleeingNow = false;
+
     // 猫の最大レベル(Lv15)の速度(6.05f)より少し遅いスピードを上限に
     static constexpr float MOUSE_MAX_SPEED = 5.3f;
 
@@ -68,7 +73,19 @@ public:
     // 2D頭上スタン表示＆パニック漫符（汗・ビックリ）表示
     void Draw2D() override;
 
-    // 壁際でのスライディング脱出＆プレイヤー回避移動ベクトル算出
+    // 壁衝突イベント（押し出し法線を受け取り、反射・スライディングして方向転換）
+    virtual void OnWallCollision(const VECTOR& pushNormal);
+
+    // 徘徊AI：新しい巡回部屋・地点を選択
+    void ChooseNewPatrolTarget();
+
+    // 徘徊AI：目標地点へ向けた移動ベクトルの更新
+    void UpdateWanderMovement(float speed);
+
+    // 逃走AI：プレイヤーから離れる移動ベクトルの更新
+    void UpdateFleeMovement(const VECTOR& playerPos, float speed);
+
+    // 壁際でのスライディング脱出＆プレイヤー回避移動ベクトル算出（互換用）
     void CalculateMovementVector(const VECTOR& playerPos, float fleeDistance, float speed, bool isFast);
 };
 

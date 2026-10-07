@@ -258,7 +258,15 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
             obs->ResolveCollision(mPos, mRadius);
         }
 
-        m_stage.ResolveWallCollision(mPos, mRadius);
+        VECTOR pushNormal = VGet(0.0f, 0.0f, 0.0f);
+        if (m_stage.ResolveWallCollision(mPos, mRadius, &pushNormal))
+        {
+            auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
+            if (mouse)
+            {
+                mouse->OnWallCollision(pushNormal);
+            }
+        }
         obj->SetPos(mPos);
     }
 }

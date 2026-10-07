@@ -146,6 +146,17 @@ void Stage3D::Init()
                 m_minBounds.x, m_minBounds.y, m_minBounds.z,
                 m_maxBounds.x, m_maxBounds.y, m_maxBounds.z);
 
+            for (int m = 0; m < meshNum; ++m)
+            {
+                VECTOR bMin = MV1GetMeshMinPosition(m_modelHandle, m);
+                VECTOR bMax = MV1GetMeshMaxPosition(m_modelHandle, m);
+                int polyNum = MV1GetMeshTriangleNum(m_modelHandle, m);
+                AppLogAdd("  Mesh[%d]: polyNum=%d, Min=(%.1f, %.1f, %.1f), Max=(%.1f, %.1f, %.1f)\n",
+                    m, polyNum,
+                    bMin.x * scale, bMin.y * scale, bMin.z * scale,
+                    bMax.x * scale, bMax.y * scale, bMax.z * scale);
+            }
+
             // モデルから直接参照ポリゴンを取得し、面法線による壁ポリゴンリストを構築
             m_wallPolygons.clear();
 
@@ -158,6 +169,8 @@ void Stage3D::Init()
                 return (m > c) ? m : c;
             };
 
+            std::vector<int> meshWallCount(meshNum, 0);
+
             auto ExtractPolygons = [&](const MV1_REF_POLYGONLIST& ref) {
                 if (ref.PolygonNum <= 0 || ref.Polygons == nullptr || ref.Vertexs == nullptr)
                 {
@@ -167,9 +180,37 @@ void Stage3D::Init()
                 for (int i = 0; i < ref.PolygonNum; ++i)
                 {
                     const auto& poly = ref.Polygons[i];
+
+                    // 【床メッシュの除外】
+                    // 親メッシュの上端が低いもの（床メッシュ: Max.Y=5.0f）や高さが小さいものは、
+                    // 床ブロックの側面や分け目なので壁として抽出しない
+                    if (poly.MeshIndex < meshNum)
+                    {
+                        VECTOR bMin = MV1GetMeshMinPosition(m_modelHandle, poly.MeshIndex);
+                        VECTOR bMax = MV1GetMeshMaxPosition(m_modelHandle, poly.MeshIndex);
+                        float meshMaxY = bMax.y * scale;
+                        float meshHeight = (bMax.y - bMin.y) * scale;
+                        if (meshMaxY < 100.0f || meshHeight < 50.0f)
+                        {
+                            continue; // 床メッシュ（分け目の垂直面）を除外
+                        }
+                    }
+
                     VECTOR v0 = ref.Vertexs[poly.VIndex[0]].Position;
                     VECTOR v1 = ref.Vertexs[poly.VIndex[1]].Position;
                     VECTOR v2 = ref.Vertexs[poly.VIndex[2]].Position;
+
+                    float polyMinY = CalcMin3(v0.y, v1.y, v2.y);
+                    float polyMaxY = CalcMax3(v0.y, v1.y, v2.y);
+                    float polyHeight = polyMaxY - polyMinY;
+
+                    // 【ポリゴン単位の床分け目除外】
+                    // 本物の壁は Y=0 〜 Y=200 まで伸びている。
+                    // 床の分け目や段差（上端が50未満、または高さが40未満）は除外
+                    if (polyMaxY < 50.0f || polyHeight < 40.0f)
+                    {
+                        continue;
+                    }
 
                     // 面法線の計算 (v1 - v0) x (v2 - v0)
                     VECTOR e1 = VSub(v1, v0);
@@ -193,9 +234,14 @@ void Stage3D::Init()
                         wp.v1 = v1;
                         wp.v2 = v2;
                         wp.normal = normal;
-                        wp.minPos = VGet(CalcMin3(v0.x, v1.x, v2.x), CalcMin3(v0.y, v1.y, v2.y), CalcMin3(v0.z, v1.z, v2.z));
-                        wp.maxPos = VGet(CalcMax3(v0.x, v1.x, v2.x), CalcMax3(v0.y, v1.y, v2.y), CalcMax3(v0.z, v1.z, v2.z));
+                        wp.minPos = VGet(CalcMin3(v0.x, v1.x, v2.x), polyMinY, CalcMin3(v0.z, v1.z, v2.z));
+                        wp.maxPos = VGet(CalcMax3(v0.x, v1.x, v2.x), polyMaxY, CalcMax3(v0.z, v1.z, v2.z));
                         m_wallPolygons.push_back(wp);
+
+                        if (poly.MeshIndex < meshNum)
+                        {
+                            meshWallCount[poly.MeshIndex]++;
+                        }
                     }
                 }
             };
@@ -208,21 +254,33 @@ void Stage3D::Init()
                 MV1TerminateReferenceMesh(m_modelHandle, -1, TRUE);
             }
 
-            // 2. もし全体取得でポリゴンが取れなかった場合は各メッシュから個別に取得
-            if (m_wallPolygons.empty())
+            for (int m = 0; m < meshNum; ++m)
             {
-                for (int m = 0; m < meshNum; ++m)
+                if (meshWallCount[m] > 0)
                 {
-                    if (MV1SetupReferenceMesh(m_modelHandle, -1, TRUE, FALSE, m) >= 0)
-                    {
-                        MV1_REF_POLYGONLIST refMesh = MV1GetReferenceMesh(m_modelHandle, -1, TRUE, FALSE, m);
-                        ExtractPolygons(refMesh);
-                        MV1TerminateReferenceMesh(m_modelHandle, -1, TRUE, FALSE, m);
-                    }
+                    AppLogAdd("  Mesh[%d] produced %d wall polygons\n", m, meshWallCount[m]);
                 }
             }
 
-            AppLogAdd("Stage wall polygons extracted: %d\n", static_cast<int>(m_wallPolygons.size()));
+            int lowPolyCount = 0;
+            int highPolyCount = 0;
+            int midPolyCount = 0;
+            for (const auto& wp : m_wallPolygons)
+            {
+                if (wp.maxPos.y <= 4.0f) lowPolyCount++;
+                else if (wp.minPos.y >= 35.0f) highPolyCount++;
+                else midPolyCount++;
+            }
+
+            AppLogAdd("Stage wall polygons: total=%d (floor-level<=4: %d, player-level: %d, ceiling-level>=35: %d)\n",
+                static_cast<int>(m_wallPolygons.size()), lowPolyCount, midPolyCount, highPolyCount);
+            if (!m_wallPolygons.empty())
+            {
+                AppLogAdd("Sample Wall Polygon 0: v0=(%.1f, %.1f, %.1f), v1=(%.1f, %.1f, %.1f), normal=(%.2f, %.2f, %.2f)\n",
+                    m_wallPolygons[0].v0.x, m_wallPolygons[0].v0.y, m_wallPolygons[0].v0.z,
+                    m_wallPolygons[0].v1.x, m_wallPolygons[0].v1.y, m_wallPolygons[0].v1.z,
+                    m_wallPolygons[0].normal.x, m_wallPolygons[0].normal.y, m_wallPolygons[0].normal.z);
+            }
         }
     }
 }
@@ -239,20 +297,26 @@ void Stage3D::Draw3D()
     }
 }
 
-bool Stage3D::ResolveWallCollision(VECTOR& outPos, float radius) const
+bool Stage3D::ResolveWallCollision(VECTOR& outPos, float radius, VECTOR* outPushNormal) const
 {
     bool anyCollided = false;
+    if (outPushNormal)
+    {
+        *outPushNormal = VGet(0.0f, 0.0f, 0.0f);
+    }
 
     if (!m_wallPolygons.empty())
     {
-        // 押し戻しを最大4回反復してコーナーや鋭角、複数壁ポリゴンに完璧に対処
+        // 押し戻しを最大4回反復（各反復で最もめり込みが大きい壁を正確に押し出し、オーバープッシュやコーナーの挟まりを解消）
         for (int iter = 0; iter < 4; ++iter)
         {
-            bool iterationPushed = false;
+            float maxPenetration = 0.0f;
+            float bestPushX = 0.0f;
+            float bestPushZ = 0.0f;
 
-            // キャラクターの判定高さを設定（猫の足元〜上半身）
+            float charHeight = (radius * 2.0f > 24.0f) ? (radius * 2.0f) : 24.0f;
             float catBottomY = outPos.y;
-            float catTopY    = outPos.y + 24.0f;
+            float catTopY    = outPos.y + charHeight;
 
             for (const auto& poly : m_wallPolygons)
             {
@@ -264,11 +328,17 @@ bool Stage3D::ResolveWallCollision(VECTOR& outPos, float radius) const
                     continue;
                 }
 
+                // 足元より下、または頭より上にある無関係なポリゴン（床の凹凸や天井・梁）は除外
+                if (poly.maxPos.y < catBottomY || poly.minPos.y > catTopY)
+                {
+                    continue;
+                }
+
                 // 三角形の高さに合わせてキャラクター中心線上の最適なテスト点Pを決定
                 float polyMidY = (poly.v0.y + poly.v1.y + poly.v2.y) * 0.333333f;
-                float testY = polyMidY;
-                if (testY < catBottomY + 4.0f) testY = catBottomY + 4.0f;
-                if (testY > catTopY - 4.0f)    testY = catTopY - 4.0f;
+                float testY = catBottomY + radius * 0.5f;
+                if (testY < poly.minPos.y) testY = poly.minPos.y + 0.1f;
+                if (testY > poly.maxPos.y) testY = poly.maxPos.y - 0.1f;
 
                 VECTOR p = VGet(outPos.x, testY, outPos.z);
                 VECTOR q = ClosestPointOnTriangle(p, poly.v0, poly.v1, poly.v2);
@@ -278,74 +348,74 @@ bool Stage3D::ResolveWallCollision(VECTOR& outPos, float radius) const
                 float dz = outPos.z - q.z;
                 float distSq = dx * dx + dz * dz;
 
-                // 水平判定半径以内で、かつ高さ方向にも重なっているか
-                if (distSq < radius * radius && q.y >= catBottomY - 4.0f && q.y <= catTopY + 4.0f)
+                // 水平判定半径以内で壁と交差しているか判定（垂直壁のため水平距離で判定）
+                if (distSq < radius * radius)
                 {
-                    // ポリゴンの水平面法線
-                    float nx = poly.normal.x;
-                    float nz = poly.normal.z;
-                    float nLenSq = nx * nx + nz * nz;
-                    if (nLenSq < 0.0001f)
-                    {
-                        continue;
-                    }
-                    float invNLen = 1.0f / std::sqrt(nLenSq);
-                    nx *= invNLen;
-                    nz *= invNLen;
-
-                    // プレイヤーが壁の表面側（法線の向き側）にいるか裏面側（突き抜けているか）判定
-                    float dot = dx * nx + dz * nz;
                     float dist = std::sqrt(distSq);
+                    float penetration = radius - dist;
 
-                    float pushX = 0.0f;
-                    float pushZ = 0.0f;
-                    float pushDist = 0.0f;
-
-                    if (dot >= -0.01f)
+                    if (penetration > maxPenetration)
                     {
-                        // 【表側からのめり込み】
-                        pushDist = radius - dist;
-
+                        // 離反方向ベクトル（三角形の接触点から離れる方向）
+                        float awayX = 0.0f;
+                        float awayZ = 0.0f;
                         if (dist > 0.001f)
                         {
-                            // 離反ベクトル (dx, dz) と面法線 (nx, nz) をブレンドして滑らかな滑り移動を実現
-                            float awayX = dx / dist;
-                            float awayZ = dz / dist;
-                            pushX = nx * 0.7f + awayX * 0.3f;
-                            pushZ = nz * 0.7f + awayZ * 0.3f;
-                            float pLen = std::sqrt(pushX * pushX + pushZ * pushZ);
-                            if (pLen > 0.0001f)
-                            {
-                                pushX /= pLen;
-                                pushZ /= pLen;
-                            }
+                            awayX = dx / dist;
+                            awayZ = dz / dist;
                         }
                         else
                         {
-                            pushX = nx;
-                            pushZ = nz;
+                            awayX = poly.normal.x;
+                            awayZ = poly.normal.z;
                         }
-                    }
-                    else
-                    {
-                        // 【突き抜けて裏側にめり込んだ場合】
-                        // 完全に突き抜けているため、表側法線方向に表側へ戻す！
-                        pushDist = radius + dist;
-                        pushX = nx;
-                        pushZ = nz;
-                    }
 
-                    outPos.x += pushX * pushDist;
-                    outPos.z += pushZ * pushDist;
+                        // ポリゴンの水平面法線
+                        float nx = poly.normal.x;
+                        float nz = poly.normal.z;
+                        float nLen = std::sqrt(nx * nx + nz * nz);
+                        if (nLen > 0.0001f)
+                        {
+                            nx /= nLen;
+                            nz /= nLen;
+                        }
 
-                    iterationPushed = true;
-                    anyCollided = true;
+                        // 法線の向きをプレイヤーがいる側（表・裏どちらから来ても自然に離れるよう）に整列
+                        float dot = awayX * nx + awayZ * nz;
+                        float alignNx = (dot >= 0.0f) ? nx : -nx;
+                        float alignNz = (dot >= 0.0f) ? nz : -nz;
+
+                        // 法線と離反ベクトルを滑らかにブレンド
+                        float pushX = alignNx * 0.65f + awayX * 0.35f;
+                        float pushZ = alignNz * 0.65f + awayZ * 0.35f;
+                        float pLen = std::sqrt(pushX * pushX + pushZ * pushZ);
+                        if (pLen > 0.0001f)
+                        {
+                            pushX /= pLen;
+                            pushZ /= pLen;
+                        }
+
+                        maxPenetration = penetration;
+                        bestPushX = pushX;
+                        bestPushZ = pushZ;
+                    }
                 }
             }
 
-            if (!iterationPushed)
+            if (maxPenetration > 0.001f)
             {
-                break;
+                outPos.x += bestPushX * maxPenetration;
+                outPos.z += bestPushZ * maxPenetration;
+                anyCollided = true;
+                if (outPushNormal)
+                {
+                    outPushNormal->x = bestPushX;
+                    outPushNormal->z = bestPushZ;
+                }
+            }
+            else
+            {
+                break; // めり込み解消完了
             }
         }
     }
@@ -429,9 +499,21 @@ bool Stage3D::ResolveWallCollision(VECTOR& outPos, float radius) const
     }
 
     // セーフティネット：外周境界ボックス
+    VECTOR prevPos = outPos;
     if (ClampToBounds(outPos, radius))
     {
         anyCollided = true;
+        if (outPushNormal && outPushNormal->x == 0.0f && outPushNormal->z == 0.0f)
+        {
+            float cdx = outPos.x - prevPos.x;
+            float cdz = outPos.z - prevPos.z;
+            float cLen = std::sqrt(cdx * cdx + cdz * cdz);
+            if (cLen > 0.0001f)
+            {
+                outPushNormal->x = cdx / cLen;
+                outPushNormal->z = cdz / cLen;
+            }
+        }
     }
 
     return anyCollided;

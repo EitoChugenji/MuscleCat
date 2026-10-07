@@ -42,6 +42,7 @@ private:
 
     // スキルチェック & Rep関連
     bool  m_isSkillChecking = false;
+    bool  m_isTitleSquat = false;
     float m_scCursor = 0.0f;         // 針の位置 (0.0f 〜 1.0f)
     float m_scZoneStart = 0.55f;     // 成功ゾーン開始
     float m_scZoneEnd   = 0.85f;     // 成功ゾーン終了
@@ -160,6 +161,15 @@ public:
     bool IsSkillChecking() const
     {
         return m_isSkillChecking;
+    }
+
+    void UpdateTitleAnimation(bool isSquatting)
+    {
+        m_animFrame++;
+        m_animTime += 1.0f / 60.0f;
+        m_isTitleSquat = isSquatting;
+        m_isSkillChecking = false;
+        UpdateAnimation(false);
     }
     
     int GetRepCount() const

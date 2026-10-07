@@ -34,7 +34,7 @@ public:
     void Draw3D();
 
     // プレイヤーやネズミがステージ壁を越えないよう押し戻す（3Dメッシュコリジョン対応）
-    bool ResolveWallCollision(VECTOR& outPos, float radius) const;
+    bool ResolveWallCollision(VECTOR& outPos, float radius, VECTOR* outPushNormal = nullptr) const;
 
     // 従来の境界ボックス（セーフティネット用）
     bool ClampToBounds(VECTOR& outPos, float radius) const;

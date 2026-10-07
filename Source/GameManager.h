@@ -43,8 +43,21 @@ private:
     bool  m_prevKey6  = false;
     int   m_prevUpdateTime = 0;
 
+    // タイトル画面用演出・メニュー状態
+    bool  m_showHowToPlay = false;
+    int   m_startTransitionTimer = 0;
+    int   m_titleAnimTimer = 0;
+    int   m_selectedMenuItem = 0; // 0: START, 1: HOW TO PLAY
+    bool  m_prevKeyH = false;
+    bool  m_prevKeyTab = false;
+    bool  m_prevKeyEsc = false;
+    bool  m_prevKeyUp = false;
+    bool  m_prevKeyDown = false;
+
     void SetupTitle();
     void SetupRoomObstacles();
+    void DrawTitleScreen();
+    void DrawHowToPlayModal();
 
 public:
     GameManager() = default;

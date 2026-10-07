@@ -11,6 +11,7 @@ void FontManager::Init()
     m_font24 = CreateFontToHandle("MS Gothic", 24, 3, DX_FONTTYPE_NORMAL);
     m_font36 = CreateFontToHandle("MS Gothic", 36, 4, DX_FONTTYPE_NORMAL);
     m_font48 = CreateFontToHandle("MS Gothic", 48, 5, DX_FONTTYPE_NORMAL);
+    m_font60 = CreateFontToHandle("MS Gothic", 60, 6, DX_FONTTYPE_ANTIALIASING_8X8);
 }
 
 void FontManager::Release()
@@ -49,5 +50,11 @@ void FontManager::Release()
     {
         DeleteFontToHandle(m_font48);
         m_font48 = -1;
+    }
+
+    if (m_font60 != -1)
+    {
+        DeleteFontToHandle(m_font60);
+        m_font60 = -1;
     }
 }

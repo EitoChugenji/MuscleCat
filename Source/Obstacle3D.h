@@ -13,6 +13,8 @@ private:
     std::string m_modelPath;
     unsigned int m_mainColor;
     unsigned int m_frameColor;
+    float m_scale;
+    VECTOR m_modelOffset;
 
 public:
     Obstacle3D(
@@ -20,10 +22,13 @@ public:
         float width,
         float height,
         float depth,
-        const std::string& name,
-        const std::string& modelPath,
-        unsigned int mainColor,
-        unsigned int frameColor
+        const std::string& name = "",
+        const std::string& modelPath = "",
+        unsigned int mainColor = 0,
+        unsigned int frameColor = 0,
+        float scale = 1.0f,
+        float rotY = 0.0f,
+        const VECTOR& modelOffset = VGet(0.0f, 0.0f, 0.0f)
     );
     virtual ~Obstacle3D() = default;
 

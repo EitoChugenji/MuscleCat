@@ -12,6 +12,7 @@ private:
     int m_font24 = -1;
     int m_font36 = -1;
     int m_font48 = -1;
+    int m_font60 = -1;
 
     FontManager() = default;
     ~FontManager() = default;
@@ -57,5 +58,10 @@ public:
     int GetFont48() const
     {
         return m_font48;
+    }
+
+    int GetFont60() const
+    {
+        return m_font60;
     }
 };

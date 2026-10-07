@@ -11,17 +11,45 @@
 #include <algorithm>
 
 // MouseBase3D 実装
+namespace
+{
+    // 建物内の主要な部屋・通路の巡回目標ポイント
+    const VECTOR PATROL_POINTS[] = {
+        {   0.0f, 0.0f,    0.0f },  // リビング中央
+        { -180.0f, 0.0f,  180.0f },  // リビング北西
+        {  180.0f, 0.0f,  180.0f },  // リビング北東
+        { -180.0f, 0.0f, -180.0f },  // リビング南西
+        {  550.0f, 0.0f,  450.0f },  // 北東大部屋中央
+        {  780.0f, 0.0f,  450.0f },  // 北東部屋東奥
+        {  550.0f, 0.0f,  200.0f },  // 北東部屋南側
+        {  600.0f, 0.0f, -100.0f },  // 東中央部屋
+        {  750.0f, 0.0f, -300.0f },  // 東部屋南奥
+        {  650.0f, 0.0f, -700.0f },  // 南東奥部屋
+        {  500.0f, 0.0f, -720.0f },  // 南通路東
+        {  320.0f, 0.0f, -720.0f },  // 南通路中央
+        {  100.0f, 0.0f, -720.0f },  // 南西奥部屋
+        { -100.0f, 0.0f, -480.0f },  // 西通路南
+        { -220.0f, 0.0f,    0.0f },  // 玄関口
+    };
+    const int NUM_PATROL_POINTS = sizeof(PATROL_POINTS) / sizeof(PATROL_POINTS[0]);
+}
+
+// MouseBase3D 実装
 MouseBase3D::MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float baseSpeed)
     : GameObject3D(pos, radius, type)
     , m_baseSpeed(baseSpeed)
     , m_speedBonus(0.0f)
     , m_animTime(0.0f)
     , m_stunTimer(0)
+    , m_targetWaypoint(pos)
+    , m_patrolTimer(0)
+    , m_isFleeingNow(false)
 {
     float angle = static_cast<float>(rand() % 360) * MathHelper::DEG_TO_RAD;
     m_vx = std::sin(angle) * m_baseSpeed;
     m_vz = std::cos(angle) * m_baseSpeed;
     m_rotY = angle;
+    ChooseNewPatrolTarget();
 }
 
 void MouseBase3D::DrawStunEffect()
@@ -98,117 +126,171 @@ void MouseBase3D::Draw2D()
     }
 }
 
-void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDistance, float speed, bool isFast)
+void MouseBase3D::ChooseNewPatrolTarget()
+{
+    // 現在地から一定以上離れた地点を優先してランダムに選択
+    int bestIdx = rand() % NUM_PATROL_POINTS;
+    for (int retry = 0; retry < 5; ++retry)
+    {
+        int idx = rand() % NUM_PATROL_POINTS;
+        float d = MathHelper::DistanceXZ(m_pos, PATROL_POINTS[idx]);
+        if (d > 120.0f)
+        {
+            bestIdx = idx;
+            break;
+        }
+    }
+    // 目的地の周囲に若干のゆらぎ（±30f）を加えて同じ点に集まらないようにする
+    float ox = static_cast<float>((rand() % 60) - 30);
+    float oz = static_cast<float>((rand() % 60) - 30);
+    m_targetWaypoint = VGet(PATROL_POINTS[bestIdx].x + ox, 0.0f, PATROL_POINTS[bestIdx].z + oz);
+    m_patrolTimer = 140 + rand() % 140; // 2.3〜4.6秒
+}
+
+void MouseBase3D::OnWallCollision(const VECTOR& pushNormal)
+{
+    float nLen = std::sqrt(pushNormal.x * pushNormal.x + pushNormal.z * pushNormal.z);
+    if (nLen < 0.001f)
+    {
+        return;
+    }
+    float nx = pushNormal.x / nLen;
+    float nz = pushNormal.z / nLen;
+
+    float currentSpd = GetCurrentSpeed();
+
+    // 壁に向かっていた速度成分（内積）
+    float dot = m_vx * nx + m_vz * nz;
+
+    if (dot < 0.0f)
+    {
+        // 反射（リフレクション）＋法線方向へのプッシュ
+        m_vx = m_vx - 2.0f * dot * nx;
+        m_vz = m_vz - 2.0f * dot * nz;
+    }
+    else
+    {
+        // すでに離れる方向なら、さらに法線方向へ加速
+        m_vx += nx * currentSpd * 0.8f;
+        m_vz += nz * currentSpd * 0.8f;
+    }
+
+    // ランダムな散乱（±35度）を加えて角に挟まらないようにする
+    float randAngle = static_cast<float>((rand() % 70) - 35) * MathHelper::DEG_TO_RAD;
+    float rx = m_vx * std::cos(randAngle) - m_vz * std::sin(randAngle);
+    float rz = m_vx * std::sin(randAngle) + m_vz * std::cos(randAngle);
+    m_vx = rx;
+    m_vz = rz;
+
+    // スピードに合わせて正規化
+    float vLen = std::sqrt(m_vx * m_vx + m_vz * m_vz);
+    if (vLen > 0.0001f)
+    {
+        m_vx = (m_vx / vLen) * currentSpd;
+        m_vz = (m_vz / vLen) * currentSpd;
+    }
+
+    // 向きを即座に更新
+    m_rotY = std::atan2(m_vx, m_vz);
+
+    // 新たな安全な目標地点を再選択し、進行を継続
+    ChooseNewPatrolTarget();
+    m_patrolTimer = 90 + rand() % 90;
+}
+
+void MouseBase3D::UpdateWanderMovement(float speed)
+{
+    m_patrolTimer--;
+
+    float distToTarget = MathHelper::DistanceXZ(m_pos, m_targetWaypoint);
+    if (distToTarget < 40.0f || m_patrolTimer <= 0)
+    {
+        ChooseNewPatrolTarget();
+    }
+
+    float toX = m_targetWaypoint.x - m_pos.x;
+    float toZ = m_targetWaypoint.z - m_pos.z;
+    float toLen = std::sqrt(toX * toX + toZ * toZ);
+
+    if (toLen > 0.001f)
+    {
+        toX /= toLen;
+        toZ /= toLen;
+    }
+    else
+    {
+        toX = 1.0f;
+        toZ = 0.0f;
+    }
+
+    // ネズミらしい生き生きとした蛇行（サイン波）
+    float wobble = std::sin(m_animTime * 6.5f) * 0.22f;
+    float dirX = toX + (-toZ) * wobble;
+    float dirZ = toZ + (toX) * wobble;
+    float dLen = std::sqrt(dirX * dirX + dirZ * dirZ);
+    if (dLen > 0.001f)
+    {
+        dirX /= dLen;
+        dirZ /= dLen;
+    }
+
+    // 進行方向へスムーズに追従
+    m_vx = MathHelper::Lerp(m_vx, dirX * speed, 0.18f);
+    m_vz = MathHelper::Lerp(m_vz, dirZ * speed, 0.18f);
+
+    float curLen = std::sqrt(m_vx * m_vx + m_vz * m_vz);
+    if (curLen > 0.0001f)
+    {
+        m_vx = (m_vx / curLen) * speed;
+        m_vz = (m_vz / curLen) * speed;
+    }
+}
+
+void MouseBase3D::UpdateFleeMovement(const VECTOR& playerPos, float speed)
 {
     float dx = m_pos.x - playerPos.x;
     float dz = m_pos.z - playerPos.z;
     float dist = std::sqrt(dx * dx + dz * dz);
 
-    float wallMargin = 40.0f;
-    float leftDist   = m_pos.x - (-Config::STAGE_HALF_WIDTH);
-    float rightDist  = Config::STAGE_HALF_WIDTH - m_pos.x;
-    float backDist   = m_pos.z - (-Config::STAGE_HALF_DEPTH);
-    float frontDist  = Config::STAGE_HALF_DEPTH - m_pos.z;
-
-    bool nearLeft  = (leftDist < wallMargin);
-    bool nearRight = (rightDist < wallMargin);
-    bool nearBack  = (backDist < wallMargin);
-    bool nearFront = (frontDist < wallMargin);
-    bool nearWall  = (nearLeft || nearRight || nearBack || nearFront);
-
-    if (dist < fleeDistance && dist > 0.001f)
+    if (dist > 0.001f)
     {
-        // プレイヤーから離れる基本ベクトル
-        float fleeDirX = dx / dist;
-        float fleeDirZ = dz / dist;
-
-        // 壁際で追い詰められたときの壁沿いスライディング＆内側回り込み脱出
-        if (nearWall)
-        {
-            float wallNormalX = 0.0f;
-            float wallNormalZ = 0.0f;
-
-            if (nearLeft)
-            {
-                wallNormalX += (wallMargin - leftDist) / wallMargin;
-            }
-
-            if (nearRight)
-            {
-                wallNormalX -= (wallMargin - rightDist) / wallMargin;
-            }
-
-            if (nearBack)
-            {
-                wallNormalZ += (wallMargin - backDist) / wallMargin;
-            }
-
-            if (nearFront)
-            {
-                wallNormalZ -= (wallMargin - frontDist) / wallMargin;
-            }
-
-            // 壁に押し付けられている場合、壁に沿った接線方向に横滑り
-            if (nearLeft || nearRight)
-            {
-                // Xの壁際: Z方向に逃げる（プレイヤーのZから離れる方向を優先）
-                float tangentZ = (dz >= 0.0f) ? 1.0f : -1.0f;
-                fleeDirZ = tangentZ * 1.2f;
-                fleeDirX = wallNormalX * 1.5f; // 壁から離れる内向きの力
-            }
-            
-            if (nearBack || nearFront)
-            {
-                // Zの壁際: X方向に逃げる（プレイヤーのXから離れる方向を優先）
-                float tangentX = (dx >= 0.0f) ? 1.0f : -1.0f;
-                fleeDirX = tangentX * 1.2f;
-                fleeDirZ = wallNormalZ * 1.5f; // 壁から離れる内向きの力
-            }
-        }
-
-        // ベクトル正規化
-        float len = std::sqrt(fleeDirX * fleeDirX + fleeDirZ * fleeDirZ);
-        if (len > 0.0001f)
-        {
-            fleeDirX /= len;
-            fleeDirZ /= len;
-        }
-
-        m_vx = fleeDirX * speed;
-        m_vz = fleeDirZ * speed;
+        dx /= dist;
+        dz /= dist;
     }
-    
     else
     {
-        // プレイヤーが近くにいない時でも、壁に近づきすぎたら自然に中央へ方向転換
-        if (nearWall)
-        {
-            if (nearLeft && m_vx < 0.0f)
-            {
-                m_vx = std::abs(m_vx);
-            }
+        dx = 1.0f;
+        dz = 0.0f;
+    }
 
-            if (nearRight && m_vx > 0.0f)
-            {
-                m_vx = -std::abs(m_vx);
-            }
+    // プレイヤーから遠ざかる方向へ即時舵を切る
+    m_vx = MathHelper::Lerp(m_vx, dx * speed, 0.28f);
+    m_vz = MathHelper::Lerp(m_vz, dz * speed, 0.28f);
 
-            if (nearBack && m_vz < 0.0f)
-            {
-                m_vz = std::abs(m_vz);
-            }
+    float curLen = std::sqrt(m_vx * m_vx + m_vz * m_vz);
+    if (curLen > 0.0001f)
+    {
+        m_vx = (m_vx / curLen) * speed;
+        m_vz = (m_vz / curLen) * speed;
+    }
+}
 
-            if (nearFront && m_vz > 0.0f)
-            {
-                m_vz = -std::abs(m_vz);
-            }
-        }
+void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDistance, float speed, bool isFast)
+{
+    float dist = MathHelper::DistanceXZ(m_pos, playerPos);
+    if (dist < fleeDistance)
+    {
+        UpdateFleeMovement(playerPos, speed);
+    }
+    else
+    {
+        UpdateWanderMovement(speed);
     }
 }
 
 // NormalMouse3D 実装
 NormalMouse3D::NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
-    : MouseBase3D(pos, 12.0f, ObjectType::NormalMouse, 2.4f)
+    : MouseBase3D(pos, 12.0f, ObjectType::NormalMouse, 3.4f)
     , m_targetPlayer(player)
 {
 }
@@ -233,29 +315,16 @@ void NormalMouse3D::Update()
     {
         VECTOR pPos = m_targetPlayer->GetPos();
         float dist = MathHelper::DistanceXZ(m_pos, pPos);
-        if (dist < 110.0f)
+        if (dist < 130.0f)
         {
-            CalculateMovementVector(pPos, 110.0f, currentSpeed, false);
+            UpdateFleeMovement(pPos, currentSpeed * 1.25f);
             m_isFleeingNow = true;
         }
     }
 
     if (!m_isFleeingNow)
     {
-        m_turnTimer--;
-        if (m_turnTimer <= 0)
-        {
-            m_turnTimer = 40 + rand() % 80;
-            float angle = static_cast<float>(rand() % 360) * MathHelper::DEG_TO_RAD;
-            m_vx = std::sin(angle) * currentSpeed;
-            m_vz = std::cos(angle) * currentSpeed;
-        }
-
-        // 壁からの自然な跳ね返り
-        if (m_targetPlayer)
-        {
-            CalculateMovementVector(m_targetPlayer->GetPos(), 0.0f, currentSpeed, false);
-        }
+        UpdateWanderMovement(currentSpeed);
     }
 
     // 移動
@@ -266,7 +335,7 @@ void NormalMouse3D::Update()
     if (std::abs(m_vx) > 0.01f || std::abs(m_vz) > 0.01f)
     {
         float targetAngle = std::atan2(m_vx, m_vz);
-        m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.25f);
+        m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.30f);
     }
 }
 
@@ -286,8 +355,10 @@ void NormalMouse3D::Draw3D()
 
 // FastMouse3D 実装
 FastMouse3D::FastMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
-    : MouseBase3D(pos, 11.0f, ObjectType::FastMouse, 2.2f)
+    : MouseBase3D(pos, 11.0f, ObjectType::FastMouse, 3.8f)
     , m_targetPlayer(player)
+    , m_fleeDistance(160.0f)
+    , m_fleeSpeed(4.8f)
 {
 }
 
@@ -314,26 +385,14 @@ void FastMouse3D::Update()
         {
             m_isFleeingNow = true;
             float fleeSpeed = GetCurrentFleeSpeed();
-            CalculateMovementVector(pPos, m_fleeDistance, fleeSpeed, true);
+            UpdateFleeMovement(pPos, fleeSpeed);
         }
     }
 
     if (!m_isFleeingNow)
     {
-        m_wanderTimer--;
-        if (m_wanderTimer <= 0)
-        {
-            m_wanderTimer = 30 + rand() % 50;
-            float wanderSpeed = GetCurrentWanderSpeed();
-            float angle = static_cast<float>(rand() % 360) * MathHelper::DEG_TO_RAD;
-            m_vx = std::sin(angle) * wanderSpeed;
-            m_vz = std::cos(angle) * wanderSpeed;
-        }
-
-        if (m_targetPlayer)
-        {
-            CalculateMovementVector(m_targetPlayer->GetPos(), 0.0f, GetCurrentWanderSpeed(), true);
-        }
+        float wanderSpeed = GetCurrentWanderSpeed();
+        UpdateWanderMovement(wanderSpeed);
     }
 
     // 移動
@@ -344,7 +403,7 @@ void FastMouse3D::Update()
     if (std::abs(m_vx) > 0.01f || std::abs(m_vz) > 0.01f)
     {
         float targetAngle = std::atan2(m_vx, m_vz);
-        m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.35f);
+        m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.40f);
     }
 }
 

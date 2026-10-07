@@ -12,7 +12,10 @@ Obstacle3D::Obstacle3D(
     const std::string& name,
     const std::string& modelPath,
     unsigned int mainColor,
-    unsigned int frameColor
+    unsigned int frameColor,
+    float scale,
+    float rotY,
+    const VECTOR& modelOffset
 )
     : GameObject3D(pos, (width + depth) * 0.25f, ObjectType::Obstacle)
     , m_width(width)
@@ -22,13 +25,17 @@ Obstacle3D::Obstacle3D(
     , m_modelPath(modelPath)
     , m_mainColor(mainColor)
     , m_frameColor(frameColor)
+    , m_scale(scale)
+    , m_modelOffset(modelOffset)
 {
+    m_rotY = rotY;
 }
 
 void Obstacle3D::Draw3D()
 {
     // 3Dモデルがあれば描画、無ければフォールバック直方体描画
-    if (!ModelManager::GetInstance().DrawModelIfLoaded(m_modelPath, m_pos, m_rotY, 1.0f))
+    VECTOR drawPos = VAdd(m_pos, m_modelOffset);
+    if (!ModelManager::GetInstance().DrawModelIfLoaded(m_modelPath, drawPos, m_rotY, m_scale))
     {
         ModelManager::GetInstance().DrawFallbackObstacle(m_pos, m_width, m_height, m_depth, m_mainColor, m_frameColor, m_name);
     }
@@ -36,6 +43,12 @@ void Obstacle3D::Draw3D()
 
 void Obstacle3D::Draw2D()
 {
+    // 名前が空の場合は頭上UIを表示しない
+    if (m_name.empty())
+    {
+        return;
+    }
+
     // 器具の頭上に3D->2D投影で器具名を表示
     VECTOR headPos = VGet(m_pos.x, m_pos.y + m_height + 14.0f, m_pos.z);
     VECTOR screenPos = ConvWorldPosToScreenPos(headPos);
