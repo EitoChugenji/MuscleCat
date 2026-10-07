@@ -125,46 +125,20 @@ void EffectManager::PlayTackleEffect(const VECTOR& pos, const VECTOR& dir)
 
 void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
 {
-    if (!m_effectEnabled || m_pumpSuccessResHandle == -1)
-    {
-        return;
-    }
-
-    // 猫が見えなくならないよう控えめな光に調整
-    float scale = 0.8f + static_cast<float>(repCount) * 0.02f;
-
-    int playHandle = PlayEffekseer3DEffect(m_pumpSuccessResHandle);
-
-    if (playHandle != -1)
-    {
-        // 猫の胴体付近を包み込むように配置して発光
-        SetPosPlayingEffekseer3DEffect(playHandle, pos.x, pos.y + 8.0f, pos.z);
-        SetScalePlayingEffekseer3DEffect(playHandle, scale, scale, scale);
-    }
+    // 筋トレ時のエフェクト無効化
+    (void)pos;
+    (void)repCount;
+    return;
 }
 
 void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCount)
 {
-    if (!m_effectEnabled || !isActive || m_muscleAuraResHandle == -1)
-    {
-        StopMuscleAura();
-        return;
-    }
-
-    // オーラが再生されていない場合は新規再生
-    if (m_activeAuraHandle == -1 || IsEffekseer3DEffectPlaying(m_activeAuraHandle) == -1)
-    {
-        m_activeAuraHandle = PlayEffekseer3DEffect(m_muscleAuraResHandle);
-    }
-
-    // 再生中のオーラ位置とサイズを猫の現在位置・Rep数に追従（足元に上品に収まるスケール）
-    if (m_activeAuraHandle != -1)
-    {
-        SetPosPlayingEffekseer3DEffect(m_activeAuraHandle, pos.x, pos.y, pos.z);
-
-        float auraScale = 0.8f + static_cast<float>(repCount) * 0.04f;
-        SetScalePlayingEffekseer3DEffect(m_activeAuraHandle, auraScale, auraScale, auraScale);
-    }
+    // 筋トレ・マッスルオーラ無効化
+    (void)pos;
+    (void)isActive;
+    (void)repCount;
+    StopMuscleAura();
+    return;
 }
 
 void EffectManager::StopMuscleAura()
