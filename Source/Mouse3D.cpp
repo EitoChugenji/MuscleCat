@@ -13,8 +13,8 @@
 // MouseBase3D 実装
 namespace
 {
-    // 建物内の主要な部屋・通路の巡回目標ポイント
-    const VECTOR PATROL_POINTS[] = {
+    // 通常ハウス (firstmap) 用の巡回目標ポイント
+    const VECTOR PATROL_POINTS_HOUSE[] = {
         {   0.0f, 0.0f,    0.0f },  // リビング中央
         { -180.0f, 0.0f,  180.0f },  // リビング北西
         {  180.0f, 0.0f,  180.0f },  // リビング北東
@@ -31,7 +31,35 @@ namespace
         { -100.0f, 0.0f, -480.0f },  // 西通路南
         { -220.0f, 0.0f,    0.0f },  // 玄関口
     };
-    const int NUM_PATROL_POINTS = sizeof(PATROL_POINTS) / sizeof(PATROL_POINTS[0]);
+    const int NUM_PATROL_POINTS_HOUSE = sizeof(PATROL_POINTS_HOUSE) / sizeof(PATROL_POINTS_HOUSE[0]);
+
+    // スロープヒルズ (15倍 secondmap) 用の巡回目標ポイント
+    const VECTOR PATROL_POINTS_SLOPE_15X[] = {
+        {      0.0f,    0.0f,      0.0f },  // 中央平地
+        {    750.0f,    0.0f,    750.0f },  // 中央平地北東
+        {   -750.0f,    0.0f,    750.0f },  // 中央平地北西
+        {    750.0f,    0.0f,   -750.0f },  // 中央平地南東
+        {   -750.0f,    0.0f,   -750.0f },  // 中央平地南西
+        {   3000.0f,  750.0f,   3000.0f },  // 北東スロープ中腹
+        {  -3000.0f,  750.0f,   3000.0f },  // 北西スロープ中腹
+        {   3000.0f,  750.0f,  -3000.0f },  // 南東スロープ中腹
+        {  -3000.0f,  750.0f,  -3000.0f },  // 南西スロープ中腹
+        {   8000.0f, 1500.0f,   7000.0f },  // 北東高台中央
+        {  11000.0f, 1500.0f,   7000.0f },  // 北東高台東奥
+        {   8000.0f, 1500.0f,   3000.0f },  // 北東高台南側
+        {   9000.0f, 1500.0f,  -1500.0f },  // 東高台中央
+        {  10000.0f, 1500.0f,  -5000.0f },  // 南東高台
+        {   9000.0f, 1500.0f, -10000.0f },  // 南東高台奥
+        {   4000.0f, 1500.0f, -10500.0f },  // 南高台東
+        {      0.0f, 1500.0f, -10500.0f },  // 南高台中央
+        {  -7500.0f, 1500.0f,  -9000.0f },  // 南西高台
+        {  -9000.0f, 1500.0f,  -3000.0f },  // 西高台南
+        {  -9000.0f, 1500.0f,   3000.0f },  // 西高台北
+        {  -7500.0f, 1500.0f,   8000.0f },  // 北西高台中央
+        { -10000.0f, 1500.0f,   9000.0f },  // 北西高台奥
+        {      0.0f, 1500.0f,   9500.0f },  // 北高台中央
+    };
+    const int NUM_PATROL_POINTS_SLOPE_15X = sizeof(PATROL_POINTS_SLOPE_15X) / sizeof(PATROL_POINTS_SLOPE_15X[0]);
 }
 
 // MouseBase3D 実装
@@ -128,22 +156,36 @@ void MouseBase3D::Draw2D()
 
 void MouseBase3D::ChooseNewPatrolTarget()
 {
+    const VECTOR* points = PATROL_POINTS_SLOPE_15X;
+    int pointCount = NUM_PATROL_POINTS_SLOPE_15X;
+    float jitter = 175.0f;
+    float minDist = 900.0f;
+
+    if (m_mapType == ModelConfig::MapType::House)
+    {
+        points = PATROL_POINTS_HOUSE;
+        pointCount = NUM_PATROL_POINTS_HOUSE;
+        jitter = 30.0f;
+        minDist = 120.0f;
+    }
+
     // 現在地から一定以上離れた地点を優先してランダムに選択
-    int bestIdx = rand() % NUM_PATROL_POINTS;
+    int bestIdx = rand() % pointCount;
     for (int retry = 0; retry < 5; ++retry)
     {
-        int idx = rand() % NUM_PATROL_POINTS;
-        float d = MathHelper::DistanceXZ(m_pos, PATROL_POINTS[idx]);
-        if (d > 120.0f)
+        int idx = rand() % pointCount;
+        float d = MathHelper::DistanceXZ(m_pos, points[idx]);
+        if (d > minDist)
         {
             bestIdx = idx;
             break;
         }
     }
-    // 目的地の周囲に若干のゆらぎ（±30f）を加えて同じ点に集まらないようにする
-    float ox = static_cast<float>((rand() % 60) - 30);
-    float oz = static_cast<float>((rand() % 60) - 30);
-    m_targetWaypoint = VGet(PATROL_POINTS[bestIdx].x + ox, 0.0f, PATROL_POINTS[bestIdx].z + oz);
+
+    // 目的地の周囲にゆらぎを加えて同じ点に集まらないようにする
+    float ox = static_cast<float>((rand() % static_cast<int>(jitter * 2.0f)) - jitter);
+    float oz = static_cast<float>((rand() % static_cast<int>(jitter * 2.0f)) - jitter);
+    m_targetWaypoint = VGet(points[bestIdx].x + ox, points[bestIdx].y, points[bestIdx].z + oz);
     m_patrolTimer = 140 + rand() % 140; // 2.3〜4.6秒
 }
 

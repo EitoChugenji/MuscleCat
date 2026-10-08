@@ -1,5 +1,6 @@
 #pragma once
 #include "GameObject3D.h"
+#include "ModelConfig.h"
 #include <memory>
 
 class Player3D;
@@ -22,10 +23,22 @@ protected:
 
     // 猫の最大レベル(Lv15)の速度(6.05f)より少し遅いスピードを上限に
     static constexpr float MOUSE_MAX_SPEED = 5.3f;
+    ModelConfig::MapType   m_mapType = ModelConfig::MapType::SlopeHills;
 
 public:
     MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float baseSpeed);
     virtual ~MouseBase3D() = default;
+
+    void SetMapType(ModelConfig::MapType mapType)
+    {
+        m_mapType = mapType;
+        ChooseNewPatrolTarget();
+    }
+
+    ModelConfig::MapType GetMapType() const
+    {
+        return m_mapType;
+    }
 
     void SetSpeedBonus(float bonus)
     {
@@ -44,8 +57,15 @@ public:
             return 0.0f;
         }
         
-        float s = m_baseSpeed + m_speedBonus;
-        return (s > MOUSE_MAX_SPEED) ? MOUSE_MAX_SPEED : s;
+        float baseSpd = m_baseSpeed;
+        float maxSpd  = MOUSE_MAX_SPEED;
+        if (m_mapType == ModelConfig::MapType::SlopeHills)
+        {
+            baseSpd *= 1.4f;
+            maxSpd  *= 1.4f;
+        }
+        float s = baseSpd + m_speedBonus;
+        return (s > maxSpd) ? maxSpd : s;
     }
 
     // スタン管理
@@ -122,14 +142,28 @@ public:
 
     float GetCurrentFleeSpeed() const
     {
-        float s = m_fleeSpeed + m_speedBonus;
-        return (s > MOUSE_MAX_SPEED) ? MOUSE_MAX_SPEED : s;
+        float fleeSpd = m_fleeSpeed;
+        float maxSpd  = MOUSE_MAX_SPEED;
+        if (m_mapType == ModelConfig::MapType::SlopeHills)
+        {
+            fleeSpd *= 1.8f;
+            maxSpd  *= 1.8f;
+        }
+        float s = fleeSpd + m_speedBonus;
+        return (s > maxSpd) ? maxSpd : s;
     }
     
     float GetCurrentWanderSpeed() const
     {
-        float s = m_baseSpeed + m_speedBonus * 0.5f;
-        return (s > MOUSE_MAX_SPEED) ? MOUSE_MAX_SPEED : s;
+        float wanderSpd = m_baseSpeed;
+        float maxSpd    = MOUSE_MAX_SPEED;
+        if (m_mapType == ModelConfig::MapType::SlopeHills)
+        {
+            wanderSpd *= 1.8f;
+            maxSpd    *= 1.8f;
+        }
+        float s = wanderSpd + m_speedBonus * 0.5f;
+        return (s > maxSpd) ? maxSpd : s;
     }
 
     void Update() override;

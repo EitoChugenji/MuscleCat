@@ -25,7 +25,8 @@ public:
     ~ObjectManager3D() = default;
 
     void Clear();
-    void InitStage();
+    void InitStage(ModelConfig::MapType mapType = ModelConfig::MapType::SlopeHills);
+    void LoadStage(ModelConfig::MapType mapType);
 
     void SetPlayer(std::shared_ptr<Player3D> player);
     

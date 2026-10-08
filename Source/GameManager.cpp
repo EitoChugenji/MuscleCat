@@ -18,106 +18,217 @@ void GameManager::Init()
     m_fpsTimer = GetNowCount();
     m_prevMouseLeft = true; // 起動直後のクリック暴発防止
 
-    m_objManager.InitStage();
+    m_objManager.InitStage(m_selectedMap);
     SetupTitle();
 }
 
 void GameManager::SetupRoomObstacles()
 {
-    // AccessoryModels（キッチン、冷蔵庫、テーブル、テレビ）を部屋に配置
-    // 各家具の当たり判定と3Dモデル描画を登録
+    // AccessoryModels（キッチン、冷蔵庫、テーブル、テレビ）を部屋・ステージに配置
+    // 各家具の接地高さ（床・高台・スロープ）を自動取得して配置
+    const auto& stage = m_objManager.GetStage();
+    auto PlaceObstacle = [&](const VECTOR& basePos, float width, float height, float depth,
+                             const std::string& name, const std::string& modelPath,
+                             unsigned int mainColor, unsigned int frameColor, float scale,
+                             float rotY, const VECTOR& modelOffset) {
+        VECTOR pos = basePos;
+        float groundY = 0.0f;
+        if (stage.GetGroundHeight(pos, groundY))
+        {
+            pos.y = groundY;
+        }
+        m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
+            pos, width, height, depth, name, modelPath, mainColor, frameColor, scale, rotY, modelOffset
+        ));
+    };
 
-    // 1. 北東大部屋（キッチン＆ダイニングエリア）
-    // システムキッチン（北壁沿い）
-    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(520.0f, 0.0f, 600.0f),
-        300.0f, 75.0f, 70.0f,
-        "", ModelConfig::KITCHEN_MODEL_PATH,
-        GetColor(200, 200, 210), GetColor(150, 150, 160),
-        ModelConfig::KITCHEN_MODEL_SCALE,
-        0.0f,
-        VGet(0.0f, ModelConfig::KITCHEN_MODEL_OFFSET_Y, 0.0f)
-    ));
+    if (m_selectedMap == ModelConfig::MapType::House)
+    {
+        // 1. 北東大部屋（キッチン＆ダイニングエリア）
+        // システムキッチン（北壁沿い）
+        PlaceObstacle(
+            VGet(520.0f, 0.0f, 600.0f),
+            300.0f, 75.0f, 70.0f,
+            "", ModelConfig::KITCHEN_MODEL_PATH,
+            GetColor(200, 200, 210), GetColor(150, 150, 160),
+            ModelConfig::KITCHEN_MODEL_SCALE,
+            0.0f,
+            VGet(0.0f, ModelConfig::KITCHEN_MODEL_OFFSET_Y, 0.0f)
+        );
 
-    // 冷蔵庫（キッチンの隣・北壁沿い）
-    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(740.0f, 0.0f, 600.0f),
-        80.0f, 160.0f, 64.0f,
-        "", ModelConfig::REFRIGERATOR_MODEL_PATH,
-        GetColor(220, 220, 230), GetColor(160, 160, 170),
-        ModelConfig::REFRIGERATOR_MODEL_SCALE,
-        0.0f,
-        VGet(0.0f, ModelConfig::REFRIGERATOR_MODEL_OFFSET_Y, 0.0f)
-    ));
+        // 冷蔵庫（キッチンの隣・北壁沿い）
+        PlaceObstacle(
+            VGet(740.0f, 0.0f, 600.0f),
+            80.0f, 160.0f, 64.0f,
+            "", ModelConfig::REFRIGERATOR_MODEL_PATH,
+            GetColor(220, 220, 230), GetColor(160, 160, 170),
+            ModelConfig::REFRIGERATOR_MODEL_SCALE,
+            0.0f,
+            VGet(0.0f, ModelConfig::REFRIGERATOR_MODEL_OFFSET_Y, 0.0f)
+        );
 
-    // ダイニングテーブル（北東部屋中央）
-    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(600.0f, 0.0f, 360.0f),
-        150.0f, 50.0f, 150.0f,
-        "", ModelConfig::TABLE_MODEL_PATH,
-        GetColor(180, 140, 100), GetColor(140, 100, 70),
-        ModelConfig::TABLE_MODEL_SCALE,
-        0.0f,
-        VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y, 0.0f)
-    ));
+        // ダイニングテーブル（北東部屋中央）
+        PlaceObstacle(
+            VGet(600.0f, 0.0f, 360.0f),
+            150.0f, 50.0f, 150.0f,
+            "", ModelConfig::TABLE_MODEL_PATH,
+            GetColor(180, 140, 100), GetColor(140, 100, 70),
+            ModelConfig::TABLE_MODEL_SCALE,
+            0.0f,
+            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y, 0.0f)
+        );
 
-    // 2. メインリビング（中央エリア）
-    // リビングのテレビ（西壁沿い・東向き）
-    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(-270.0f, 0.0f, 50.0f),
-        30.0f, 60.0f, 120.0f,
-        "", ModelConfig::TV_MODEL_PATH,
-        GetColor(40, 40, 45), GetColor(20, 20, 25),
-        ModelConfig::TV_MODEL_SCALE,
-        DX_PI_F * 0.5f,
-        VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y, 0.0f)
-    ));
+        // 2. メインリビング（中央エリア）
+        // リビングのテレビ（西壁沿い・東向き）
+        PlaceObstacle(
+            VGet(-270.0f, 0.0f, 50.0f),
+            30.0f, 60.0f, 120.0f,
+            "", ModelConfig::TV_MODEL_PATH,
+            GetColor(40, 40, 45), GetColor(20, 20, 25),
+            ModelConfig::TV_MODEL_SCALE,
+            DX_PI_F * 0.5f,
+            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y, 0.0f)
+        );
 
-    // リビングのテーブル（中央北西寄り・猫の初期位置(0,0)から離れた位置）
-    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(-100.0f, 0.0f, 120.0f),
-        140.0f, 50.0f, 140.0f,
-        "", ModelConfig::TABLE_MODEL_PATH,
-        GetColor(180, 140, 100), GetColor(140, 100, 70),
-        70.0f,
-        0.0f,
-        VGet(0.0f, 35.0f, 0.0f)
-    ));
+        // リビングのテーブル
+        PlaceObstacle(
+            VGet(-100.0f, 0.0f, 120.0f),
+            140.0f, 50.0f, 140.0f,
+            "", ModelConfig::TABLE_MODEL_PATH,
+            GetColor(180, 140, 100), GetColor(140, 100, 70),
+            70.0f,
+            0.0f,
+            VGet(0.0f, 35.0f, 0.0f)
+        );
 
-    // 3. 南東奥部屋（寝室/個室エリア）
-    // 奥部屋のテレビ（南壁沿い・北向き）
-    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(600.0f, 0.0f, -820.0f),
-        120.0f, 60.0f, 30.0f,
-        "", ModelConfig::TV_MODEL_PATH,
-        GetColor(40, 40, 45), GetColor(20, 20, 25),
-        ModelConfig::TV_MODEL_SCALE,
-        0.0f,
-        VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y, 0.0f)
-    ));
+        // 3. 南東奥部屋（寝室/個室エリア）
+        // 奥部屋のテレビ（南壁沿い・北向き）
+        PlaceObstacle(
+            VGet(600.0f, 0.0f, -820.0f),
+            120.0f, 60.0f, 30.0f,
+            "", ModelConfig::TV_MODEL_PATH,
+            GetColor(40, 40, 45), GetColor(20, 20, 25),
+            ModelConfig::TV_MODEL_SCALE,
+            0.0f,
+            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y, 0.0f)
+        );
 
-    // 奥部屋のテーブル
-    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(480.0f, 0.0f, -700.0f),
-        120.0f, 45.0f, 120.0f,
-        "", ModelConfig::TABLE_MODEL_PATH,
-        GetColor(180, 140, 100), GetColor(140, 100, 70),
-        60.0f,
-        0.0f,
-        VGet(0.0f, 30.0f, 0.0f)
-    ));
+        // 奥部屋のテーブル
+        PlaceObstacle(
+            VGet(480.0f, 0.0f, -700.0f),
+            120.0f, 45.0f, 120.0f,
+            "", ModelConfig::TABLE_MODEL_PATH,
+            GetColor(180, 140, 100), GetColor(140, 100, 70),
+            60.0f,
+            0.0f,
+            VGet(0.0f, 30.0f, 0.0f)
+        );
 
-    // 4. 東部屋
-    // 東部屋のテーブル
-    m_objManager.AddObstacle(std::make_shared<Obstacle3D>(
-        VGet(700.0f, 0.0f, -100.0f),
-        140.0f, 50.0f, 140.0f,
-        "", ModelConfig::TABLE_MODEL_PATH,
-        GetColor(180, 140, 100), GetColor(140, 100, 70),
-        70.0f,
-        0.0f,
-        VGet(0.0f, 35.0f, 0.0f)
-    ));
+        // 4. 東部屋のテーブル
+        PlaceObstacle(
+            VGet(700.0f, 0.0f, -100.0f),
+            140.0f, 50.0f, 140.0f,
+            "", ModelConfig::TABLE_MODEL_PATH,
+            GetColor(180, 140, 100), GetColor(140, 100, 70),
+            70.0f,
+            0.0f,
+            VGet(0.0f, 35.0f, 0.0f)
+        );
+    }
+    else
+    {
+        // SlopeHills (15倍スロープマップ) 用の家具配置（中央平地および各高台）
+        PlaceObstacle(
+            VGet(600.0f, 0.0f, 800.0f),
+            300.0f, 75.0f, 70.0f,
+            "", ModelConfig::KITCHEN_MODEL_PATH,
+            GetColor(200, 200, 210), GetColor(150, 150, 160),
+            ModelConfig::KITCHEN_MODEL_SCALE * 1.5f,
+            0.0f,
+            VGet(0.0f, ModelConfig::KITCHEN_MODEL_OFFSET_Y * 1.5f, 0.0f)
+        );
+
+        PlaceObstacle(
+            VGet(950.0f, 0.0f, 800.0f),
+            80.0f, 160.0f, 64.0f,
+            "", ModelConfig::REFRIGERATOR_MODEL_PATH,
+            GetColor(220, 220, 230), GetColor(160, 160, 170),
+            ModelConfig::REFRIGERATOR_MODEL_SCALE * 1.5f,
+            0.0f,
+            VGet(0.0f, ModelConfig::REFRIGERATOR_MODEL_OFFSET_Y * 1.5f, 0.0f)
+        );
+
+        PlaceObstacle(
+            VGet(-500.0f, 0.0f, 600.0f),
+            150.0f, 50.0f, 150.0f,
+            "", ModelConfig::TABLE_MODEL_PATH,
+            GetColor(180, 140, 100), GetColor(140, 100, 70),
+            ModelConfig::TABLE_MODEL_SCALE * 1.5f,
+            0.0f,
+            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.5f, 0.0f)
+        );
+
+        PlaceObstacle(
+            VGet(-500.0f, 0.0f, 150.0f),
+            30.0f, 60.0f, 120.0f,
+            "", ModelConfig::TV_MODEL_PATH,
+            GetColor(40, 40, 45), GetColor(20, 20, 25),
+            ModelConfig::TV_MODEL_SCALE * 1.5f,
+            DX_PI_F * 0.5f,
+            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.5f, 0.0f)
+        );
+
+        // 高台フロアの家具
+        PlaceObstacle(
+            VGet(8000.0f, 0.0f, 7000.0f),
+            150.0f, 50.0f, 150.0f,
+            "", ModelConfig::TABLE_MODEL_PATH,
+            GetColor(180, 140, 100), GetColor(140, 100, 70),
+            ModelConfig::TABLE_MODEL_SCALE * 1.5f,
+            0.0f,
+            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.5f, 0.0f)
+        );
+
+        PlaceObstacle(
+            VGet(-7500.0f, 0.0f, 8000.0f),
+            120.0f, 60.0f, 30.0f,
+            "", ModelConfig::TV_MODEL_PATH,
+            GetColor(40, 40, 45), GetColor(20, 20, 25),
+            ModelConfig::TV_MODEL_SCALE * 1.5f,
+            0.0f,
+            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.5f, 0.0f)
+        );
+    }
+}
+
+void GameManager::SwitchSelectedMap(ModelConfig::MapType newMap)
+{
+    if (m_selectedMap != newMap)
+    {
+        m_selectedMap = newMap;
+        m_objManager.LoadStage(m_selectedMap);
+
+        // タイトル画面中の猫の足元高さを再取得
+        auto player = m_objManager.GetPlayer();
+        if (player)
+        {
+            player->SetMapType(m_selectedMap);
+            float gy = 0.0f;
+            if (m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), gy))
+            {
+                player->SetPos(VGet(0.0f, gy, 0.0f));
+                player->SetGroundY(gy);
+            }
+        }
+
+        // 家具の配置を更新
+        m_objManager.Clear();
+        if (player)
+        {
+            m_objManager.SetPlayer(player);
+        }
+        SetupRoomObstacles();
+    }
 }
 
 void GameManager::SetupTitle()
@@ -126,9 +237,20 @@ void GameManager::SetupTitle()
     m_objManager.Clear();
     EffectManager::GetInstance().StopMuscleAura();
 
+    // 選択中マップのステージ読み込み
+    m_objManager.LoadStage(m_selectedMap);
+
     // タイトル画面：マッチョな猫を生成（Rep=6の堂々たる姿）
     auto player = std::make_shared<Player3D>(VGet(0.0f, 0.0f, 0.0f));
     player->AddRep(6); // Lv.6のマッチョ体格
+    player->SetMapType(m_selectedMap);
+
+    float groundY = 0.0f;
+    if (m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), groundY))
+    {
+        player->SetPos(VGet(0.0f, groundY, 0.0f));
+        player->SetGroundY(groundY);
+    }
     m_objManager.SetPlayer(player);
 
     m_titleCameraAngle = -0.7f;
@@ -145,34 +267,71 @@ void GameManager::StartGame()
     m_objManager.Clear();
     EffectManager::GetInstance().StopMuscleAura();
 
+    // 選択されたマップのステージ読み込み
+    m_objManager.LoadStage(m_selectedMap);
+
     // プレイヤー生成（原点）
     auto player = std::make_shared<Player3D>(VGet(0.0f, 0.0f, 0.0f));
+    player->SetMapType(m_selectedMap);
+    float playerGy = 0.0f;
+    if (m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), playerGy))
+    {
+        player->SetPos(VGet(0.0f, playerGy, 0.0f));
+        player->SetGroundY(playerGy);
+    }
     m_objManager.SetPlayer(player);
 
     // カメラ初期化（猫の背後から開始）
     m_camera.Init(player->GetPos(), player->GetRotY());
 
-    // 部屋の家具配置
+    // 部屋・ステージの家具配置
     SetupRoomObstacles();
 
-    // ネズミの生成（建物内の様々な部屋・通路に分散して初期配置）
-    const VECTOR spawnRooms[] = {
+    // ネズミの生成（マップ別のスポーン位置）
+    const VECTOR spawnRoomsHouse[] = {
         VGet(  0.0f, 0.0f,  150.0f),  // リビング北
         VGet(600.0f, 0.0f,  400.0f),  // 北東大部屋
         VGet(600.0f, 0.0f, -150.0f),  // 東中央部屋
         VGet(600.0f, 0.0f, -700.0f),  // 南東奥部屋
         VGet( 50.0f, 0.0f, -700.0f),  // 南西奥部屋
         VGet(-150.0f, 0.0f, -200.0f), // リビング南西
+        VGet(-500.0f, 0.0f,  500.0f), // 北西高台
+        VGet(-600.0f, 0.0f, -200.0f), // 西高台
     };
-    int roomCount = sizeof(spawnRooms) / sizeof(spawnRooms[0]);
+    const int houseRoomCount = sizeof(spawnRoomsHouse) / sizeof(spawnRoomsHouse[0]);
 
+    const VECTOR spawnRoomsSlope[] = {
+        VGet(   500.0f, 0.0f,   500.0f),  // 中央平地北東
+        VGet(  -500.0f, 0.0f,   500.0f),  // 中央平地北西
+        VGet(   500.0f, 0.0f,  -500.0f),  // 中央平地南東
+        VGet(  -500.0f, 0.0f,  -500.0f),  // 中央平地南西
+        VGet(  1750.0f, 0.0f,   1750.0f),  // スロープ入口北東
+        VGet( -1750.0f, 0.0f,   1750.0f),  // スロープ入口北西
+        VGet(  6000.0f, 0.0f,   6000.0f),  // 北東高台
+        VGet( -6000.0f, 0.0f,   6000.0f),  // 北西高台
+        VGet(  6000.0f, 0.0f,  -6000.0f),  // 南東高台
+        VGet( -6000.0f, 0.0f,  -6000.0f),  // 南西高台
+    };
+    const int slopeRoomCount = sizeof(spawnRoomsSlope) / sizeof(spawnRoomsSlope[0]);
+
+    const VECTOR* spawnRooms = (m_selectedMap == ModelConfig::MapType::House) ? spawnRoomsHouse : spawnRoomsSlope;
+    int roomCount = (m_selectedMap == ModelConfig::MapType::House) ? houseRoomCount : slopeRoomCount;
+
+    const auto& stage = m_objManager.GetStage();
     for (int i = 0; i < Config::NORMAL_MOUSE_COUNT; ++i)
     {
         int rIdx = i % roomCount;
         float ox = static_cast<float>((rand() % 40) - 20);
         float oz = static_cast<float>((rand() % 40) - 20);
         VECTOR spawnPos = VGet(spawnRooms[rIdx].x + ox, 0.0f, spawnRooms[rIdx].z + oz);
-        m_objManager.AddObject(std::make_shared<NormalMouse3D>(spawnPos, player));
+        float gy = 0.0f;
+        if (stage.GetGroundHeight(spawnPos, gy))
+        {
+            spawnPos.y = gy;
+        }
+        auto mouse = std::make_shared<NormalMouse3D>(spawnPos, player);
+        mouse->SetMapType(m_selectedMap);
+        m_objManager.AddObject(mouse);
     }
 
     for (int i = 0; i < Config::FAST_MOUSE_COUNT; ++i)
@@ -181,7 +340,14 @@ void GameManager::StartGame()
         float ox = static_cast<float>((rand() % 40) - 20);
         float oz = static_cast<float>((rand() % 40) - 20);
         VECTOR spawnPos = VGet(spawnRooms[rIdx].x + ox, 0.0f, spawnRooms[rIdx].z + oz);
-        m_objManager.AddObject(std::make_shared<FastMouse3D>(spawnPos, player));
+        float gy = 0.0f;
+        if (stage.GetGroundHeight(spawnPos, gy))
+        {
+            spawnPos.y = gy;
+        }
+        auto mouse = std::make_shared<FastMouse3D>(spawnPos, player);
+        mouse->SetMapType(m_selectedMap);
+        m_objManager.AddObject(mouse);
     }
 
     m_startCount = GetNowCount();
@@ -199,9 +365,11 @@ void GameManager::Update()
 
         // シネマティックカメラ演出：猫を中心に低アングルから優雅に旋回（全身が綺麗に収まる距離感に調整）
         m_titleCameraAngle += 0.0055f;
+        auto player = m_objManager.GetPlayer();
+        float catY = (player) ? player->GetPos().y : 0.0f;
         float camDist = 240.0f;
-        float camHeight = 38.0f + std::sin(m_titleAnimTimer * 0.02f) * 6.0f;
-        VECTOR center = VGet(0.0f, 20.0f, 0.0f);
+        float camHeight = catY + 38.0f + std::sin(m_titleAnimTimer * 0.02f) * 6.0f;
+        VECTOR center = VGet(0.0f, catY + 20.0f, 0.0f);
         VECTOR camPos = VGet(
             std::sin(m_titleCameraAngle) * camDist,
             camHeight,
@@ -210,7 +378,6 @@ void GameManager::Update()
         SetCameraPositionAndTarget_UpVecY(camPos, center);
 
         // 猫のアニメーション：定期的にスクワット運動＆黄金オーラ
-        auto player = m_objManager.GetPlayer();
         if (player)
         {
             // 2.5秒ごとにスクワットと待機を切り替え
@@ -222,25 +389,31 @@ void GameManager::Update()
         }
 
         // キー入力
-        bool keyH    = (CheckHitKey(KEY_INPUT_H) != 0);
-        bool keyTab  = (CheckHitKey(KEY_INPUT_TAB) != 0);
-        bool keyEsc  = (CheckHitKey(KEY_INPUT_ESCAPE) != 0);
-        bool keyUp   = (CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
-        bool keyDown = (CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
-        bool isEnter = (CheckHitKey(KEY_INPUT_RETURN) != 0);
-        bool isSpace = (CheckHitKey(KEY_INPUT_SPACE) != 0);
+        bool keyH     = (CheckHitKey(KEY_INPUT_H) != 0);
+        bool keyTab   = (CheckHitKey(KEY_INPUT_TAB) != 0);
+        bool keyEsc   = (CheckHitKey(KEY_INPUT_ESCAPE) != 0);
+        bool keyUp    = (CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
+        bool keyDown  = (CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
+        bool keyLeft  = (CheckHitKey(KEY_INPUT_LEFT) != 0 || CheckHitKey(KEY_INPUT_A) != 0);
+        bool keyRight = (CheckHitKey(KEY_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_D) != 0);
+        bool isEnter  = (CheckHitKey(KEY_INPUT_RETURN) != 0);
+        bool isSpace  = (CheckHitKey(KEY_INPUT_SPACE) != 0);
 
-        bool triggerH    = keyH && !m_prevKeyH;
-        bool triggerTab  = keyTab && !m_prevKeyTab;
-        bool triggerEsc  = keyEsc && !m_prevKeyEsc;
-        bool triggerUp   = keyUp && !m_prevKeyUp;
-        bool triggerDown = keyDown && !m_prevKeyDown;
+        bool triggerH     = keyH && !m_prevKeyH;
+        bool triggerTab   = keyTab && !m_prevKeyTab;
+        bool triggerEsc   = keyEsc && !m_prevKeyEsc;
+        bool triggerUp    = keyUp && !m_prevKeyUp;
+        bool triggerDown  = keyDown && !m_prevKeyDown;
+        bool triggerLeft  = keyLeft && !m_prevKeyLeft;
+        bool triggerRight = keyRight && !m_prevKeyRight;
 
-        m_prevKeyH   = keyH;
-        m_prevKeyTab = keyTab;
-        m_prevKeyEsc = keyEsc;
-        m_prevKeyUp  = keyUp;
-        m_prevKeyDown = keyDown;
+        m_prevKeyH     = keyH;
+        m_prevKeyTab   = keyTab;
+        m_prevKeyEsc   = keyEsc;
+        m_prevKeyUp    = keyUp;
+        m_prevKeyDown  = keyDown;
+        m_prevKeyLeft  = keyLeft;
+        m_prevKeyRight = keyRight;
 
         // マウス入力
         int mx = 0, my = 0;
@@ -290,22 +463,60 @@ void GameManager::Update()
             return;
         }
 
-        // メニュー項目の上下移動
-        if (triggerUp)   m_selectedMenuItem = 0;
-        if (triggerDown) m_selectedMenuItem = 1;
+        // メニュー項目の上下移動 (0: START, 1: STAGE, 2: HOW TO PLAY)
+        if (triggerUp)   m_selectedMenuItem = (m_selectedMenuItem + 2) % 3;
+        if (triggerDown) m_selectedMenuItem = (m_selectedMenuItem + 1) % 3;
 
         // ボタンの当たり判定座標
-        int btnW = 380;
-        int btnH = 54;
+        int btnW = 420;
+        int btnH = 52;
         int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-        int startBtnY = 380;
-        int howBtnY   = 448;
+        int startBtnY = 356;
+        int stageBtnY = 420;
+        int howBtnY   = 484;
 
         bool hoverStart = (mx >= btnX && mx <= btnX + btnW && my >= startBtnY && my <= startBtnY + btnH);
+        bool hoverStage = (mx >= btnX && mx <= btnX + btnW && my >= stageBtnY && my <= stageBtnY + btnH);
         bool hoverHow   = (mx >= btnX && mx <= btnX + btnW && my >= howBtnY && my <= howBtnY + btnH);
 
         if (hoverStart) m_selectedMenuItem = 0;
-        if (hoverHow)   m_selectedMenuItem = 1;
+        if (hoverStage) m_selectedMenuItem = 1;
+        if (hoverHow)   m_selectedMenuItem = 2;
+
+        // 左右キーによるマップ切り替え
+        if (triggerLeft)
+        {
+            SwitchSelectedMap(ModelConfig::MapType::House);
+        }
+        if (triggerRight)
+        {
+            SwitchSelectedMap(ModelConfig::MapType::SlopeHills);
+        }
+
+        // STAGEボタンクリックまたはEnter/Spaceによるマップ切り替え
+        if (hoverStage && isMouseTrigger)
+        {
+            if (mx < btnX + 70)
+            {
+                SwitchSelectedMap(ModelConfig::MapType::House);
+            }
+            else if (mx > btnX + btnW - 70)
+            {
+                SwitchSelectedMap(ModelConfig::MapType::SlopeHills);
+            }
+            else
+            {
+                SwitchSelectedMap((m_selectedMap == ModelConfig::MapType::House)
+                    ? ModelConfig::MapType::SlopeHills
+                    : ModelConfig::MapType::House);
+            }
+        }
+        else if ((isEnter || isSpace) && m_selectedMenuItem == 1)
+        {
+            SwitchSelectedMap((m_selectedMap == ModelConfig::MapType::House)
+                ? ModelConfig::MapType::SlopeHills
+                : ModelConfig::MapType::House);
+        }
 
         // スタート実行判定
         if ((hoverStart && isMouseTrigger) || ((isEnter || isSpace) && m_selectedMenuItem == 0))
@@ -319,7 +530,7 @@ void GameManager::Update()
         }
 
         // 遊び方を開く判定
-        if ((hoverHow && isMouseTrigger) || ((isEnter || isSpace) && m_selectedMenuItem == 1))
+        if ((hoverHow && isMouseTrigger) || ((isEnter || isSpace) && m_selectedMenuItem == 2))
         {
             m_showHowToPlay = true;
             return;
@@ -715,10 +926,10 @@ void GameManager::DrawTitleScreen()
     DrawBox(0, Config::SCREEN_HEIGHT - 44, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(20, 24, 45), TRUE);
 
     // 上部ヘッダー（アメコミ風の元気なタイトルタグライン）
-    DrawStringToHandle(25, 14, "🐱💥 THE MOST PUMPED FELINE ADVENTURE! 💥🐱", GetColor(255, 230, 60), font16);
+    DrawStringToHandle(25, 14, "★ THE MOST PUMPED FELINE ADVENTURE! ★", GetColor(255, 230, 60), font16);
 
     // 下部操作ガイド（ポップなコミックガイドプレート）
-    const char* helpStr = "[ ↑ / ↓ ] SELECT   [ ENTER / SPACE ] PUSH!   [ H / TAB ] HOW TO PLAY";
+    const char* helpStr = "[ ↑ / ↓ ] SELECT   [ ← / → ] CHANGE STAGE   [ ENTER / SPACE ] DECIDE   [ H / TAB ] HOW TO PLAY";
     int helpW = GetDrawStringWidthToHandle(helpStr, static_cast<int>(strlen(helpStr)), font16);
     DrawStringToHandle((Config::SCREEN_WIDTH - helpW) / 2, Config::SCREEN_HEIGHT - 32, helpStr, GetColor(255, 255, 255), font16);
     DrawStringToHandle(Config::SCREEN_WIDTH - 100, Config::SCREEN_HEIGHT - 30, "VER 1.0", GetColor(100, 220, 255), font13);
@@ -831,12 +1042,13 @@ void GameManager::DrawTitleScreen()
     DrawStringToHandle(subX,     subY + 1, subText, GetColor(0, 0, 0), font18);
     DrawStringToHandle(subX,     subY,     subText, GetColor(255, 245, 150), font18);
 
-    // 5. カートゥーン・ステッカー風メニューボタン
-    int btnW = 390;
-    int btnH = 58;
+    // 5. カートゥーン・ステッカー風メニューボタン（3項目）
+    int btnW = 420;
+    int btnH = 52;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-    int startBtnY = 378;
-    int howBtnY   = 452;
+    int startBtnY = 356;
+    int stageBtnY = 420;
+    int howBtnY   = 484;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
@@ -854,12 +1066,12 @@ void GameManager::DrawTitleScreen()
 
         // 元気な肉球／星アイコン
         int bounceX = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 5.0f);
-        DrawStringToHandle(btnX + 22 + bounceX, startBtnY + 14, "🐾", GetColor(20, 20, 20), font24);
+        DrawStringToHandle(btnX + 22 + bounceX, startBtnY + 12, "🐾", GetColor(20, 20, 20), font24);
 
         const char* startTxt = "GAME START !!";
         int tW = GetDrawStringWidthToHandle(startTxt, static_cast<int>(strlen(startTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 15, startTxt, GetColor(20, 20, 30), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 14, startTxt, GetColor(0, 0, 0), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 13, startTxt, GetColor(20, 20, 30), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 12, startTxt, GetColor(0, 0, 0), font24);
     }
     else
     {
@@ -871,11 +1083,49 @@ void GameManager::DrawTitleScreen()
 
         const char* startTxt = "GAME START";
         int tW = GetDrawStringWidthToHandle(startTxt, static_cast<int>(strlen(startTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 15, startTxt, GetColor(210, 230, 255), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 13, startTxt, GetColor(210, 230, 255), font24);
     }
 
-    // --- ボタン2: HOW TO PLAY ---
-    bool isHowSelected = (m_selectedMenuItem == 1);
+    // --- ボタン2: STAGE SELECT (MAP SWITCH) ---
+    bool isStageSelected = (m_selectedMenuItem == 1);
+    const char* stageNameStr = (m_selectedMap == ModelConfig::MapType::House)
+        ? "STAGE : MAP 1 (HOUSE)"
+        : "STAGE : MAP 2 (SLOPE 15x)";
+
+    if (isStageSelected)
+    {
+        DrawBox(btnX + 6, stageBtnY + 6, btnX + btnW + 6, stageBtnY + btnH + 6, GetColor(0, 0, 0), TRUE);
+
+        // ビビッドオレンジの弾力ボディ＋極太ブラック枠
+        DrawBox(btnX - 2, stageBtnY - 2, btnX + btnW + 2, stageBtnY + btnH + 2, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, stageBtnY, btnX + btnW, stageBtnY + btnH, GetColor(255, 140 + static_cast<int>(35 * btnPulse), 40), TRUE);
+        DrawBox(btnX + 3, stageBtnY + 3, btnX + btnW - 3, stageBtnY + 11, GetColor(255, 230, 180), TRUE);
+
+        // 左右の切り替え矢印 [◀] [▶] (アニメーションでパルス)
+        int arrowPulse = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 4.0f);
+        DrawStringToHandle(btnX + 18 - arrowPulse, stageBtnY + 12, "◀", GetColor(20, 20, 20), font24);
+        DrawStringToHandle(btnX + btnW - 38 + arrowPulse, stageBtnY + 12, "▶", GetColor(20, 20, 20), font24);
+
+        int tW = GetDrawStringWidthToHandle(stageNameStr, static_cast<int>(strlen(stageNameStr)), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, stageBtnY + 13, stageNameStr, GetColor(20, 20, 30), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, stageBtnY + 12, stageNameStr, GetColor(0, 0, 0), font24);
+    }
+    else
+    {
+        DrawBox(btnX + 4, stageBtnY + 4, btnX + btnW + 4, stageBtnY + btnH + 4, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 1, stageBtnY - 1, btnX + btnW + 1, stageBtnY + btnH + 1, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, stageBtnY, btnX + btnW, stageBtnY + btnH, GetColor(32, 42, 65), TRUE);
+        DrawBox(btnX + 2, stageBtnY + 2, btnX + btnW - 2, stageBtnY + 8, GetColor(60, 75, 110), TRUE);
+
+        DrawStringToHandle(btnX + 20, stageBtnY + 12, "‹", GetColor(140, 170, 210), font24);
+        DrawStringToHandle(btnX + btnW - 32, stageBtnY + 12, "›", GetColor(140, 170, 210), font24);
+
+        int tW = GetDrawStringWidthToHandle(stageNameStr, static_cast<int>(strlen(stageNameStr)), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, stageBtnY + 13, stageNameStr, GetColor(210, 230, 255), font24);
+    }
+
+    // --- ボタン3: HOW TO PLAY ---
+    bool isHowSelected = (m_selectedMenuItem == 2);
     if (isHowSelected)
     {
         DrawBox(btnX + 6, howBtnY + 6, btnX + btnW + 6, howBtnY + btnH + 6, GetColor(0, 0, 0), TRUE);
@@ -886,12 +1136,12 @@ void GameManager::DrawTitleScreen()
         DrawBox(btnX + 3, howBtnY + 3, btnX + btnW - 3, howBtnY + 12, GetColor(210, 250, 255), TRUE);
 
         int bounceX = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 5.0f);
-        DrawStringToHandle(btnX + 22 + bounceX, howBtnY + 14, "📖", GetColor(20, 20, 20), font24);
+        DrawStringToHandle(btnX + 22 + bounceX, howBtnY + 12, "📖", GetColor(20, 20, 20), font24);
 
         const char* howTxt = "HOW TO PLAY !!";
         int tW = GetDrawStringWidthToHandle(howTxt, static_cast<int>(strlen(howTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 15, howTxt, GetColor(20, 20, 30), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 14, howTxt, GetColor(0, 0, 0), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 13, howTxt, GetColor(20, 20, 30), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 12, howTxt, GetColor(0, 0, 0), font24);
     }
     else
     {
@@ -902,8 +1152,24 @@ void GameManager::DrawTitleScreen()
 
         const char* howTxt = "HOW TO PLAY (遊び方)";
         int tW = GetDrawStringWidthToHandle(howTxt, static_cast<int>(strlen(howTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 15, howTxt, GetColor(210, 230, 255), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 13, howTxt, GetColor(210, 230, 255), font24);
     }
+
+    // ステージ切り替えガイドヒント（半透明コミックプレート付きで視認性抜群）
+    const char* stageHint = (m_selectedMap == ModelConfig::MapType::House)
+        ? "★ [ ← / → ] またはクリックで MAP 2: 15倍スロープ に切替"
+        : "★ [ ← / → ] またはクリックで MAP 1: 通常ハウス に切替";
+    int hintW = GetDrawStringWidthToHandle(stageHint, static_cast<int>(strlen(stageHint)), font13);
+    int hintX = (Config::SCREEN_WIDTH - hintW) / 2;
+    int hintY = 546;
+
+    // 半透明ブラックプレート＋イエロー枠
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 190);
+    DrawBox(hintX - 18, hintY - 4, hintX + hintW + 18, hintY + 20, GetColor(15, 20, 36), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    DrawBox(hintX - 18, hintY - 4, hintX + hintW + 18, hintY + 20, GetColor(255, 215, 40), FALSE);
+
+    DrawStringToHandle(hintX, hintY, stageHint, GetColor(255, 235, 120), font13);
 
     // 6. 遊び方モーダルが開いていれば描画
     if (m_showHowToPlay)
@@ -1008,11 +1274,11 @@ void GameManager::DrawHowToPlayModal()
     DrawBox(c3X, cardY + 32, c3X + cardW, cardY + 35, GetColor(0, 0, 0), TRUE);
     DrawStringToHandle(c3X + 16, cardY + 7, "【STEP 3】 ネズミ全滅クリア!", GetColor(20, 20, 30), font16);
 
-    DrawStringToHandle(c3X + 12, cardY + 44, "・部屋の逃げ回るネズミを全滅!", GetColor(255, 255, 255), font13);
-    DrawStringToHandle(c3X + 12, cardY + 70, "・全員捕まえればゲームクリア!", GetColor(100, 245, 140), font13);
-    DrawStringToHandle(c3X + 12, cardY + 98, "・クリア時間でマッスルランク判定:", GetColor(255, 255, 255), font13);
-    DrawStringToHandle(c3X + 22, cardY + 120, "Sランク: 20秒以内 (GOD)", GetColor(255, 215, 40), font13);
-    DrawStringToHandle(c3X + 22, cardY + 142, "Aランク: 35秒以内 (GREAT)", GetColor(255, 150, 60), font13);
+    DrawStringToHandle(c3X + 12, cardY + 44, "・逃げ回るネズミを全滅!", GetColor(255, 255, 255), font13);
+    DrawStringToHandle(c3X + 12, cardY + 66, "・MAP 1: 通常ハウス (室内)", GetColor(255, 220, 100), font13);
+    DrawStringToHandle(c3X + 12, cardY + 88, "・MAP 2: スロープ丘 (15倍)", GetColor(100, 240, 255), font13);
+    DrawStringToHandle(c3X + 12, cardY + 112, "・クリア時間でランク判定:", GetColor(255, 255, 255), font13);
+    DrawStringToHandle(c3X + 22, cardY + 132, "S: 20秒以内, A: 35秒以内", GetColor(255, 215, 40), font13);
 
     // 4. キーボード操作一覧表（ポップな黒枠プレート）
     int keyTableY = modalY + 288;

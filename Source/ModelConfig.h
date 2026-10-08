@@ -24,9 +24,26 @@ namespace ModelConfig
     constexpr float       MOUSE_FAST_MODEL_SCALE = 7.0f;
     constexpr float       MOUSE_FAST_MODEL_ROT_Y = 3.14159265f; // 180度反転（ラジアン）
 
-    // ステージ（家/部屋）
-    constexpr const char* STAGE_MODEL_PATH = "Resource/Models/Maps/firstmap.mv1";
-    constexpr float       STAGE_MODEL_SCALE = 100.0f;
+    // マップ種別
+    enum class MapType
+    {
+        House = 0,     // 通常ハウス (firstmap.mv1, scale: 100.0f)
+        SlopeHills = 1 // スロープヒルズ (secondmap.mv1, scale: 15.0f = 15倍サイズ)
+    };
+
+    // ステージ1: 通常ハウス
+    constexpr const char* MAP1_HOUSE_PATH = "Resource/Models/Maps/firstmap.mv1";
+    constexpr float       MAP1_HOUSE_SCALE = 100.0f;
+    constexpr const char* MAP1_HOUSE_NAME = "通常ハウス (HOUSE)";
+
+    // ステージ2: スロープヒルズ (ユーザー要望により15倍サイズに調整)
+    constexpr const char* MAP2_SLOPE_PATH = "Resource/Models/Maps/secondmap.mv1";
+    constexpr float       MAP2_SLOPE_SCALE = 15.0f;
+    constexpr const char* MAP2_SLOPE_NAME = "スロープヒルズ 15倍 (SLOPE)";
+
+    // デフォルトステージ設定（互換用）
+    constexpr const char* STAGE_MODEL_PATH = MAP2_SLOPE_PATH;
+    constexpr float       STAGE_MODEL_SCALE = MAP2_SLOPE_SCALE;
 
     // 家具モデル（AccessoryModels）
     constexpr const char* KITCHEN_MODEL_PATH       = "Resource/Models/AccessoryModels/Kitchen.mv1";

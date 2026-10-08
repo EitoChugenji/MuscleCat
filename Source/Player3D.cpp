@@ -19,6 +19,7 @@ Player3D::Player3D(const VECTOR& pos)
     , m_state(MuscleState::Normal)
     , m_repCount(0)
     , m_pumpDecayTimer(0)
+    , m_groundY(pos.y)
 {
     m_rotY = 0.0f;
 
@@ -276,7 +277,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         m_stunTimer--;
         m_isTackling = false;
         m_isPouncing = false;
-        m_pos.y = 0.0f;
+        m_pos.y = m_groundY;
         UpdateAnimation(false);
         return;
     }
@@ -293,10 +294,10 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         }
 
         // 地面を滑るような超高速直進
-        float tSpeed = GetTackleSpeed();
+        float tSpeed = GetTackleSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.3f : 1.0f);
         m_pos.x += m_tackleDir.x * tSpeed;
         m_pos.z += m_tackleDir.z * tSpeed;
-        m_pos.y = 0.0f;
+        m_pos.y = m_groundY;
 
         if (m_tackleTimer <= 0)
         {
@@ -318,7 +319,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         float progress = 1.0f - static_cast<float>(m_pounceTimer) / static_cast<float>(duration);
         float jumpHeight = 15.0f + static_cast<float>(m_repCount - 4) * 3.0f;
         float currentY = std::sin(progress * MathHelper::PI) * jumpHeight;
-        m_pos.y = currentY;
+        m_pos.y = m_groundY + currentY;
 
         // 3D残像記録（控えめな半透明）
         if (m_pounceTimer % 2 == 0)
@@ -362,21 +363,21 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         }
 
         // Rep数に応じた突進速度で直進
-        float pSpeed = GetPounceSpeed();
+        float pSpeed = GetPounceSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.3f : 1.0f);
         m_pos.x += m_pounceDir.x * pSpeed;
         m_pos.z += m_pounceDir.z * pSpeed;
 
         if (m_pounceTimer <= 0)
         {
             m_isPouncing = false;
-            m_pos.y = 0.0f;
+            m_pos.y = m_groundY;
             m_pounceCooldown = GetPounceCooldownMax();
         }
     }
     
     else
     {
-        m_pos.y = 0.0f;
+        m_pos.y = m_groundY;
 
         // 通常 / 筋肉痛 / 筋トレ（Rep進行 & 15秒減衰）処理
         if (m_state == MuscleState::Soreness)
@@ -570,8 +571,9 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                     m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.25f);
 
                     // 移動
-                    m_pos.x += moveDir.x * m_speed;
-                    m_pos.z += moveDir.z * m_speed;
+                    float speedMult = (m_mapType == ModelConfig::MapType::SlopeHills) ? 1.35f : 1.0f;
+                    m_pos.x += moveDir.x * (m_speed * speedMult);
+                    m_pos.z += moveDir.z * (m_speed * speedMult);
                 }
 
                 // 筋トレ開始チェック
