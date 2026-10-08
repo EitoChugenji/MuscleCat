@@ -53,6 +53,8 @@ private:
     bool  m_prevKeyEsc = false;
     bool  m_prevKeyUp = false;
     bool  m_prevKeyDown = false;
+    bool  m_prevKeyEnter = false;
+    bool  m_prevKeySpace = false;
 
     void SetupTitle();
     void SetupRoomObstacles();

@@ -397,15 +397,25 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         
         else
         {
-            // 15秒間何もしなければ 0 Rep に戻る減衰処理
+            // 15秒間何もしなければ 3 Rep ずつ下がる減衰処理
             if (m_repCount > 0 && !m_isSkillChecking)
             {
                 if (--m_pumpDecayTimer <= 0)
                 {
-                    m_pumpDecayTimer = 0;
-                    m_repCount = 0;
-                    m_speed = SPEED_INITIAL;
-                    m_state = MuscleState::Normal;
+                    if (m_repCount > 3)
+                    {
+                        m_repCount -= 3;
+                        m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 次の15秒へ再セット
+                        m_state = MuscleState::Muscular;
+                    }
+                    else
+                    {
+                        m_repCount = 0;
+                        m_pumpDecayTimer = 0;
+                        m_state = MuscleState::Normal;
+                    }
+
+                    m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.15f;
                     m_resultShowTimer = 60;
                     m_wasDecayed = true;
                 }
@@ -902,9 +912,26 @@ void Player3D::Draw2D()
         int barX = (Config::SCREEN_WIDTH - barW) / 2;
         int barY = Config::SCREEN_HEIGHT - 125;
 
-        // ポップな極太枠付きバー背景（バカゲー風）
+        // 輪郭付きテキスト描画ラムダ（白いステージでもクッキリ目立つ黒縁取り）
+        auto DrawOutlinedText = [](int x, int y, const char* str, unsigned int textColor, int fontHandle)
+        {
+            unsigned int black = GetColor(0, 0, 0);
+            for (int ox = -2; ox <= 2; ++ox)
+            {
+                for (int oy = -2; oy <= 2; ++oy)
+                {
+                    if (ox != 0 || oy != 0)
+                    {
+                        DrawStringToHandle(x + ox, y + oy, str, black, fontHandle);
+                    }
+                }
+            }
+            DrawStringToHandle(x, y, str, textColor, fontHandle);
+        };
+
+        // ポップな極太枠付きバー背景（バカゲー風：白い床でも締まるバーニングオレンジ枠）
         DrawBox(barX - 6, barY - 6, barX + barW + 6, barY + barH + 6, GetColor(0, 0, 0), TRUE);
-        DrawBox(barX - 3, barY - 3, barX + barW + 3, barY + barH + 3, GetColor(255, 220, 50), TRUE);
+        DrawBox(barX - 3, barY - 3, barX + barW + 3, barY + barH + 3, GetColor(255, 110, 30), TRUE);
         DrawBox(barX, barY, barX + barW, barY + barH, GetColor(40, 40, 50), TRUE);
 
         // 成功ゾーン（ビビッドグリーン）
@@ -918,63 +945,90 @@ void Player3D::Draw2D()
         unsigned int needleColor = GetColor(255, 40, 40);
         if (m_scStoppedTimer > 0)
         {
-            needleColor = m_lastResultSuccess ? GetColor(255, 255, 50) : GetColor(255, 30, 30);
+            needleColor = m_lastResultSuccess ? GetColor(255, 120, 30) : GetColor(255, 30, 30);
         }
         DrawBox(cursorX - 5, barY - 10, cursorX + 5, barY + barH + 10, GetColor(0, 0, 0), TRUE);
         DrawBox(cursorX - 3, barY - 8, cursorX + 3, barY + barH + 8, needleColor, TRUE);
 
-        // ガイドテキスト
+        // ガイドテキスト（白い床でも視認性抜群の黒縁取り＋燃えるマッスルオレンジ）
         if (m_scStoppedTimer > 0)
         {
             if (m_lastResultSuccess)
             {
-                DrawStringToHandle(barX + 90, barY - 32, "★ NICE PUMP!! ★", GetColor(255, 255, 50), font24);
+                DrawOutlinedText(barX + 85, barY - 34, "★ NICE PUMP!! ★", GetColor(255, 110, 25), font24);
             }
             
             else
             {
-                DrawStringToHandle(barX + 115, barY - 32, "× MISS! ×", GetColor(255, 60, 60), font24);
+                DrawOutlinedText(barX + 115, barY - 34, "× MISS! ×", GetColor(255, 60, 60), font24);
             }
         }
         
         else
         {
-            DrawStringToHandle(barX + 35, barY - 30, "緑のゾーンで [SPACE] を離せ！", GetColor(255, 255, 80), font18);
+            DrawOutlinedText(barX + 12, barY - 32, "長押し→緑のゾーンで [SPACE] を離せ！", GetColor(255, 130, 35), font18);
         }
     }
 
-    // スキルチェック結果・筋肉痛・減衰通知テキスト（バカゲー風ポップ装飾）
+    // スキルチェック結果・筋肉痛・減衰通知テキスト（バカゲー風ポップ装飾：黒縁取りで白床でも鮮明）
     if (m_resultShowTimer > 0)
     {
         int alpha = (m_resultShowTimer > 20) ? 255 : (m_resultShowTimer * 255 / 20);
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
 
+        auto DrawOutlinedTextCenter = [](int x, int y, const char* str, unsigned int textColor, int fontHandle)
+        {
+            unsigned int black = GetColor(0, 0, 0);
+            for (int ox = -2; ox <= 2; ++ox)
+            {
+                for (int oy = -2; oy <= 2; ++oy)
+                {
+                    if (ox != 0 || oy != 0)
+                    {
+                        DrawStringToHandle(x + ox, y + oy, str, black, fontHandle);
+                    }
+                }
+            }
+            DrawStringToHandle(x, y, str, textColor, fontHandle);
+        };
+
         if (m_wasDecayed)
         {
-            DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 140, Config::SCREEN_HEIGHT / 2 - 45,
-                               "15秒放置: 筋肉が減衰した！ (0 Rep)", GetColor(180, 200, 255), font18);
+            char decayBuf[64];
+            if (m_repCount > 0)
+            {
+                snprintf(decayBuf, sizeof(decayBuf), "15秒放置: 筋肉減衰! (-3 Rep / 現在 Lv.%d)", m_repCount);
+            }
+            else
+            {
+                snprintf(decayBuf, sizeof(decayBuf), "15秒放置: 筋肉が完全に減衰した! (0 Rep)");
+            }
+            DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 160, Config::SCREEN_HEIGHT / 2 - 45,
+                                   decayBuf, GetColor(180, 200, 255), font18);
         }
         
         else if (m_state == MuscleState::Soreness)
         {
-            DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 160, Config::SCREEN_HEIGHT / 2 - 45,
-                               "FAIL! 筋肉痛で5秒間動けない！", GetColor(255, 70, 70), font24);
+            DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 160, Config::SCREEN_HEIGHT / 2 - 45,
+                                   "FAIL! 筋肉痛で5秒間動けない！", GetColor(255, 70, 70), font24);
         }
         
         else if (m_lastResultSuccess)
         {
+            char resultBuf[128];
+
             if (m_repCount >= MAX_EFFECTIVE_REP)
             {
-                DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 180, Config::SCREEN_HEIGHT / 2 - 45,
-                                         GetColor(255, 215, 0), font24,
-                                         "★ GOD MUSCLE MAX!! ★ +1 REP (Lv.%d)", m_repCount);
+                snprintf(resultBuf, sizeof(resultBuf), "★ GOD MUSCLE MAX!! ★ +1 REP (Lv.%d)", m_repCount);
+                DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 180, Config::SCREEN_HEIGHT / 2 - 45,
+                                       resultBuf, GetColor(255, 60, 40), font24);
             }
             
             else
             {
-                DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 45,
-                                         GetColor(255, 230, 40), font24,
-                                         "PUMP UP!! +1 REP (Lv.%d)", m_repCount);
+                snprintf(resultBuf, sizeof(resultBuf), "PUMP UP!! +1 REP (Lv.%d)", m_repCount);
+                DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 45,
+                                       resultBuf, GetColor(255, 115, 30), font24);
             }
         }
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
