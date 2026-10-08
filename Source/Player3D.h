@@ -1,5 +1,6 @@
 #pragma once
 #include "GameObject3D.h"
+#include "ModelConfig.h"
 #include <deque>
 #include <vector>
 
@@ -37,6 +38,8 @@ private:
 
     int   m_sorenessTimer = 0;       // 筋肉痛残りフレーム (5秒 = 300f)
     int   m_pumpDecayTimer = 0;      // Rep維持残りフレーム (15秒 = 900f)
+    float m_groundY = 0.0f;          // 現在の接地地面高さ（床・坂道対応）
+    ModelConfig::MapType m_mapType = ModelConfig::MapType::SlopeHills;
     int   m_animFrame = 0;
     float m_animTime = 0.0f;
 
@@ -136,6 +139,30 @@ public:
     MuscleState GetMuscleState() const
     {
         return m_state;
+    }
+
+    void SetGroundY(float groundY)
+    {
+        m_groundY = groundY;
+        if (!m_isPouncing)
+        {
+            m_pos.y = m_groundY;
+        }
+    }
+
+    float GetGroundY() const
+    {
+        return m_groundY;
+    }
+
+    void SetMapType(ModelConfig::MapType type)
+    {
+        m_mapType = type;
+    }
+
+    ModelConfig::MapType GetMapType() const
+    {
+        return m_mapType;
     }
     
     float GetCurrentSpeed() const

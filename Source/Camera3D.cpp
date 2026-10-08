@@ -252,7 +252,7 @@ void Camera3D::Update(
 
 void Camera3D::Apply() const
 {
-    SetCameraNearFar(5.0f, 3500.0f);
+    SetCameraNearFar(5.0f, 90000.0f);
     SetCameraPositionAndTarget_UpVecY(m_currentPos, m_targetPos);
 }
 

@@ -44,17 +44,19 @@ private:
     int   m_prevUpdateTime = 0;
 
     // タイトル画面用演出・メニュー状態
+    ModelConfig::MapType m_selectedMap = ModelConfig::MapType::SlopeHills;
     bool  m_showHowToPlay = false;
     int   m_startTransitionTimer = 0;
     int   m_titleAnimTimer = 0;
-    int   m_selectedMenuItem = 0; // 0: START, 1: HOW TO PLAY
+    int   m_selectedMenuItem = 0; // 0: START, 1: STAGE, 2: HOW TO PLAY
     bool  m_prevKeyH = false;
     bool  m_prevKeyTab = false;
     bool  m_prevKeyEsc = false;
     bool  m_prevKeyUp = false;
     bool  m_prevKeyDown = false;
+    bool  m_prevKeyLeft = false;
+    bool  m_prevKeyRight = false;
 
-    void SetupTitle();
     void SetupRoomObstacles();
     void DrawTitleScreen();
     void DrawHowToPlayModal();
@@ -64,12 +66,19 @@ public:
     ~GameManager() = default;
 
     void Init();
+    void SetupTitle();
     void StartGame();
+    void SwitchSelectedMap(ModelConfig::MapType newMap);
     void Update();
     void Draw();
 
     void SetFrameProcessTime(float ms)
     {
         m_frameProcessTimeMs = ms;
+    }
+
+    ObjectManager3D& GetObjManager()
+    {
+        return m_objManager;
     }
 };

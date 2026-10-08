@@ -17,9 +17,14 @@ void ObjectManager3D::Clear()
     m_isTimeFrozen = false;
 }
 
-void ObjectManager3D::InitStage()
+void ObjectManager3D::InitStage(ModelConfig::MapType mapType)
 {
-    m_stage.Init();
+    m_stage.Init(mapType);
+}
+
+void ObjectManager3D::LoadStage(ModelConfig::MapType mapType)
+{
+    m_stage.LoadStage(mapType);
 }
 
 void ObjectManager3D::SetPlayer(std::shared_ptr<Player3D> player)
@@ -39,18 +44,38 @@ void ObjectManager3D::AddObstacle(std::shared_ptr<Obstacle3D> obs)
 
 void ObjectManager3D::SpawnNormalMouse()
 {
-    float x = static_cast<float>(-380 + rand() % 760);
-    float z = static_cast<float>(100 + rand() % 220);
+    float rangeX = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 2500.0f : 380.0f;
+    float rangeZ = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 2500.0f : 220.0f;
+    float x = static_cast<float>(-rangeX + rand() % static_cast<int>(rangeX * 2.0f));
+    float z = static_cast<float>(100.0f + rand() % static_cast<int>(rangeZ));
     if (rand() % 2 == 0) z = -z;
-    AddObject(std::make_shared<NormalMouse3D>(VGet(x, 0.0f, z), m_player));
+    VECTOR pos = VGet(x, 0.0f, z);
+    float gy = 0.0f;
+    if (m_stage.GetGroundHeight(pos, gy))
+    {
+        pos.y = gy;
+    }
+    auto mouse = std::make_shared<NormalMouse3D>(pos, m_player);
+    mouse->SetMapType(m_stage.GetMapType());
+    AddObject(mouse);
 }
 
 void ObjectManager3D::SpawnFastMouse()
 {
-    float x = static_cast<float>(-380 + rand() % 760);
-    float z = static_cast<float>(120 + rand() % 200);
+    float rangeX = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 2500.0f : 380.0f;
+    float rangeZ = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 2500.0f : 200.0f;
+    float x = static_cast<float>(-rangeX + rand() % static_cast<int>(rangeX * 2.0f));
+    float z = static_cast<float>(120.0f + rand() % static_cast<int>(rangeZ));
     if (rand() % 2 == 0) z = -z;
-    AddObject(std::make_shared<FastMouse3D>(VGet(x, 0.0f, z), m_player));
+    VECTOR pos = VGet(x, 0.0f, z);
+    float gy = 0.0f;
+    if (m_stage.GetGroundHeight(pos, gy))
+    {
+        pos.y = gy;
+    }
+    auto mouse = std::make_shared<FastMouse3D>(pos, m_player);
+    mouse->SetMapType(m_stage.GetMapType());
+    AddObject(mouse);
 }
 
 void ObjectManager3D::Update(const Camera3D& camera)
@@ -239,6 +264,17 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
             m_player->ApplyStun(90);
         }
 
+        // 床・坂道への接地判定
+        float groundY = 0.0f;
+        if (m_stage.GetGroundHeight(pPos, groundY))
+        {
+            m_player->SetGroundY(groundY);
+            if (!m_player->IsPouncing())
+            {
+                pPos.y = groundY;
+            }
+        }
+
         m_player->SetPos(pPos);
     }
 
@@ -267,6 +303,14 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
                 mouse->OnWallCollision(pushNormal);
             }
         }
+
+        // ネズミの床・坂道への接地判定
+        float groundY = 0.0f;
+        if (m_stage.GetGroundHeight(mPos, groundY))
+        {
+            mPos.y = groundY;
+        }
+
         obj->SetPos(mPos);
     }
 }

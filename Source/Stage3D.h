@@ -3,6 +3,8 @@
 #include <string>
 #include <vector>
 
+#include "ModelConfig.h"
+
 // 壁ポリゴン情報
 struct WallPolygon
 {
@@ -19,6 +21,8 @@ private:
     float m_halfDepth;
     float m_wallHeight;
     std::string m_modelPath;
+    float m_scale = 1.0f;
+    ModelConfig::MapType m_mapType = ModelConfig::MapType::SlopeHills;
 
     int    m_modelHandle = -1;
     bool   m_hasCollision = false;
@@ -30,11 +34,20 @@ public:
     Stage3D();
     ~Stage3D();
 
-    void Init();
+    void Init(ModelConfig::MapType mapType = ModelConfig::MapType::SlopeHills);
+    void LoadStage(ModelConfig::MapType mapType);
     void Draw3D();
+
+    ModelConfig::MapType GetMapType() const
+    {
+        return m_mapType;
+    }
 
     // プレイヤーやネズミがステージ壁を越えないよう押し戻す（3Dメッシュコリジョン対応）
     bool ResolveWallCollision(VECTOR& outPos, float radius, VECTOR* outPushNormal = nullptr) const;
+
+    // キャラクターの現在位置に対応する床・坂道（スロープ）の高さを取得（接地判定）
+    bool GetGroundHeight(const VECTOR& pos, float& outGroundY, VECTOR* outGroundNormal = nullptr) const;
 
     // 従来の境界ボックス（セーフティネット用）
     bool ClampToBounds(VECTOR& outPos, float radius) const;

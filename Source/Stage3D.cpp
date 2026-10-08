@@ -81,7 +81,7 @@ Stage3D::~Stage3D()
     }
 }
 
-void Stage3D::Init()
+void Stage3D::Init(ModelConfig::MapType mapType)
 {
     // 画面クリア背景色（アニメ調の明るいパステルブルー・空色）
     SetBackgroundColor(175, 218, 252);
@@ -93,10 +93,39 @@ void Stage3D::Init()
     SetLightDifColor(GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
     SetLightSpcColor(GetColorF(0.7f, 0.7f, 0.7f, 1.0f));
 
-    // フォグ設定（アニメ調の澄んだ空気感）
-    SetFogEnable(TRUE);
-    SetFogColor(175, 218, 252);
-    SetFogStartEnd(1800.0f, 4200.0f);
+    LoadStage(mapType);
+}
+
+void Stage3D::LoadStage(ModelConfig::MapType mapType)
+{
+    m_mapType = mapType;
+
+    if (m_mapType == ModelConfig::MapType::House)
+    {
+        m_modelPath = ModelConfig::MAP1_HOUSE_PATH;
+        m_scale = ModelConfig::MAP1_HOUSE_SCALE; // 100.0f
+        m_halfWidth = 850.0f;
+        m_halfDepth = 850.0f;
+        m_wallHeight = 250.0f;
+
+        // フォグ設定（室内用）
+        SetFogEnable(TRUE);
+        SetFogColor(175, 218, 252);
+        SetFogStartEnd(2500.0f, 5500.0f);
+    }
+    else // SlopeHills (15倍サイズスロープ)
+    {
+        m_modelPath = ModelConfig::MAP2_SLOPE_PATH;
+        m_scale = ModelConfig::MAP2_SLOPE_SCALE; // 15.0f
+        m_halfWidth = 14000.0f;
+        m_halfDepth = 14000.0f;
+        m_wallHeight = 1800.0f;
+
+        // フォグ設定（広大屋外・スロープ用）
+        SetFogEnable(TRUE);
+        SetFogColor(175, 218, 252);
+        SetFogStartEnd(18000.0f, 45000.0f);
+    }
 
     // 既存モデルハンドルの破棄
     if (m_modelHandle != -1)
@@ -114,7 +143,7 @@ void Stage3D::Init()
         m_modelHandle = MV1DuplicateModel(baseHandle);
         if (m_modelHandle != -1)
         {
-            float scale = ModelConfig::STAGE_MODEL_SCALE;
+            float scale = m_scale;
             MV1SetPosition(m_modelHandle, VGet(0.0f, 0.0f, 0.0f));
             MV1SetRotationXYZ(m_modelHandle, VGet(0.0f, 0.0f, 0.0f));
             MV1SetScale(m_modelHandle, VGet(scale, scale, scale));
@@ -151,10 +180,34 @@ void Stage3D::Init()
                 VECTOR bMin = MV1GetMeshMinPosition(m_modelHandle, m);
                 VECTOR bMax = MV1GetMeshMaxPosition(m_modelHandle, m);
                 int polyNum = MV1GetMeshTriangleNum(m_modelHandle, m);
-                AppLogAdd("  Mesh[%d]: polyNum=%d, Min=(%.1f, %.1f, %.1f), Max=(%.1f, %.1f, %.1f)\n",
+                AppLogAdd("  Mesh[%d]: polyNum=%d, RawMin=(%.2f, %.2f, %.2f), RawMax=(%.2f, %.2f, %.2f)\n",
                     m, polyNum,
-                    bMin.x * scale, bMin.y * scale, bMin.z * scale,
-                    bMax.x * scale, bMax.y * scale, bMax.z * scale);
+                    bMin.x, bMin.y, bMin.z,
+                    bMax.x, bMax.y, bMax.z);
+            }
+
+            // モデル全体の参照メッシュを取得して頂点全体のバウンディングボックスを計測
+            if (MV1SetupReferenceMesh(m_modelHandle, -1, TRUE) >= 0)
+            {
+                MV1_REF_POLYGONLIST refAll = MV1GetReferenceMesh(m_modelHandle, -1, TRUE);
+                VECTOR refMin = VGet(1e9f, 1e9f, 1e9f);
+                VECTOR refMax = VGet(-1e9f, -1e9f, -1e9f);
+                for (int v = 0; v < refAll.VertexNum; ++v)
+                {
+                    const auto& pos = refAll.Vertexs[v].Position;
+                    if (pos.x < refMin.x) refMin.x = pos.x;
+                    if (pos.y < refMin.y) refMin.y = pos.y;
+                    if (pos.z < refMin.z) refMin.z = pos.z;
+                    if (pos.x > refMax.x) refMax.x = pos.x;
+                    if (pos.y > refMax.y) refMax.y = pos.y;
+                    if (pos.z > refMax.z) refMax.z = pos.z;
+                }
+                m_minBounds = refMin;
+                m_maxBounds = refMax;
+                AppLogAdd("Stage Exact Bounds: Min=(%.1f, %.1f, %.1f), Max=(%.1f, %.1f, %.1f)\n",
+                    m_minBounds.x, m_minBounds.y, m_minBounds.z,
+                    m_maxBounds.x, m_maxBounds.y, m_maxBounds.z);
+                MV1TerminateReferenceMesh(m_modelHandle, -1, TRUE);
             }
 
             // モデルから直接参照ポリゴンを取得し、面法線による壁ポリゴンリストを構築
@@ -181,21 +234,6 @@ void Stage3D::Init()
                 {
                     const auto& poly = ref.Polygons[i];
 
-                    // 【床メッシュの除外】
-                    // 親メッシュの上端が低いもの（床メッシュ: Max.Y=5.0f）や高さが小さいものは、
-                    // 床ブロックの側面や分け目なので壁として抽出しない
-                    if (poly.MeshIndex < meshNum)
-                    {
-                        VECTOR bMin = MV1GetMeshMinPosition(m_modelHandle, poly.MeshIndex);
-                        VECTOR bMax = MV1GetMeshMaxPosition(m_modelHandle, poly.MeshIndex);
-                        float meshMaxY = bMax.y * scale;
-                        float meshHeight = (bMax.y - bMin.y) * scale;
-                        if (meshMaxY < 100.0f || meshHeight < 50.0f)
-                        {
-                            continue; // 床メッシュ（分け目の垂直面）を除外
-                        }
-                    }
-
                     VECTOR v0 = ref.Vertexs[poly.VIndex[0]].Position;
                     VECTOR v1 = ref.Vertexs[poly.VIndex[1]].Position;
                     VECTOR v2 = ref.Vertexs[poly.VIndex[2]].Position;
@@ -204,10 +242,8 @@ void Stage3D::Init()
                     float polyMaxY = CalcMax3(v0.y, v1.y, v2.y);
                     float polyHeight = polyMaxY - polyMinY;
 
-                    // 【ポリゴン単位の床分け目除外】
-                    // 本物の壁は Y=0 〜 Y=200 まで伸びている。
-                    // 床の分け目や段差（上端が50未満、または高さが40未満）は除外
-                    if (polyMaxY < 50.0f || polyHeight < 40.0f)
+                    // 床の分け目や段差などの微小ポリゴン（高さが3未満）は除外
+                    if (polyHeight < 3.0f)
                     {
                         continue;
                     }
@@ -226,8 +262,9 @@ void Stage3D::Init()
                     VECTOR normal = VGet(cross.x * invLen, cross.y * invLen, cross.z * invLen);
 
                     // 壁ポリゴンの判定:
-                    // 法線のY成分の絶対値が 0.65 未満のものを壁（垂直壁・急勾配）とする
-                    if (std::abs(normal.y) < 0.65f)
+                    // 法線のY成分の絶対値が 0.35 未満（傾き約70度以上のほぼ垂直な面）を壁とする
+                    // （坂道・スロープは normal.y >= 0.89 のため壁として誤判定されない）
+                    if (std::abs(normal.y) < 0.35f)
                     {
                         WallPolygon wp;
                         wp.v0 = v0;
@@ -274,13 +311,6 @@ void Stage3D::Init()
 
             AppLogAdd("Stage wall polygons: total=%d (floor-level<=4: %d, player-level: %d, ceiling-level>=35: %d)\n",
                 static_cast<int>(m_wallPolygons.size()), lowPolyCount, midPolyCount, highPolyCount);
-            if (!m_wallPolygons.empty())
-            {
-                AppLogAdd("Sample Wall Polygon 0: v0=(%.1f, %.1f, %.1f), v1=(%.1f, %.1f, %.1f), normal=(%.2f, %.2f, %.2f)\n",
-                    m_wallPolygons[0].v0.x, m_wallPolygons[0].v0.y, m_wallPolygons[0].v0.z,
-                    m_wallPolygons[0].v1.x, m_wallPolygons[0].v1.y, m_wallPolygons[0].v1.z,
-                    m_wallPolygons[0].normal.x, m_wallPolygons[0].normal.y, m_wallPolygons[0].normal.z);
-            }
         }
     }
 }
@@ -291,7 +321,7 @@ void Stage3D::Draw3D()
     {
         MV1DrawModel(m_modelHandle);
     }
-    else if (!ModelManager::GetInstance().DrawModelIfLoaded(m_modelPath, VGet(0.0f, 0.0f, 0.0f), 0.0f, ModelConfig::STAGE_MODEL_SCALE))
+    else if (!ModelManager::GetInstance().DrawModelIfLoaded(m_modelPath, VGet(0.0f, 0.0f, 0.0f), 0.0f, m_scale))
     {
         ModelManager::GetInstance().DrawFallbackStage(m_halfWidth, m_halfDepth, m_wallHeight);
     }
@@ -552,4 +582,49 @@ bool Stage3D::ClampToBounds(VECTOR& outPos, float radius) const
     }
 
     return collided;
+}
+
+bool Stage3D::GetGroundHeight(const VECTOR& pos, float& outGroundY, VECTOR* outGroundNormal) const
+{
+    if (m_modelHandle == -1 || !m_hasCollision)
+    {
+        outGroundY = 0.0f;
+        return false;
+    }
+
+    // 1. 現在の足元付近のレイキャスト（頭上250から足元下250まで探索）
+    float searchUp = 250.0f;
+    float searchDown = 250.0f;
+    VECTOR start = VGet(pos.x, pos.y + searchUp, pos.z);
+    VECTOR end   = VGet(pos.x, pos.y - searchDown, pos.z);
+
+    MV1_COLL_RESULT_POLY hit = MV1CollCheck_Line(m_modelHandle, -1, start, end);
+    if (hit.HitFlag == 1 && hit.Normal.y >= 0.35f)
+    {
+        outGroundY = hit.HitPosition.y;
+        if (outGroundNormal)
+        {
+            *outGroundNormal = hit.Normal;
+        }
+        return true;
+    }
+
+    // 2. セーフティネット：ステージ全体の縦レイ（上空〜地下までマップ全体探索）
+    float skyY   = (m_maxBounds.y > 500.0f) ? (m_maxBounds.y + 500.0f) : 500.0f;
+    float underY = (m_minBounds.y < -100.0f) ? (m_minBounds.y - 100.0f) : -100.0f;
+    VECTOR wideStart = VGet(pos.x, skyY, pos.z);
+    VECTOR wideEnd   = VGet(pos.x, underY, pos.z);
+    MV1_COLL_RESULT_POLY wideHit = MV1CollCheck_Line(m_modelHandle, -1, wideStart, wideEnd);
+    if (wideHit.HitFlag == 1 && wideHit.Normal.y >= 0.35f)
+    {
+        outGroundY = wideHit.HitPosition.y;
+        if (outGroundNormal)
+        {
+            *outGroundNormal = wideHit.Normal;
+        }
+        return true;
+    }
+
+    outGroundY = 0.0f;
+    return false;
 }
