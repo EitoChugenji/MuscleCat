@@ -97,15 +97,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
             else if (autoTestFrame == 75)
             {
-                // マップ2（SlopeHills 15x）に切り替え
+                // マップ2（SlopeHills 10x）に切り替え
                 game.SwitchSelectedMap(ModelConfig::MapType::SlopeHills);
-                AppLogAdd("AutoTest: Switched to MAP 2: Slope Hills 15x\n");
+                AppLogAdd("AutoTest: Switched to MAP 2: Slope Hills 10x\n");
             }
             else if (autoTestFrame == 85)
             {
                 // マップ2でゲーム開始
                 game.StartGame();
-                AppLogAdd("AutoTest: Started game on MAP 2: Slope Hills 15x\n");
+                AppLogAdd("AutoTest: Started game on MAP 2: Slope Hills 10x\n");
             }
             else if (autoTestFrame > 85 && autoTestFrame <= 140)
             {
@@ -114,8 +114,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 if (p)
                 {
                     VECTOR pos = p->GetPos();
-                    pos.x += 45.0f;
-                    pos.z += 45.0f;
+                    pos.x += 35.0f;
+                    pos.z += 35.0f;
                     float gy = 0.0f;
                     if (game.GetObjManager().GetStage().GetGroundHeight(pos, gy))
                     {

@@ -61,8 +61,8 @@ public:
         float maxSpd  = MOUSE_MAX_SPEED;
         if (m_mapType == ModelConfig::MapType::SlopeHills)
         {
-            baseSpd *= 1.4f;
-            maxSpd  *= 1.4f;
+            baseSpd *= 1.25f;
+            maxSpd  *= 1.25f;
         }
         float s = baseSpd + m_speedBonus;
         return (s > maxSpd) ? maxSpd : s;

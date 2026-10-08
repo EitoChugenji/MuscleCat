@@ -294,7 +294,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         }
 
         // 地面を滑るような超高速直進
-        float tSpeed = GetTackleSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.3f : 1.0f);
+        float tSpeed = GetTackleSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f);
         m_pos.x += m_tackleDir.x * tSpeed;
         m_pos.z += m_tackleDir.z * tSpeed;
         m_pos.y = m_groundY;
@@ -363,7 +363,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         }
 
         // Rep数に応じた突進速度で直進
-        float pSpeed = GetPounceSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.3f : 1.0f);
+        float pSpeed = GetPounceSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f);
         m_pos.x += m_pounceDir.x * pSpeed;
         m_pos.z += m_pounceDir.z * pSpeed;
 
@@ -571,7 +571,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                     m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.25f);
 
                     // 移動
-                    float speedMult = (m_mapType == ModelConfig::MapType::SlopeHills) ? 1.35f : 1.0f;
+                    float speedMult = (m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f;
                     m_pos.x += moveDir.x * (m_speed * speedMult);
                     m_pos.z += moveDir.z * (m_speed * speedMult);
                 }

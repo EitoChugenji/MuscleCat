@@ -28,7 +28,7 @@ namespace ModelConfig
     enum class MapType
     {
         House = 0,     // 通常ハウス (firstmap.mv1, scale: 100.0f)
-        SlopeHills = 1 // スロープヒルズ (secondmap.mv1, scale: 15.0f = 15倍サイズ)
+        SlopeHills = 1 // スロープヒルズ (secondmap.mv1, scale: 10.0f = 10倍サイズ)
     };
 
     // ステージ1: 通常ハウス
@@ -36,10 +36,10 @@ namespace ModelConfig
     constexpr float       MAP1_HOUSE_SCALE = 100.0f;
     constexpr const char* MAP1_HOUSE_NAME = "通常ハウス (HOUSE)";
 
-    // ステージ2: スロープヒルズ (ユーザー要望により15倍サイズに調整)
+    // ステージ2: スロープヒルズ (ユーザー要望により10倍サイズに調整)
     constexpr const char* MAP2_SLOPE_PATH = "Resource/Models/Maps/secondmap.mv1";
-    constexpr float       MAP2_SLOPE_SCALE = 15.0f;
-    constexpr const char* MAP2_SLOPE_NAME = "スロープヒルズ 15倍 (SLOPE)";
+    constexpr float       MAP2_SLOPE_SCALE = 10.0f;
+    constexpr const char* MAP2_SLOPE_NAME = "スロープヒルズ 10倍 (SLOPE)";
 
     // デフォルトステージ設定（互換用）
     constexpr const char* STAGE_MODEL_PATH = MAP2_SLOPE_PATH;

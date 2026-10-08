@@ -137,66 +137,66 @@ void GameManager::SetupRoomObstacles()
     }
     else
     {
-        // SlopeHills (15倍スロープマップ) 用の家具配置（中央平地および各高台）
+        // SlopeHills (10倍スロープマップ) 用の家具配置（中央平地および各高台）
         PlaceObstacle(
-            VGet(600.0f, 0.0f, 800.0f),
-            300.0f, 75.0f, 70.0f,
+            VGet(500.0f, 0.0f, 650.0f),
+            240.0f, 60.0f, 55.0f,
             "", ModelConfig::KITCHEN_MODEL_PATH,
             GetColor(200, 200, 210), GetColor(150, 150, 160),
-            ModelConfig::KITCHEN_MODEL_SCALE * 1.5f,
+            ModelConfig::KITCHEN_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::KITCHEN_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::KITCHEN_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
         PlaceObstacle(
-            VGet(950.0f, 0.0f, 800.0f),
-            80.0f, 160.0f, 64.0f,
+            VGet(800.0f, 0.0f, 650.0f),
+            65.0f, 130.0f, 52.0f,
             "", ModelConfig::REFRIGERATOR_MODEL_PATH,
             GetColor(220, 220, 230), GetColor(160, 160, 170),
-            ModelConfig::REFRIGERATOR_MODEL_SCALE * 1.5f,
+            ModelConfig::REFRIGERATOR_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::REFRIGERATOR_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::REFRIGERATOR_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
         PlaceObstacle(
-            VGet(-500.0f, 0.0f, 600.0f),
-            150.0f, 50.0f, 150.0f,
+            VGet(-400.0f, 0.0f, 500.0f),
+            120.0f, 40.0f, 120.0f,
             "", ModelConfig::TABLE_MODEL_PATH,
             GetColor(180, 140, 100), GetColor(140, 100, 70),
-            ModelConfig::TABLE_MODEL_SCALE * 1.5f,
+            ModelConfig::TABLE_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
         PlaceObstacle(
-            VGet(-500.0f, 0.0f, 150.0f),
-            30.0f, 60.0f, 120.0f,
+            VGet(-400.0f, 0.0f, 120.0f),
+            25.0f, 50.0f, 100.0f,
             "", ModelConfig::TV_MODEL_PATH,
             GetColor(40, 40, 45), GetColor(20, 20, 25),
-            ModelConfig::TV_MODEL_SCALE * 1.5f,
+            ModelConfig::TV_MODEL_SCALE * 1.2f,
             DX_PI_F * 0.5f,
-            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
         // 高台フロアの家具
         PlaceObstacle(
-            VGet(8000.0f, 0.0f, 7000.0f),
-            150.0f, 50.0f, 150.0f,
+            VGet(5300.0f, 0.0f, 4700.0f),
+            120.0f, 40.0f, 120.0f,
             "", ModelConfig::TABLE_MODEL_PATH,
             GetColor(180, 140, 100), GetColor(140, 100, 70),
-            ModelConfig::TABLE_MODEL_SCALE * 1.5f,
+            ModelConfig::TABLE_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
         PlaceObstacle(
-            VGet(-7500.0f, 0.0f, 8000.0f),
-            120.0f, 60.0f, 30.0f,
+            VGet(-5000.0f, 0.0f, 5300.0f),
+            100.0f, 50.0f, 25.0f,
             "", ModelConfig::TV_MODEL_PATH,
             GetColor(40, 40, 45), GetColor(20, 20, 25),
-            ModelConfig::TV_MODEL_SCALE * 1.5f,
+            ModelConfig::TV_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
     }
 }
@@ -301,16 +301,16 @@ void GameManager::StartGame()
     const int houseRoomCount = sizeof(spawnRoomsHouse) / sizeof(spawnRoomsHouse[0]);
 
     const VECTOR spawnRoomsSlope[] = {
-        VGet(   500.0f, 0.0f,   500.0f),  // 中央平地北東
-        VGet(  -500.0f, 0.0f,   500.0f),  // 中央平地北西
-        VGet(   500.0f, 0.0f,  -500.0f),  // 中央平地南東
-        VGet(  -500.0f, 0.0f,  -500.0f),  // 中央平地南西
-        VGet(  1750.0f, 0.0f,   1750.0f),  // スロープ入口北東
-        VGet( -1750.0f, 0.0f,   1750.0f),  // スロープ入口北西
-        VGet(  6000.0f, 0.0f,   6000.0f),  // 北東高台
-        VGet( -6000.0f, 0.0f,   6000.0f),  // 北西高台
-        VGet(  6000.0f, 0.0f,  -6000.0f),  // 南東高台
-        VGet( -6000.0f, 0.0f,  -6000.0f),  // 南西高台
+        VGet(   350.0f, 0.0f,   350.0f),  // 中央平地北東
+        VGet(  -350.0f, 0.0f,   350.0f),  // 中央平地北西
+        VGet(   350.0f, 0.0f,  -350.0f),  // 中央平地南東
+        VGet(  -350.0f, 0.0f,  -350.0f),  // 中央平地南西
+        VGet(  1200.0f, 0.0f,   1200.0f),  // スロープ入口北東
+        VGet( -1200.0f, 0.0f,   1200.0f),  // スロープ入口北西
+        VGet(  4000.0f, 0.0f,   4000.0f),  // 北東高台
+        VGet( -4000.0f, 0.0f,   4000.0f),  // 北西高台
+        VGet(  4000.0f, 0.0f,  -4000.0f),  // 南東高台
+        VGet( -4000.0f, 0.0f,  -4000.0f),  // 南西高台
     };
     const int slopeRoomCount = sizeof(spawnRoomsSlope) / sizeof(spawnRoomsSlope[0]);
 
@@ -1090,7 +1090,7 @@ void GameManager::DrawTitleScreen()
     bool isStageSelected = (m_selectedMenuItem == 1);
     const char* stageNameStr = (m_selectedMap == ModelConfig::MapType::House)
         ? "STAGE : MAP 1 (HOUSE)"
-        : "STAGE : MAP 2 (SLOPE 15x)";
+        : "STAGE : MAP 2 (SLOPE 10x)";
 
     if (isStageSelected)
     {
@@ -1157,7 +1157,7 @@ void GameManager::DrawTitleScreen()
 
     // ステージ切り替えガイドヒント（半透明コミックプレート付きで視認性抜群）
     const char* stageHint = (m_selectedMap == ModelConfig::MapType::House)
-        ? "★ [ ← / → ] またはクリックで MAP 2: 15倍スロープ に切替"
+        ? "★ [ ← / → ] またはクリックで MAP 2: 10倍スロープ に切替"
         : "★ [ ← / → ] またはクリックで MAP 1: 通常ハウス に切替";
     int hintW = GetDrawStringWidthToHandle(stageHint, static_cast<int>(strlen(stageHint)), font13);
     int hintX = (Config::SCREEN_WIDTH - hintW) / 2;
@@ -1276,7 +1276,7 @@ void GameManager::DrawHowToPlayModal()
 
     DrawStringToHandle(c3X + 12, cardY + 44, "・逃げ回るネズミを全滅!", GetColor(255, 255, 255), font13);
     DrawStringToHandle(c3X + 12, cardY + 66, "・MAP 1: 通常ハウス (室内)", GetColor(255, 220, 100), font13);
-    DrawStringToHandle(c3X + 12, cardY + 88, "・MAP 2: スロープ丘 (15倍)", GetColor(100, 240, 255), font13);
+    DrawStringToHandle(c3X + 12, cardY + 88, "・MAP 2: スロープ丘 (10倍)", GetColor(100, 240, 255), font13);
     DrawStringToHandle(c3X + 12, cardY + 112, "・クリア時間でランク判定:", GetColor(255, 255, 255), font13);
     DrawStringToHandle(c3X + 22, cardY + 132, "S: 20秒以内, A: 35秒以内", GetColor(255, 215, 40), font13);
 

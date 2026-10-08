@@ -113,18 +113,18 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
         SetFogColor(175, 218, 252);
         SetFogStartEnd(2500.0f, 5500.0f);
     }
-    else // SlopeHills (15倍サイズスロープ)
+    else // SlopeHills (10倍サイズスロープ)
     {
         m_modelPath = ModelConfig::MAP2_SLOPE_PATH;
-        m_scale = ModelConfig::MAP2_SLOPE_SCALE; // 15.0f
-        m_halfWidth = 14000.0f;
-        m_halfDepth = 14000.0f;
-        m_wallHeight = 1800.0f;
+        m_scale = ModelConfig::MAP2_SLOPE_SCALE; // 10.0f
+        m_halfWidth = 9500.0f;
+        m_halfDepth = 9500.0f;
+        m_wallHeight = 1200.0f;
 
         // フォグ設定（広大屋外・スロープ用）
         SetFogEnable(TRUE);
         SetFogColor(175, 218, 252);
-        SetFogStartEnd(18000.0f, 45000.0f);
+        SetFogStartEnd(12000.0f, 30000.0f);
     }
 
     // 既存モデルハンドルの破棄
