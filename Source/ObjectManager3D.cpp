@@ -44,8 +44,8 @@ void ObjectManager3D::AddObstacle(std::shared_ptr<Obstacle3D> obs)
 
 void ObjectManager3D::SpawnNormalMouse()
 {
-    float rangeX = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 2500.0f : 380.0f;
-    float rangeZ = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 2500.0f : 220.0f;
+    float rangeX = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 1700.0f : 380.0f;
+    float rangeZ = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 1700.0f : 220.0f;
     float x = static_cast<float>(-rangeX + rand() % static_cast<int>(rangeX * 2.0f));
     float z = static_cast<float>(100.0f + rand() % static_cast<int>(rangeZ));
     if (rand() % 2 == 0) z = -z;
@@ -62,8 +62,8 @@ void ObjectManager3D::SpawnNormalMouse()
 
 void ObjectManager3D::SpawnFastMouse()
 {
-    float rangeX = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 2500.0f : 380.0f;
-    float rangeZ = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 2500.0f : 200.0f;
+    float rangeX = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 1700.0f : 380.0f;
+    float rangeZ = (m_stage.GetMapType() == ModelConfig::MapType::SlopeHills) ? 1700.0f : 200.0f;
     float x = static_cast<float>(-rangeX + rand() % static_cast<int>(rangeX * 2.0f));
     float z = static_cast<float>(120.0f + rand() % static_cast<int>(rangeZ));
     if (rand() % 2 == 0) z = -z;
