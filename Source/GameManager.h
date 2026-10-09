@@ -56,6 +56,8 @@ private:
     bool  m_prevKeyDown = false;
     bool  m_prevKeyLeft = false;
     bool  m_prevKeyRight = false;
+    bool  m_prevKeyEnter = false;
+    bool  m_prevKeySpace = false;
 
     void SetupRoomObstacles();
     void DrawTitleScreen();
