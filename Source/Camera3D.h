@@ -16,6 +16,7 @@ private:
     int    m_prevMouseX = 0;
     int    m_prevMouseY = 0;
     bool   m_isFirstFrame = true;
+    bool   m_resetMouseNextFrame = true;
     VECTOR m_prevPlayerPos = VGet(0.0f, 0.0f, 0.0f);
     int    m_manualControlTimer = 0;
 
@@ -24,6 +25,7 @@ public:
     ~Camera3D() = default;
 
     void Init(const VECTOR& initialTargetPos, float initialAngleH = 0.0f);
+    void ResetMouseToCenter();
     void Update(
         const VECTOR& targetPlayerPos,
         float playerFacingAngle,

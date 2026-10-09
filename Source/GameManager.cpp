@@ -255,6 +255,9 @@ void GameManager::SetupTitle()
 
     m_titleCameraAngle = -0.7f;
     m_showHowToPlay = false;
+    m_isPaused = false;
+    m_pauseStartTime = 0;
+    m_pauseMenuItem = 0;
     m_startTransitionTimer = 0;
     m_titleAnimTimer = 0;
     m_selectedMenuItem = 0;
@@ -266,6 +269,9 @@ void GameManager::StartGame()
 {
     m_objManager.Clear();
     EffectManager::GetInstance().StopMuscleAura();
+    m_isPaused = false;
+    m_pauseStartTime = 0;
+    m_pauseMenuItem = 0;
 
     // 選択されたマップのステージ読み込み
     m_objManager.LoadStage(m_selectedMap);
@@ -283,6 +289,7 @@ void GameManager::StartGame()
 
     // カメラ初期化（猫の背後から開始）
     m_camera.Init(player->GetPos(), player->GetRotY());
+    SetMouseDispFlag(FALSE); // ゲームプレイ中はカーソル非表示（マウス視点移動）
 
     // 部屋・ステージの家具配置
     SetupRoomObstacles();
@@ -467,6 +474,13 @@ void GameManager::Update()
             return;
         }
 
+        // タイトル画面でESCが押されたらゲーム終了
+        if (triggerEsc && !m_showHowToPlay)
+        {
+            m_shouldQuit = true;
+            return;
+        }
+
         // メニュー項目の上下移動 (0: START, 1: STAGE, 2: ゲーム説明)
         if (triggerUp)   m_selectedMenuItem = (m_selectedMenuItem + 2) % 3;
         if (triggerDown) m_selectedMenuItem = (m_selectedMenuItem + 1) % 3;
@@ -543,7 +557,30 @@ void GameManager::Update()
     
     else if (m_state == GameState::Playing)
     {
-        SetMouseDispFlag(TRUE); // ゲーム中もカーソル表示（マウス移動操作用）
+        // ESCキーによるポーズ切替判定
+        bool keyEsc = (CheckHitKey(KEY_INPUT_ESCAPE) != 0);
+        bool triggerEsc = keyEsc && !m_prevKeyEsc;
+        m_prevKeyEsc = keyEsc;
+
+        // ポーズ中の更新処理
+        if (m_isPaused)
+        {
+            SetMouseDispFlag(TRUE); // ポーズ中はカーソル表示
+            UpdatePause(triggerEsc);
+            return;
+        }
+
+        // プレイ中にESCが押されたらポーズ開始
+        if (triggerEsc)
+        {
+            m_isPaused = true;
+            m_pauseStartTime = GetNowCount();
+            m_pauseMenuItem = 0;
+            SetMouseDispFlag(TRUE);
+            return;
+        }
+
+        SetMouseDispFlag(FALSE); // ゲームプレイ中はカーソル非表示（マウス視点移動）
 
         auto player = m_objManager.GetPlayer();
         if (player)
@@ -664,8 +701,11 @@ void GameManager::Update()
         }
     }
 
-    // 3Dエフェクトの更新
-    EffectManager::GetInstance().Update();
+    // 3Dエフェクトの更新（ポーズ中は更新停止）
+    if (!m_isPaused)
+    {
+        EffectManager::GetInstance().Update();
+    }
 }
 
 void GameManager::Draw()
@@ -722,7 +762,7 @@ void GameManager::Draw()
     else if (m_state == GameState::Playing)
     {
         // ゲームプレイHUD（バカゲー風ポップ装飾）
-        float currentSec = (GetNowCount() - m_startCount) / 1000.0f;
+        float currentSec = (m_isPaused ? (m_pauseStartTime - m_startCount) : (GetNowCount() - m_startCount)) / 1000.0f;
 
         // =========================================================================
         // 1. 左上：プレイヤーステータス ＆ 特大レベルバッジ（一目で現在Lvがわかる）
@@ -834,7 +874,7 @@ void GameManager::Draw()
         }
 
         // 下段：基本移動・カメラ
-        DrawStringToHandle(gX + 14, gY + 40, "移動: WASD  |  カメラ: 矢印 [←→]  |  視点リセット: [F]", GetColor(210, 225, 245), font13);
+        DrawStringToHandle(gX + 14, gY + 40, "移動: WASD  |  視点: マウス / 矢印  |  視点リセット: [F]", GetColor(210, 225, 245), font13);
 
         // デバッグチートパネル表示
         auto cheatPlayer = m_objManager.GetPlayer();
@@ -881,7 +921,11 @@ void GameManager::Draw()
             DrawStringToHandle(Config::SCREEN_WIDTH - 220, 42, "[F1] DEBUG CHEAT", GetColor(100, 100, 120), font13);
         }
 
-
+        // ポーズ画面描画
+        if (m_isPaused)
+        {
+            DrawPauseModal();
+        }
     }
 
     else if (m_state == GameState::GameClear)
@@ -1343,8 +1387,8 @@ void GameManager::DrawHowToPlayModal()
     DrawStringToHandle(col2X, row1Y + rowStep * 0, "移動: [W] [A] [S] [D]", GetColor(255, 255, 255), font16);
     DrawStringToHandle(col2X + 18, row1Y + rowStep * 0 + 20, "➔ キャラクターの前後左右移動", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col2X, row1Y + rowStep * 1, "カメラ回転: 矢印キー [←] [→] [↑] [↓]", GetColor(100, 220, 255), font16);
-    DrawStringToHandle(col2X + 18, row1Y + rowStep * 1 + 20, "➔ 視点旋回 [←→] / 見下ろし角 [↑↓]", GetColor(210, 225, 245), font13);
+    DrawStringToHandle(col2X, row1Y + rowStep * 1, "カメラ回転: マウス移動 / 矢印 [←→↑↓]", GetColor(100, 220, 255), font16);
+    DrawStringToHandle(col2X + 18, row1Y + rowStep * 1 + 20, "➔ マウス移動または矢印で自在に視点旋回", GetColor(210, 225, 245), font13);
 
     DrawStringToHandle(col2X, row1Y + rowStep * 2, "視点リセット: [F] キー", GetColor(180, 210, 255), font16);
     DrawStringToHandle(col2X + 18, row1Y + rowStep * 2 + 20, "➔ カメラを猫の背後に即戻す", GetColor(210, 225, 245), font13);
@@ -1375,4 +1419,230 @@ void GameManager::DrawHowToPlayModal()
         DrawBox(closeBtnX + 2, closeBtnY + 2, closeBtnX + closeBtnW - 2, closeBtnY + 8, GetColor(240, 100, 100), TRUE);
         DrawStringToHandle(closeBtnX + 20, closeBtnY + 9, "閉じる (ESC)", GetColor(255, 255, 255), font16);
     }
+}
+
+// ============================================================================
+// ポーズ中の更新処理（ESC / リトライ / タイトルに戻る）
+// ============================================================================
+void GameManager::UpdatePause(bool triggerEsc)
+{
+    // マウス入力
+    int mx = 0, my = 0;
+    GetMousePoint(&mx, &my);
+    bool isLeftClick = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
+    bool isMouseTrigger = isLeftClick && !m_prevMouseLeft;
+    m_prevMouseLeft = isLeftClick;
+
+    // キー入力
+    bool keyUp    = (CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
+    bool keyDown  = (CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
+    bool isEnter  = (CheckHitKey(KEY_INPUT_RETURN) != 0);
+    bool isSpace  = (CheckHitKey(KEY_INPUT_SPACE) != 0);
+    bool keyR     = (CheckHitKey(KEY_INPUT_R) != 0);
+    bool keyT     = (CheckHitKey(KEY_INPUT_T) != 0);
+
+    bool triggerUp    = keyUp && !m_prevKeyUp;
+    bool triggerDown  = keyDown && !m_prevKeyDown;
+    bool triggerEnter = isEnter && !m_prevKeyEnter;
+    bool triggerSpace = isSpace && !m_prevKeySpace;
+    bool triggerR     = keyR && !m_prevKeyR;
+    bool triggerT     = keyT && !m_prevKeyT;
+
+    m_prevKeyUp    = keyUp;
+    m_prevKeyDown  = keyDown;
+    m_prevKeyEnter = isEnter;
+    m_prevKeySpace = isSpace;
+    m_prevKeyR     = keyR;
+    m_prevKeyT     = keyT;
+
+    // ESCキーでポーズ解除（ゲーム再開）
+    if (triggerEsc)
+    {
+        m_startCount += (GetNowCount() - m_pauseStartTime);
+        m_isPaused = false;
+        m_camera.ResetMouseToCenter();
+        SetMouseDispFlag(FALSE);
+        return;
+    }
+
+    // 上下キーで選択切り替え (0: リトライ, 1: タイトルに戻る)
+    if (triggerUp || triggerDown)
+    {
+        m_pauseMenuItem = (m_pauseMenuItem + 1) % 2;
+    }
+
+    // ボタン当たり判定座標
+    int modalW = 460;
+    int modalH = 340;
+    int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
+    int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
+
+    int btnW = 340;
+    int btnH = 54;
+    int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
+    int retryBtnY = modalY + 76;
+    int titleBtnY = modalY + 148;
+
+    int resumeBtnW = 240;
+    int resumeBtnH = 36;
+    int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
+    int resumeBtnY = modalY + 230;
+
+    bool hoverRetry  = (mx >= btnX && mx <= btnX + btnW && my >= retryBtnY && my <= retryBtnY + btnH);
+    bool hoverTitle  = (mx >= btnX && mx <= btnX + btnW && my >= titleBtnY && my <= titleBtnY + btnH);
+    bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW && my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
+
+    if (hoverRetry) m_pauseMenuItem = 0;
+    if (hoverTitle) m_pauseMenuItem = 1;
+
+    // 1. リトライ判定（ボタンクリック / 選択中Enter/Space / Rキー）
+    if ((hoverRetry && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_pauseMenuItem == 0) || triggerR)
+    {
+        m_isPaused = false;
+        StartGame();
+        return;
+    }
+
+    // 2. タイトルに戻る判定（ボタンクリック / 選択中Enter/Space / Tキー）
+    if ((hoverTitle && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_pauseMenuItem == 1) || triggerT)
+    {
+        m_isPaused = false;
+        SetupTitle();
+        return;
+    }
+
+    // 3. ゲームに戻る判定（再開ボタンクリック）
+    if (hoverResume && isMouseTrigger)
+    {
+        m_startCount += (GetNowCount() - m_pauseStartTime);
+        m_isPaused = false;
+        m_camera.ResetMouseToCenter();
+        SetMouseDispFlag(FALSE);
+        return;
+    }
+}
+
+// ============================================================================
+// ポーズモーダルダイアログ描画
+// ============================================================================
+void GameManager::DrawPauseModal()
+{
+    auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
+    int font16 = fm.GetFont16();
+    int font24 = fm.GetFont24();
+
+    // 1. 全画面暗転レイヤー（背面のゲーム画面が薄暗く透ける）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 195);
+    DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 18), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+    // 2. モーダルウィンドウ外枠・本体
+    int modalW = 460;
+    int modalH = 340;
+    int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
+    int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
+
+    // ドロップシャドウ
+    DrawBox(modalX + 8, modalY + 8, modalX + modalW + 8, modalY + modalH + 8, GetColor(0, 0, 0), TRUE);
+    // 極太黒枠
+    DrawBox(modalX - 3, modalY - 3, modalX + modalW + 3, modalY + modalH + 3, GetColor(0, 0, 0), TRUE);
+    DrawBox(modalX - 1, modalY - 1, modalX + modalW + 1, modalY + modalH + 1, GetColor(255, 120, 30), FALSE);
+    // 背景
+    DrawBox(modalX, modalY, modalX + modalW, modalY + modalH, GetColor(20, 24, 38), TRUE);
+
+    // ヘッダーバー
+    DrawBox(modalX, modalY, modalX + modalW, modalY + 52, GetColor(26, 32, 50), TRUE);
+    DrawBox(modalX, modalY + 50, modalX + modalW, modalY + 53, GetColor(255, 120, 30), TRUE);
+
+    const char* pauseHeader = "⏸ PAUSE (一時停止)";
+    int hW = GetDrawStringWidthToHandle(pauseHeader, static_cast<int>(strlen(pauseHeader)), font24);
+    DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 13, pauseHeader, GetColor(255, 220, 60), font24);
+
+    // ボタン配置
+    int btnW = 340;
+    int btnH = 54;
+    int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
+    int retryBtnY = modalY + 76;
+    int titleBtnY = modalY + 148;
+
+    float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
+
+    // --- ボタン1: リトライ ---
+    bool isRetrySelected = (m_pauseMenuItem == 0);
+    if (isRetrySelected)
+    {
+        DrawBox(btnX + 5, retryBtnY + 5, btnX + btnW + 5, retryBtnY + btnH + 5, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 2, retryBtnY - 2, btnX + btnW + 2, retryBtnY + btnH + 2, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, retryBtnY, btnX + btnW, retryBtnY + btnH, GetColor(100, 230 + static_cast<int>(25 * btnPulse), 120), TRUE);
+        DrawBox(btnX + 3, retryBtnY + 3, btnX + btnW - 3, retryBtnY + 11, GetColor(210, 255, 220), TRUE);
+
+        DrawStringToHandle(btnX + 20, retryBtnY + 13, "🔄", GetColor(20, 20, 20), font24);
+        const char* retryTxt = "リトライ (R)";
+        int tW = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 14, retryTxt, GetColor(15, 25, 20), font24);
+    }
+    else
+    {
+        DrawBox(btnX + 3, retryBtnY + 3, btnX + btnW + 3, retryBtnY + btnH + 3, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 1, retryBtnY - 1, btnX + btnW + 1, retryBtnY + btnH + 1, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, retryBtnY, btnX + btnW, retryBtnY + btnH, GetColor(32, 42, 65), TRUE);
+        DrawBox(btnX + 2, retryBtnY + 2, btnX + btnW - 2, retryBtnY + 8, GetColor(60, 75, 110), TRUE);
+
+        DrawStringToHandle(btnX + 20, retryBtnY + 13, "🔄", GetColor(140, 170, 210), font24);
+        const char* retryTxt = "リトライ";
+        int tW = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 14, retryTxt, GetColor(210, 230, 255), font24);
+    }
+
+    // --- ボタン2: タイトルに戻る ---
+    bool isTitleSelected = (m_pauseMenuItem == 1);
+    if (isTitleSelected)
+    {
+        DrawBox(btnX + 5, titleBtnY + 5, btnX + btnW + 5, titleBtnY + btnH + 5, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 2, titleBtnY - 2, btnX + btnW + 2, titleBtnY + btnH + 2, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, titleBtnY, btnX + btnW, titleBtnY + btnH, GetColor(70, 190 + static_cast<int>(35 * btnPulse), 255), TRUE);
+        DrawBox(btnX + 3, titleBtnY + 3, btnX + btnW - 3, titleBtnY + 11, GetColor(210, 240, 255), TRUE);
+
+        DrawStringToHandle(btnX + 20, titleBtnY + 13, "🏠", GetColor(20, 20, 20), font24);
+        const char* titleTxt = "タイトルに戻る (T)";
+        int tW = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 14, titleTxt, GetColor(15, 20, 30), font24);
+    }
+    else
+    {
+        DrawBox(btnX + 3, titleBtnY + 3, btnX + btnW + 3, titleBtnY + btnH + 3, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 1, titleBtnY - 1, btnX + btnW + 1, titleBtnY + btnH + 1, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, titleBtnY, btnX + btnW, titleBtnY + btnH, GetColor(32, 42, 65), TRUE);
+        DrawBox(btnX + 2, titleBtnY + 2, btnX + btnW - 2, titleBtnY + 8, GetColor(60, 75, 110), TRUE);
+
+        DrawStringToHandle(btnX + 20, titleBtnY + 13, "🏠", GetColor(140, 170, 210), font24);
+        const char* titleTxt = "タイトルに戻る";
+        int tW = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 14, titleTxt, GetColor(210, 230, 255), font24);
+    }
+
+    // --- 下部: ゲームに戻る (ESC) ガイドボタン ---
+    int resumeBtnW = 240;
+    int resumeBtnH = 36;
+    int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
+    int resumeBtnY = modalY + 230;
+
+    int mx, my;
+    GetMousePoint(&mx, &my);
+    bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW &&
+                       my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
+
+    DrawBox(resumeBtnX + 2, resumeBtnY + 2, resumeBtnX + resumeBtnW + 2, resumeBtnY + resumeBtnH + 2, GetColor(0, 0, 0), TRUE);
+    DrawBox(resumeBtnX, resumeBtnY, resumeBtnX + resumeBtnW, resumeBtnY + resumeBtnH, hoverResume ? GetColor(45, 60, 90) : GetColor(24, 30, 46), TRUE);
+    DrawBox(resumeBtnX, resumeBtnY, resumeBtnX + resumeBtnW, resumeBtnY + resumeBtnH, hoverResume ? GetColor(100, 220, 255) : GetColor(60, 75, 110), FALSE);
+
+    const char* resumeTxt = "▶ ゲームに戻る (ESC)";
+    int rW = GetDrawStringWidthToHandle(resumeTxt, static_cast<int>(strlen(resumeTxt)), font16);
+    DrawStringToHandle((Config::SCREEN_WIDTH - rW) / 2, resumeBtnY + 9, resumeTxt, hoverResume ? GetColor(255, 255, 255) : GetColor(180, 205, 235), font16);
+
+    // 操作説明ガイド
+    const char* guideTxt = "選択: [↑/↓]  決定: [ENTER] / [SPACE]";
+    int gW = GetDrawStringWidthToHandle(guideTxt, static_cast<int>(strlen(guideTxt)), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW) / 2, modalY + 288, guideTxt, GetColor(140, 160, 190), font13);
 }

@@ -525,49 +525,6 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                     moveDir = VSub(moveDir, rightXZ);
                 }
 
-                // マウス左クリック長押しによる移動
-                m_isMouseMoving = false;
-                if ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0)
-                {
-                    int mx = 0, my = 0;
-                    GetMousePoint(&mx, &my);
-                    m_mouseTargetX = mx;
-                    m_mouseTargetY = my;
-
-                    VECTOR catScreen = ConvWorldPosToScreenPos(m_pos);
-                    // カメラ前方（描画範囲内）にあるかチェック
-                    if (catScreen.z > 0.0f)
-                    {
-                        float dx = static_cast<float>(mx) - catScreen.x;
-                        float dy = static_cast<float>(my) - catScreen.y;
-                        float distSq = dx * dx + dy * dy;
-
-                        // 猫の足元から15ピクセル以上離れていれば移動
-                        if (distSq > 15.0f * 15.0f)
-                        {
-                            m_isMouseMoving = true;
-                            float dist = std::sqrt(distSq);
-                            float ndx = dx / dist;
-                            float ndy = dy / dist;
-
-                            // スクリーン空間: 上(-dy)はカメラ奥(forwardXZ)、右(+dx)はカメラ右(rightXZ)
-                            VECTOR mouseMoveDir = VAdd(VScale(rightXZ, ndx), VScale(forwardXZ, -ndy));
-                            mouseMoveDir.y = 0.0f;
-
-                            float keyLenSq = moveDir.x * moveDir.x + moveDir.z * moveDir.z;
-                            if (keyLenSq < 0.0001f)
-                            {
-                                moveDir = mouseMoveDir;
-                            }
-                            
-                            else
-                            {
-                                moveDir = VAdd(moveDir, mouseMoveDir);
-                            }
-                        }
-                    }
-                }
-
                 float inputLengthSq = moveDir.x * moveDir.x + moveDir.z * moveDir.z;
                 if (inputLengthSq > 0.0001f)
                 {
@@ -1044,23 +1001,6 @@ void Player3D::Draw2D()
         DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 140, Config::SCREEN_HEIGHT / 2 - 70, GetColor(255, 230, 40), font24, "★ STUNNED!! 残り%.1fs ★", GetCatStunRemainingSeconds());
         DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 40, "壁・家具に激突して気絶中！", GetColor(255, 240, 120), font16);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-    }
-
-    // マウス左クリック長押し移動時の方向ガイドライン＆マーカー
-    if (m_isMouseMoving && m_state != MuscleState::Soreness && m_stunTimer <= 0)
-    {
-        VECTOR catScreen = ConvWorldPosToScreenPos(m_pos);
-        if (catScreen.z > 0.0f)
-        {
-            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 160);
-            // 猫の足元からマウスカーソルへの方向ガイドライン
-            DrawLine(static_cast<int>(catScreen.x), static_cast<int>(catScreen.y),
-                     m_mouseTargetX, m_mouseTargetY, GetColor(100, 220, 255), 2);
-            // マウスカーソル位置のガイドターゲット円
-            DrawCircle(m_mouseTargetX, m_mouseTargetY, 12, GetColor(100, 220, 255), FALSE);
-            DrawCircle(m_mouseTargetX, m_mouseTargetY, 4, GetColor(255, 255, 255), TRUE);
-            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-        }
     }
 }
 

@@ -58,10 +58,20 @@ private:
     bool  m_prevKeyRight = false;
     bool  m_prevKeyEnter = false;
     bool  m_prevKeySpace = false;
+    bool  m_prevKeyR = false;
+    bool  m_prevKeyT = false;
+
+    // ポーズ状態
+    bool  m_isPaused = false;
+    int   m_pauseStartTime = 0;
+    int   m_pauseMenuItem = 0; // 0: リトライ, 1: タイトルに戻る
+    bool  m_shouldQuit = false;
 
     void SetupRoomObstacles();
     void DrawTitleScreen();
     void DrawHowToPlayModal();
+    void UpdatePause(bool triggerEsc);
+    void DrawPauseModal();
 
 public:
     GameManager() = default;
@@ -73,6 +83,11 @@ public:
     void SwitchSelectedMap(ModelConfig::MapType newMap);
     void Update();
     void Draw();
+
+    bool ShouldQuit() const
+    {
+        return m_shouldQuit;
+    }
 
     void SetFrameProcessTime(float ms)
     {

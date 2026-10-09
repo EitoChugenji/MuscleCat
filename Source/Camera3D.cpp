@@ -37,7 +37,20 @@ void Camera3D::Init(const VECTOR& initialTargetPos, float initialAngleH)
 
     m_currentPos = VGet(desiredCamX, desiredCamY, desiredCamZ);
 
-    GetMousePoint(&m_prevMouseX, &m_prevMouseY);
+    ResetMouseToCenter();
+}
+
+void Camera3D::ResetMouseToCenter()
+{
+    int centerX = Config::SCREEN_WIDTH / 2;
+    int centerY = Config::SCREEN_HEIGHT / 2;
+    m_prevMouseX = centerX;
+    m_prevMouseY = centerY;
+    m_resetMouseNextFrame = true;
+    if (GetActiveFlag() != FALSE)
+    {
+        SetMousePoint(centerX, centerY);
+    }
 }
 
 void Camera3D::Update(
@@ -86,27 +99,57 @@ void Camera3D::Update(
         m_angleH = MathHelper::LerpAngle(m_angleH, playerFacingAngle, 0.25f);
     }
 
-    // マウス右ボタンドラッグ操作（マウス使用時の互換性）
-    int mouseX = 0, mouseY = 0;
-    GetMousePoint(&mouseX, &mouseY);
-
-    if (enableMouseLook && ((GetMouseInput() & MOUSE_INPUT_RIGHT) != 0))
+    // ------------------------------------------------------------------------
+    // マウスによる視点移動（TPS標準：マウスを動かすだけで直感的にカメラ旋回）
+    // ------------------------------------------------------------------------
+    if (enableMouseLook)
     {
-        if (!m_isFirstFrame)
+        int mouseX = 0, mouseY = 0;
+        GetMousePoint(&mouseX, &mouseY);
+
+        int centerX = Config::SCREEN_WIDTH / 2;
+        int centerY = Config::SCREEN_HEIGHT / 2;
+
+        if (m_resetMouseNextFrame)
         {
+            m_prevMouseX = centerX;
+            m_prevMouseY = centerY;
+            m_resetMouseNextFrame = false;
+            if (GetActiveFlag() != FALSE)
+            {
+                SetMousePoint(centerX, centerY);
+            }
+        }
+        else
+        {
+            // マウス移動量（デルタ）を計算
             int dx = mouseX - m_prevMouseX;
             int dy = mouseY - m_prevMouseY;
 
-            if (dx != 0 || dy != 0)
+            if (GetActiveFlag() != FALSE)
             {
-                m_angleH += static_cast<float>(dx) * 0.006f;
-                m_angleV += static_cast<float>(dy) * 0.006f;
+                if (dx != 0 || dy != 0)
+                {
+                    // 滑らかで素直な視点旋回感度
+                    const float mouseSensitivityH = 0.0035f;
+                    const float mouseSensitivityV = 0.0028f;
+
+                    m_angleH += static_cast<float>(dx) * mouseSensitivityH;
+                    m_angleV += static_cast<float>(dy) * mouseSensitivityV;
+                }
+
+                // 画面端への突き当たりを防止するため中央にリセット
+                SetMousePoint(centerX, centerY);
+                m_prevMouseX = centerX;
+                m_prevMouseY = centerY;
+            }
+            else
+            {
+                m_prevMouseX = mouseX;
+                m_prevMouseY = mouseY;
             }
         }
     }
-
-    m_prevMouseX = mouseX;
-    m_prevMouseY = mouseY;
 
     // マウスホイールでのカメラ距離（ズーム）調整
     int wheelRot = GetMouseWheelRotVol();
