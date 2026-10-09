@@ -406,6 +406,8 @@ void GameManager::Update()
         bool triggerDown  = keyDown && !m_prevKeyDown;
         bool triggerLeft  = keyLeft && !m_prevKeyLeft;
         bool triggerRight = keyRight && !m_prevKeyRight;
+        bool triggerEnter = isEnter && !m_prevKeyEnter;
+        bool triggerSpace = isSpace && !m_prevKeySpace;
 
         m_prevKeyH     = keyH;
         m_prevKeyTab   = keyTab;
@@ -414,6 +416,8 @@ void GameManager::Update()
         m_prevKeyDown  = keyDown;
         m_prevKeyLeft  = keyLeft;
         m_prevKeyRight = keyRight;
+        m_prevKeyEnter = isEnter;
+        m_prevKeySpace = isSpace;
 
         // マウス入力
         int mx = 0, my = 0;
@@ -433,23 +437,23 @@ void GameManager::Update()
             return;
         }
 
-        // HOW TO PLAY ダイアログ表示中の処理
+        // ゲーム説明 ダイアログ表示中の処理（点滅・即閉じ防止にトリガー判定を使用）
         if (m_showHowToPlay)
         {
-            int modalW = 840;
-            int modalH = 530;
+            int modalW = 860;
+            int modalH = 520;
             int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
             int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
-            int closeBtnX = modalX + modalW - 140;
-            int closeBtnY = modalY + modalH - 50;
-            int closeBtnW = 120;
+            int closeBtnX = modalX + modalW - 164;
+            int closeBtnY = modalY + modalH - 52;
+            int closeBtnW = 140;
             int closeBtnH = 38;
 
             bool clickCloseBtn = (isMouseTrigger &&
                 mx >= closeBtnX && mx <= closeBtnX + closeBtnW &&
                 my >= closeBtnY && my <= closeBtnY + closeBtnH);
 
-            if (triggerEsc || triggerH || triggerTab || ((isEnter || isSpace) && !isMouseTrigger) || clickCloseBtn)
+            if (triggerEsc || triggerH || triggerTab || ((triggerEnter || triggerSpace) && !isMouseTrigger) || clickCloseBtn)
             {
                 m_showHowToPlay = false;
             }
@@ -463,7 +467,7 @@ void GameManager::Update()
             return;
         }
 
-        // メニュー項目の上下移動 (0: START, 1: STAGE, 2: HOW TO PLAY)
+        // メニュー項目の上下移動 (0: START, 1: STAGE, 2: ゲーム説明)
         if (triggerUp)   m_selectedMenuItem = (m_selectedMenuItem + 2) % 3;
         if (triggerDown) m_selectedMenuItem = (m_selectedMenuItem + 1) % 3;
 
@@ -511,7 +515,7 @@ void GameManager::Update()
                     : ModelConfig::MapType::House);
             }
         }
-        else if ((isEnter || isSpace) && m_selectedMenuItem == 1)
+        else if ((triggerEnter || triggerSpace) && m_selectedMenuItem == 1)
         {
             SwitchSelectedMap((m_selectedMap == ModelConfig::MapType::House)
                 ? ModelConfig::MapType::SlopeHills
@@ -519,7 +523,7 @@ void GameManager::Update()
         }
 
         // スタート実行判定
-        if ((hoverStart && isMouseTrigger) || ((isEnter || isSpace) && m_selectedMenuItem == 0))
+        if ((hoverStart && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_selectedMenuItem == 0))
         {
             m_startTransitionTimer = 22; // 閃光トランジション開始
             if (player)
@@ -529,8 +533,8 @@ void GameManager::Update()
             return;
         }
 
-        // 遊び方を開く判定
-        if ((hoverHow && isMouseTrigger) || ((isEnter || isSpace) && m_selectedMenuItem == 2))
+        // ゲーム説明を開く判定
+        if ((hoverHow && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_selectedMenuItem == 2))
         {
             m_showHowToPlay = true;
             return;
@@ -720,86 +724,117 @@ void GameManager::Draw()
         // ゲームプレイHUD（バカゲー風ポップ装飾）
         float currentSec = (GetNowCount() - m_startCount) / 1000.0f;
 
-        // 左上ステータス枠（ポップな黒＋黄色の太縁）
-        DrawBox(10, 10, 440, 118, GetColor(0, 0, 0), TRUE);
-        DrawBox(12, 12, 438, 116, GetColor(255, 220, 40), FALSE);
-        DrawBox(14, 14, 436, 114, GetColor(20, 25, 40), TRUE);
+        // =========================================================================
+        // 1. 左上：プレイヤーステータス ＆ 特大レベルバッジ（一目で現在Lvがわかる）
+        // =========================================================================
+        int pX = 14;
+        int pY = 14;
+        int pW = 340;
+        int pH = 84;
 
-        DrawFormatStringToHandle(24, 18, white, font16, "タイム: %.2f 秒", currentSec);
-        DrawFormatStringToHandle(24, 40, yellow, font16, "残りネズミ: %d 匹", m_objManager.GetRemainingMouseCount());
+        // 白いステージ床でもクッキリ浮き立つ黒半透明プレート＆オレンジ太縁
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 215);
+        DrawBox(pX - 4, pY - 4, pX + pW + 4, pY + pH + 4, GetColor(0, 0, 0), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        DrawBox(pX - 2, pY - 2, pX + pW + 2, pY + pH + 2, GetColor(255, 110, 30), FALSE);
+        DrawBox(pX, pY, pX + pW, pY + pH, GetColor(20, 24, 38), TRUE);
 
         auto player = m_objManager.GetPlayer();
+        int reps = player ? player->GetRepCount() : 0;
+        MuscleState ms = player ? player->GetMuscleState() : MuscleState::Normal;
+        bool isGod = (reps >= Player3D::MAX_EFFECTIVE_REP);
+
+        // --- 左側：レベルバッジ（Lv.数字を特大表示） ---
+        int badgeX = pX + 8;
+        int badgeY = pY + 8;
+        int badgeW = 96;
+        int badgeH = 68;
+
+        unsigned int badgeBg = isGod ? GetColor(60, 20, 25) : GetColor(32, 40, 62);
+        DrawBox(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, badgeBg, TRUE);
+        DrawBox(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, isGod ? GetColor(255, 60, 40) : GetColor(255, 130, 30), FALSE);
+
+        DrawStringToHandle(badgeX + 14, badgeY + 4, "LEVEL", GetColor(180, 195, 225), font13);
+
+        char lvBuf[16];
+        snprintf(lvBuf, sizeof(lvBuf), "Lv.%d", reps);
+        unsigned int lvColor = isGod ? GetColor(255, 60, 40) : (reps >= 4 ? GetColor(255, 130, 30) : white);
+        DrawStringToHandle(badgeX + 10, badgeY + 18, lvBuf, lvColor, font24);
+
+        // 筋肉減衰ゲージバー（残り15秒の維持時間をバー表示）
+        if (player && reps > 0 && ms != MuscleState::Soreness)
+        {
+            float decaySec = player->GetPumpDecayRemainingSeconds();
+            float gaugeRatio = decaySec / 15.0f;
+            if (gaugeRatio > 1.0f) gaugeRatio = 1.0f;
+            if (gaugeRatio < 0.0f) gaugeRatio = 0.0f;
+
+            int gBarW = badgeW - 14;
+            int gBarH = 5;
+            int gBarX = badgeX + 7;
+            int gBarY = badgeY + badgeH - 12;
+
+            DrawBox(gBarX, gBarY, gBarX + gBarW, gBarY + gBarH, GetColor(10, 10, 15), TRUE);
+            unsigned int gColor = (decaySec <= 4.0f && (GetNowCount() / 200) % 2 == 0) ? GetColor(255, 50, 50) : GetColor(255, 130, 30);
+            DrawBox(gBarX, gBarY, gBarX + static_cast<int>(gBarW * gaugeRatio), gBarY + gBarH, gColor, TRUE);
+        }
+        else if (ms == MuscleState::Soreness)
+        {
+            DrawStringToHandle(badgeX + 12, badgeY + badgeH - 16, "筋肉痛!", GetColor(100, 180, 255), font13);
+        }
+
+        // --- 右側：ミッション＆タイム情報 ---
+        int infoX = badgeX + badgeW + 14;
+
+        int remainMice = m_objManager.GetRemainingMouseCount();
+        DrawStringToHandle(infoX, pY + 8, "ネズミ:", GetColor(200, 215, 240), font16);
+        char miceBuf[32];
+        snprintf(miceBuf, sizeof(miceBuf), "%d 匹", remainMice);
+        DrawStringToHandle(infoX + 60, pY + 6, miceBuf, GetColor(255, 80, 80), font18);
+
+        char timeBuf[32];
+        snprintf(timeBuf, sizeof(timeBuf), "タイム: %.1f 秒", currentSec);
+        DrawStringToHandle(infoX, pY + 34, timeBuf, white, font16);
+
         if (player)
         {
-            MuscleState ms = player->GetMuscleState();
-            float speed = player->GetCurrentSpeed();
-            int reps = player->GetRepCount();
-            float mouseSpeed = m_objManager.GetCurrentMouseSpeed();
-            int caught = m_objManager.GetCaughtCount();
-
-            if (player->IsStunned())
-            {
-                DrawFormatStringToHandle(24, 62, GetColor(255, 90, 90), font16, "猫速度: 0.0 [激突気絶中!! 残り%.1fs]", player->GetCatStunRemainingSeconds());
-            }
-            
-            else if (player->IsTackling())
-            {
-                DrawFormatStringToHandle(24, 62, GetColor(255, 140, 30), font16, "猫速度: %.1f [Lv.%d タックル突進中!!]", speed, reps);
-            }
-            
-            else if (player->IsPouncing())
-            {
-                DrawFormatStringToHandle(24, 62, GetColor(255, 80, 0), font16, "猫速度: %.1f [Lv.%d 飛びつき突進中!!]", speed, reps);
-            }
-            
-            else if (ms == MuscleState::Soreness)
-            {
-                DrawFormatStringToHandle(24, 62, GetColor(100, 180, 255), font16, "猫速度: 0.0 [筋肉痛!! 残り%.1fs]", player->GetSorenessRemainingSeconds());
-            }
-            
-            else if (reps >= Player3D::MAX_EFFECTIVE_REP)
-            {
-                // 能力値上限15到達（表示レベルは無限に上がる）
-                DrawFormatStringToHandle(24, 62, GetColor(255, 215, 0), font16, "猫速度: %.1f [Lv.%d (★MAX GOD MUSCLE!★ 残り%.1fs)]", speed, reps, player->GetPumpDecayRemainingSeconds());
-            }
-            
-            else if (reps >= 4)
-            {
-                DrawFormatStringToHandle(24, 62, GetColor(255, 150, 20), font16, "猫速度: %.1f [Lv.%d (攻撃解放! タックル[E]/飛びつき可 残り%.1fs)]", speed, reps, player->GetPumpDecayRemainingSeconds());
-            }
-            
-            else if (reps > 0)
-            {
-                DrawFormatStringToHandle(24, 62, GetColor(255, 210, 60), font16, "猫速度: %.1f [Lv.%d (+%.2f / 残り%.1fs)]", speed, reps, reps * 0.15f, player->GetPumpDecayRemainingSeconds());
-            }
-            
-            else
-            {
-                DrawFormatStringToHandle(24, 62, white, font16, "猫速度: %.1f [Lv.0 (通常)]", speed);
-            }
-
-            DrawFormatStringToHandle(24, 85, (caught > 0) ? GetColor(255, 130, 130) : gray, font13, "鼠速度: %.1f (上限5.3 / %d匹捕獲パニック加速中)", mouseSpeed, caught);
+            float catSpeed = player->GetCurrentSpeed();
+            char spdBuf[48];
+            snprintf(spdBuf, sizeof(spdBuf), "猫速度: %.1f (%s)", catSpeed, (reps >= 4) ? "突進解放済" : "Lv.4で技解放");
+            DrawStringToHandle(infoX, pY + 58, spdBuf, (reps >= 4) ? GetColor(100, 245, 140) : GetColor(160, 175, 200), font13);
         }
 
-        // 画面下の操作ヒント枠（ポップな縁取り）
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 200);
-        DrawBox(10, Config::SCREEN_HEIGHT - 78, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 6, GetColor(15, 20, 30), TRUE);
-        DrawBox(10, Config::SCREEN_HEIGHT - 78, Config::SCREEN_WIDTH - 10, Config::SCREEN_HEIGHT - 6, GetColor(255, 210, 50), FALSE);
+        // =========================================================================
+        // 2. 画面右下：スマート操作ガイドカード（筋トレ長押し明記・見切れ防止）
+        // =========================================================================
+        int gW = 450;
+        int gH = 70;
+        int gX = Config::SCREEN_WIDTH - gW - 20;
+        int gY = Config::SCREEN_HEIGHT - gH - 20;
+
+        // 半透明プレート（ゲーム画面・床を邪魔しないコンパクトサイズ）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 215);
+        DrawBox(gX - 3, gY - 3, gX + gW + 3, gY + gH + 3, GetColor(0, 0, 0), TRUE);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        DrawBox(gX - 1, gY - 1, gX + gW + 1, gY + gH + 1, GetColor(80, 100, 140), FALSE);
+        DrawBox(gX, gY, gX + gW, gY + gH, GetColor(18, 22, 34), TRUE);
 
-        if (player && player->GetRepCount() >= 4 && player->GetMuscleState() != MuscleState::Soreness)
+        // 上段：アクションスキル（筋トレが長押しであることを明記）
+        DrawStringToHandle(gX + 14, gY + 10, "[SPACE] 筋トレ(長押し)", GetColor(100, 245, 140), font16);
+
+        if (reps >= 4)
         {
-            DrawFormatStringToHandle(20, Config::SCREEN_HEIGHT - 72, GetColor(255, 230, 80), font16, "★ タックル: [E] (Push突進！ネズミ気絶) | 飛びつき: [SHIFT]/[X] (Lv.%d 跳躍突進！)", player->GetRepCount());
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD | カメラ: 矢印キー [←→↑↓] または [Q][R] | 視点リセット: [F]", white, font16);
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] 長押し→タイミングよく離してRep追加！ (15秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
+            DrawStringToHandle(gX + 195, gY + 10, "[E] タックル", GetColor(255, 150, 40), font16);
+            DrawStringToHandle(gX + 315, gY + 10, "[SHIFT] 飛びつき", GetColor(255, 90, 90), font16);
         }
-        
         else
         {
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 72, "【Lv.4でタックル[E]＆飛びつき解放】 筋トレ: [SPACE] で筋肉をつけよう！", GetColor(255, 200, 80), font16);
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 50, "移動: WASD | カメラ: 矢印キー [←→↑↓] または [Q][R] | 視点リセット: [F]", white, font16);
-            DrawStringToHandle(20, Config::SCREEN_HEIGHT - 28, "筋トレ: [SPACE] 長押し→タイミングよく離してRep追加！ (15秒放置で0Rep / 失敗で5秒移動不可)", GetColor(255, 220, 100), font13);
+            DrawStringToHandle(gX + 195, gY + 10, "[E] (Lv.4~)", GetColor(120, 130, 150), font16);
+            DrawStringToHandle(gX + 315, gY + 10, "[SHIFT] (Lv.4~)", GetColor(120, 130, 150), font16);
         }
+
+        // 下段：基本移動・カメラ
+        DrawStringToHandle(gX + 14, gY + 40, "移動: WASD  |  カメラ: 矢印 [←→]  |  視点リセット: [F]", GetColor(210, 225, 245), font13);
 
         // デバッグチートパネル表示
         auto cheatPlayer = m_objManager.GetPlayer();
@@ -1124,7 +1159,7 @@ void GameManager::DrawTitleScreen()
         DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, stageBtnY + 13, stageNameStr, GetColor(210, 230, 255), font24);
     }
 
-    // --- ボタン3: HOW TO PLAY ---
+    // --- ボタン3: ゲーム説明 ---
     bool isHowSelected = (m_selectedMenuItem == 2);
     if (isHowSelected)
     {
@@ -1138,7 +1173,7 @@ void GameManager::DrawTitleScreen()
         int bounceX = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 5.0f);
         DrawStringToHandle(btnX + 22 + bounceX, howBtnY + 12, "📖", GetColor(20, 20, 20), font24);
 
-        const char* howTxt = "HOW TO PLAY !!";
+        const char* howTxt = "ゲーム説明 !!";
         int tW = GetDrawStringWidthToHandle(howTxt, static_cast<int>(strlen(howTxt)), font24);
         DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 13, howTxt, GetColor(20, 20, 30), font24);
         DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 12, howTxt, GetColor(0, 0, 0), font24);
@@ -1150,7 +1185,7 @@ void GameManager::DrawTitleScreen()
         DrawBox(btnX, howBtnY, btnX + btnW, howBtnY + btnH, GetColor(32, 42, 65), TRUE);
         DrawBox(btnX + 2, howBtnY + 2, btnX + btnW - 2, howBtnY + 8, GetColor(60, 75, 110), TRUE);
 
-        const char* howTxt = "HOW TO PLAY (遊び方)";
+        const char* howTxt = "ゲーム説明";
         int tW = GetDrawStringWidthToHandle(howTxt, static_cast<int>(strlen(howTxt)), font24);
         DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 13, howTxt, GetColor(210, 230, 255), font24);
     }
@@ -1190,7 +1225,7 @@ void GameManager::DrawTitleScreen()
 }
 
 // ============================================================================
-// 遊び方モーダルダイアログの描画（カートゥーン・コミックブック調）
+// ゲーム説明モーダルダイアログの描画（ゲーム画面UIと統一されたシンプル＆洗練デザイン）
 // ============================================================================
 void GameManager::DrawHowToPlayModal()
 {
@@ -1199,127 +1234,126 @@ void GameManager::DrawHowToPlayModal()
     int font16 = fm.GetFont16();
     int font24 = fm.GetFont24();
 
-    // 1. 全画面暗転レイヤー（コミック半透明）
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 185);
-    DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(10, 12, 25), TRUE);
+    // 1. 全画面暗転レイヤー（ゲーム中HUDと同じシックな半透明ダーク）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 210);
+    DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 16), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // 2. モーダルウィンドウ本体（ステッカー風の極太ブラック枠＋ドロップシャドウ）
-    int modalW = 840;
-    int modalH = 530;
+    // 2. モーダルウィンドウ本体（ゲーム中HUDと同じネイビー基調＆オレンジアクセント）
+    int modalW = 860;
+    int modalH = 520;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
-    // 黒ドロップシャドウ
+    // ドロップシャドウ＆極太外枠
     DrawBox(modalX + 8, modalY + 8, modalX + modalW + 8, modalY + modalH + 8, GetColor(0, 0, 0), TRUE);
+    DrawBox(modalX - 3, modalY - 3, modalX + modalW + 3, modalY + modalH + 3, GetColor(0, 0, 0), TRUE);
+    DrawBox(modalX - 1, modalY - 1, modalX + modalW + 1, modalY + modalH + 1, GetColor(255, 110, 30), FALSE);
 
-    // 極太ブラック枠
-    DrawBox(modalX - 4, modalY - 4, modalX + modalW + 4, modalY + modalH + 4, GetColor(0, 0, 0), TRUE);
+    // 本体背景（ゲーム画面HUDと同じダークネイビー）
+    DrawBox(modalX, modalY, modalX + modalW, modalY + modalH, GetColor(18, 22, 34), TRUE);
 
-    // 本体背景（ダークネイビー・コミックページ）
-    DrawBox(modalX, modalY, modalX + modalW, modalY + modalH, GetColor(22, 28, 48), TRUE);
+    // ヘッダーバー
+    DrawBox(modalX, modalY, modalX + modalW, modalY + 52, GetColor(26, 32, 50), TRUE);
+    DrawBox(modalX, modalY + 50, modalX + modalW, modalY + 53, GetColor(255, 110, 30), TRUE);
 
-    // ヘッダーバー（ビビッドイエロー＋ブラック枠）
-    DrawBox(modalX, modalY, modalX + modalW, modalY + 54, GetColor(255, 215, 30), TRUE);
-    DrawBox(modalX, modalY + 52, modalX + modalW, modalY + 56, GetColor(0, 0, 0), TRUE);
-
-    const char* modalHeader = "💥 HOW TO PLAY - 筋肉ネズミ大捕獲作戦!! 💥";
+    const char* modalHeader = "💥 ゲーム説明 - 筋肉ネズミ大捕獲作戦!! 💥";
     int hW = GetDrawStringWidthToHandle(modalHeader, static_cast<int>(strlen(modalHeader)), font24);
-    DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 12, modalHeader, GetColor(20, 20, 30), font24);
-    DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2 + 1, modalY + 13, modalHeader, GetColor(0, 0, 0), font24);
+    DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 13, modalHeader, GetColor(255, 230, 80), font24);
 
-    // 3. 3ステップ攻略カード（3分割コミックパネル）
+    // 3. 上段：3ステップ基本ルールカード（シンプル＆要点のみ）
     int cardY = modalY + 68;
-    int cardH = 202;
-    int cardW = 252;
-    int gap = 20;
-    int cardStartX = modalX + 22;
+    int cardH = 196;
+    int cardW = 260;
+    int gap = 16;
+    int cardStartX = modalX + 24;
 
-    // --- CARD 1: 筋トレ（ビタミンイエロー・コミックパネル） ---
+    // --- CARD 1: 筋トレ ---
     int c1X = cardStartX;
-    DrawBox(c1X + 4, cardY + 4, c1X + cardW + 4, cardY + cardH + 4, GetColor(0, 0, 0), TRUE); // シャドウ
-    DrawBox(c1X - 2, cardY - 2, c1X + cardW + 2, cardY + cardH + 2, GetColor(0, 0, 0), TRUE); // 黒枠
-    DrawBox(c1X, cardY, c1X + cardW, cardY + cardH, GetColor(32, 38, 62), TRUE);
-    DrawBox(c1X, cardY, c1X + cardW, cardY + 34, GetColor(255, 205, 30), TRUE); // ヘッダー
-    DrawBox(c1X, cardY + 32, c1X + cardW, cardY + 35, GetColor(0, 0, 0), TRUE);
-    DrawStringToHandle(c1X + 16, cardY + 7, "【STEP 1】 筋トレで巨大化!", GetColor(20, 20, 30), font16);
+    DrawBox(c1X + 4, cardY + 4, c1X + cardW + 4, cardY + cardH + 4, GetColor(0, 0, 0), TRUE);
+    DrawBox(c1X - 2, cardY - 2, c1X + cardW + 2, cardY + cardH + 2, GetColor(0, 0, 0), TRUE);
+    DrawBox(c1X, cardY, c1X + cardW, cardY + cardH, GetColor(24, 30, 46), TRUE);
+    DrawBox(c1X, cardY, c1X + cardW, cardY + 32, GetColor(35, 55, 70), TRUE);
+    DrawBox(c1X, cardY + 30, c1X + cardW, cardY + 32, GetColor(100, 245, 140), TRUE);
+    DrawStringToHandle(c1X + 14, cardY + 6, "① 筋トレ (パワーUP)", GetColor(100, 245, 140), font16);
 
-    DrawStringToHandle(c1X + 12, cardY + 44, "・[SPACE] 長押しでチャージ!", GetColor(255, 255, 255), font13);
-    DrawStringToHandle(c1X + 12, cardY + 68, "・緑ゾーンで離してRep獲得!", GetColor(100, 245, 140), font13);
-    DrawStringToHandle(c1X + 12, cardY + 92, "・体がグングン巨大化＆超加速!", GetColor(255, 225, 100), font13);
-    DrawStringToHandle(c1X + 12, cardY + 120, "※ 失敗で5秒間筋肉痛で停止!", GetColor(255, 110, 110), font13);
-    DrawStringToHandle(c1X + 12, cardY + 144, "※ 15秒間放置で筋肉減衰!", GetColor(255, 170, 110), font13);
+    DrawStringToHandle(c1X + 14, cardY + 46, "・[SPACE] 長押し ➔ 緑で離す", GetColor(255, 255, 255), font13);
+    DrawStringToHandle(c1X + 14, cardY + 74, "・成功: 巨大化＆スピードUP!", GetColor(100, 245, 140), font13);
+    DrawStringToHandle(c1X + 14, cardY + 106, "・失敗: 5秒間 筋肉痛 (停止)", GetColor(255, 110, 110), font13);
+    DrawStringToHandle(c1X + 14, cardY + 134, "・放置: 15秒ごとに -3 レベル", GetColor(255, 160, 100), font13);
 
-    // --- CARD 2: 特殊技（ホットオレンジ・コミックパネル） ---
+    // --- CARD 2: 必殺技 ---
     int c2X = cardStartX + cardW + gap;
     DrawBox(c2X + 4, cardY + 4, c2X + cardW + 4, cardY + cardH + 4, GetColor(0, 0, 0), TRUE);
     DrawBox(c2X - 2, cardY - 2, c2X + cardW + 2, cardY + cardH + 2, GetColor(0, 0, 0), TRUE);
-    DrawBox(c2X, cardY, c2X + cardW, cardY + cardH, GetColor(32, 38, 62), TRUE);
-    DrawBox(c2X, cardY, c2X + cardW, cardY + 34, GetColor(255, 140, 30), TRUE);
-    DrawBox(c2X, cardY + 32, c2X + cardW, cardY + 35, GetColor(0, 0, 0), TRUE);
-    DrawStringToHandle(c2X + 16, cardY + 7, "【STEP 2】 必殺技で圧倒!!", GetColor(20, 20, 30), font16);
+    DrawBox(c2X, cardY, c2X + cardW, cardY + cardH, GetColor(24, 30, 46), TRUE);
+    DrawBox(c2X, cardY, c2X + cardW, cardY + 32, GetColor(55, 45, 40), TRUE);
+    DrawBox(c2X, cardY + 30, c2X + cardW, cardY + 32, GetColor(255, 150, 40), TRUE);
+    DrawStringToHandle(c2X + 14, cardY + 6, "② 必殺技 (Lv.4以上)", GetColor(255, 150, 40), font16);
 
-    DrawStringToHandle(c2X + 12, cardY + 44, "★ 4 Rep以上で必殺技が解放!", GetColor(255, 240, 120), font13);
-    DrawStringToHandle(c2X + 12, cardY + 70, "・[E] タックル突進:", GetColor(255, 160, 60), font13);
-    DrawStringToHandle(c2X + 22, cardY + 92, "猛ダッシュでネズミを気絶!", GetColor(255, 255, 255), font13);
-    DrawStringToHandle(c2X + 12, cardY + 118, "・[SHIFT] / [X] 飛びつき:", GetColor(255, 100, 100), font13);
-    DrawStringToHandle(c2X + 22, cardY + 140, "ホーミング大跳躍で急襲!", GetColor(255, 255, 255), font13);
+    DrawStringToHandle(c2X + 14, cardY + 46, "・[E] タックル", GetColor(255, 150, 40), font13);
+    DrawStringToHandle(c2X + 26, cardY + 68, "➔ 突進してネズミを気絶!", GetColor(255, 255, 255), font13);
+    DrawStringToHandle(c2X + 14, cardY + 104, "・[SHIFT] / [X] 飛びつき", GetColor(255, 90, 90), font13);
+    DrawStringToHandle(c2X + 26, cardY + 126, "➔ 前方のネズミへ大跳躍!", GetColor(255, 255, 255), font13);
 
-    // --- CARD 3: 全滅目標（ビビッドシアン・コミックパネル） ---
+    // --- CARD 3: 目標 ---
     int c3X = cardStartX + (cardW + gap) * 2;
     DrawBox(c3X + 4, cardY + 4, c3X + cardW + 4, cardY + cardH + 4, GetColor(0, 0, 0), TRUE);
     DrawBox(c3X - 2, cardY - 2, c3X + cardW + 2, cardY + cardH + 2, GetColor(0, 0, 0), TRUE);
-    DrawBox(c3X, cardY, c3X + cardW, cardY + cardH, GetColor(32, 38, 62), TRUE);
-    DrawBox(c3X, cardY, c3X + cardW, cardY + 34, GetColor(40, 215, 255), TRUE);
-    DrawBox(c3X, cardY + 32, c3X + cardW, cardY + 35, GetColor(0, 0, 0), TRUE);
-    DrawStringToHandle(c3X + 16, cardY + 7, "【STEP 3】 ネズミ全滅クリア!", GetColor(20, 20, 30), font16);
+    DrawBox(c3X, cardY, c3X + cardW, cardY + cardH, GetColor(24, 30, 46), TRUE);
+    DrawBox(c3X, cardY, c3X + cardW, cardY + 32, GetColor(30, 50, 65), TRUE);
+    DrawBox(c3X, cardY + 30, c3X + cardW, cardY + 32, GetColor(80, 210, 255), TRUE);
+    DrawStringToHandle(c3X + 14, cardY + 6, "③ 目標 (ネズミ全滅)", GetColor(80, 210, 255), font16);
 
-    DrawStringToHandle(c3X + 12, cardY + 44, "・逃げ回るネズミを全滅!", GetColor(255, 255, 255), font13);
-    DrawStringToHandle(c3X + 12, cardY + 66, "・MAP 1: 通常ハウス (室内)", GetColor(255, 220, 100), font13);
-    DrawStringToHandle(c3X + 12, cardY + 88, "・MAP 2: スロープ丘 (15倍)", GetColor(100, 240, 255), font13);
-    DrawStringToHandle(c3X + 12, cardY + 112, "・クリア時間でランク判定:", GetColor(255, 255, 255), font13);
-    DrawStringToHandle(c3X + 22, cardY + 132, "S: 20秒以内, A: 35秒以内", GetColor(255, 215, 40), font13);
+    DrawStringToHandle(c3X + 14, cardY + 46, "・部屋のネズミを全員捕獲!", GetColor(255, 255, 255), font13);
+    DrawStringToHandle(c3X + 14, cardY + 74, "・気絶したネズミは捕まえやすい!", GetColor(100, 245, 140), font13);
+    DrawStringToHandle(c3X + 14, cardY + 106, "・数が減るとネズミがスピードUP!", GetColor(255, 150, 150), font13);
+    DrawStringToHandle(c3X + 14, cardY + 134, "・早いクリアで高ランク獲得!", GetColor(255, 215, 40), font13);
 
-    // 4. キーボード操作一覧表（ポップな黒枠プレート）
-    int keyTableY = modalY + 288;
-    int keyTableH = 175;
-    DrawBox(modalX + 26, keyTableY + 4, modalX + modalW - 18, keyTableY + keyTableH + 4, GetColor(0, 0, 0), TRUE);
-    DrawBox(modalX + 20, keyTableY - 2, modalX + modalW - 20, keyTableY + keyTableH + 2, GetColor(0, 0, 0), TRUE);
-    DrawBox(modalX + 22, keyTableY, modalX + modalW - 22, keyTableY + keyTableH, GetColor(28, 34, 54), TRUE);
+    // 4. 下段：操作一覧（シンプルに要点のみ配置）
+    int keyTableY = modalY + 278;
+    int keyTableW = 812;
+    int keyTableH = 180;
+    int keyTableX = modalX + 24;
 
-    DrawBox(modalX + 22, keyTableY, modalX + modalW - 22, keyTableY + 30, GetColor(40, 50, 78), TRUE);
-    DrawBox(modalX + 22, keyTableY + 28, modalX + modalW - 22, keyTableY + 31, GetColor(0, 0, 0), TRUE);
-    DrawStringToHandle(modalX + 38, keyTableY + 6, "🎮 操作キーバインド一覧", GetColor(255, 225, 40), font16);
+    DrawBox(keyTableX + 4, keyTableY + 4, keyTableX + keyTableW + 4, keyTableY + keyTableH + 4, GetColor(0, 0, 0), TRUE);
+    DrawBox(keyTableX - 2, keyTableY - 2, keyTableX + keyTableW + 2, keyTableY + keyTableH + 2, GetColor(0, 0, 0), TRUE);
+    DrawBox(keyTableX, keyTableY, keyTableX + keyTableW, keyTableY + keyTableH, GetColor(20, 25, 38), TRUE);
+    DrawBox(keyTableX, keyTableY, keyTableX + keyTableW, keyTableY + 30, GetColor(30, 38, 56), TRUE);
+    DrawBox(keyTableX, keyTableY + 28, keyTableX + keyTableW, keyTableY + 30, GetColor(255, 110, 30), TRUE);
+    DrawStringToHandle(keyTableX + 16, keyTableY + 6, "🎮 操作方法", GetColor(255, 220, 60), font16);
 
     // 2列レイアウト
-    int col1X = modalX + 40;
-    int col2X = modalX + 430;
+    int col1X = keyTableX + 24;
+    int col2X = keyTableX + 430;
     int row1Y = keyTableY + 42;
-    int rowStep = 32;
+    int rowStep = 42;
 
-    DrawStringToHandle(col1X, row1Y + rowStep * 0, "・移動操作", GetColor(255, 220, 60), font16);
-    DrawStringToHandle(col1X + 130, row1Y + rowStep * 0, ": [W] [A] [S] [D] キー", GetColor(255, 255, 255), font16);
+    // 左列: アクション
+    DrawStringToHandle(col1X, row1Y + rowStep * 0, "[SPACE] 筋トレ (長押し)", GetColor(100, 245, 140), font16);
+    DrawStringToHandle(col1X + 18, row1Y + rowStep * 0 + 20, "➔ 長押しして緑ゾーンで離す", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col1X, row1Y + rowStep * 1, "・カメラ回転", GetColor(100, 230, 255), font16);
-    DrawStringToHandle(col1X + 130, row1Y + rowStep * 1, ": 矢印キー [←][↑][→][↓] / [Q][R]", GetColor(255, 255, 255), font16);
+    DrawStringToHandle(col1X, row1Y + rowStep * 1, "[E] タックル (Lv.4~)", GetColor(255, 150, 40), font16);
+    DrawStringToHandle(col1X + 18, row1Y + rowStep * 1 + 20, "➔ 突進してネズミを気絶させる", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col1X, row1Y + rowStep * 2, "・視点リセット", GetColor(100, 230, 255), font16);
-    DrawStringToHandle(col1X + 130, row1Y + rowStep * 2, ": [F] キー", GetColor(255, 255, 255), font16);
+    DrawStringToHandle(col1X, row1Y + rowStep * 2, "[SHIFT] / [X] 飛びつき (Lv.4~)", GetColor(255, 90, 90), font16);
+    DrawStringToHandle(col1X + 18, row1Y + rowStep * 2 + 20, "➔ 前方のネズミへ大ジャンプ", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col2X, row1Y + rowStep * 0, "・筋トレ", GetColor(100, 245, 140), font16);
-    DrawStringToHandle(col2X + 130, row1Y + rowStep * 0, ": [SPACE] キー (ホールド＆離す)", GetColor(255, 255, 255), font16);
+    // 右列: 移動・カメラ
+    DrawStringToHandle(col2X, row1Y + rowStep * 0, "移動: [W] [A] [S] [D]", GetColor(255, 255, 255), font16);
+    DrawStringToHandle(col2X + 18, row1Y + rowStep * 0 + 20, "➔ キャラクターの前後左右移動", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col2X, row1Y + rowStep * 1, "・タックル", GetColor(255, 160, 50), font16);
-    DrawStringToHandle(col2X + 130, row1Y + rowStep * 1, ": [E] キー (4 Rep以上)", GetColor(255, 255, 255), font16);
+    DrawStringToHandle(col2X, row1Y + rowStep * 1, "カメラ回転: 矢印キー [←] [→] [↑] [↓]", GetColor(100, 220, 255), font16);
+    DrawStringToHandle(col2X + 18, row1Y + rowStep * 1 + 20, "➔ 視点旋回 [←→] / 見下ろし角 [↑↓]", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col2X, row1Y + rowStep * 2, "・飛びつき", GetColor(255, 100, 100), font16);
-    DrawStringToHandle(col2X + 130, row1Y + rowStep * 2, ": [SHIFT] または [X] キー (4 Rep以上)", GetColor(255, 255, 255), font16);
+    DrawStringToHandle(col2X, row1Y + rowStep * 2, "視点リセット: [F] キー", GetColor(180, 210, 255), font16);
+    DrawStringToHandle(col2X + 18, row1Y + rowStep * 2 + 20, "➔ カメラを猫の背後に即戻す", GetColor(210, 225, 245), font13);
 
-    // 5. 閉じるボタン（ポップな赤いコミックボタン）
-    int closeBtnW = 120;
+    // 5. 閉じるボタン
+    int closeBtnW = 140;
     int closeBtnH = 38;
-    int closeBtnX = modalX + modalW - 140;
-    int closeBtnY = modalY + modalH - 50;
+    int closeBtnX = modalX + modalW - 164;
+    int closeBtnY = modalY + modalH - 52;
 
     int mx, my;
     GetMousePoint(&mx, &my);
@@ -1333,12 +1367,12 @@ void GameManager::DrawHowToPlayModal()
     {
         DrawBox(closeBtnX, closeBtnY, closeBtnX + closeBtnW, closeBtnY + closeBtnH, GetColor(255, 80, 80), TRUE);
         DrawBox(closeBtnX + 2, closeBtnY + 2, closeBtnX + closeBtnW - 2, closeBtnY + 8, GetColor(255, 180, 180), TRUE);
-        DrawStringToHandle(closeBtnX + 14, closeBtnY + 9, "閉じる (ESC)", GetColor(255, 255, 255), font16);
+        DrawStringToHandle(closeBtnX + 20, closeBtnY + 9, "閉じる (ESC)", GetColor(255, 255, 255), font16);
     }
     else
     {
         DrawBox(closeBtnX, closeBtnY, closeBtnX + closeBtnW, closeBtnY + closeBtnH, GetColor(200, 40, 40), TRUE);
         DrawBox(closeBtnX + 2, closeBtnY + 2, closeBtnX + closeBtnW - 2, closeBtnY + 8, GetColor(240, 100, 100), TRUE);
-        DrawStringToHandle(closeBtnX + 14, closeBtnY + 9, "閉じる (ESC)", GetColor(255, 255, 255), font16);
+        DrawStringToHandle(closeBtnX + 20, closeBtnY + 9, "閉じる (ESC)", GetColor(255, 255, 255), font16);
     }
 }
