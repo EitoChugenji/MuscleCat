@@ -175,6 +175,21 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                 m_minBounds.x, m_minBounds.y, m_minBounds.z,
                 m_maxBounds.x, m_maxBounds.y, m_maxBounds.z);
 
+            int frameNum = MV1GetFrameNum(m_modelHandle);
+            AppLogAdd("  Stage Total Frames: %d, Total Meshes: %d\n", frameNum, meshNum);
+            for (int f = 0; f < frameNum; ++f)
+            {
+                const char* fName = MV1GetFrameName(m_modelHandle, f);
+                int fMeshNum = MV1GetFrameMeshNum(m_modelHandle, f);
+                AppLogAdd("  Frame[%d]: '%s', meshCount=%d", f, (fName ? fName : ""), fMeshNum);
+                for (int fm = 0; fm < fMeshNum; ++fm)
+                {
+                    int mIdx = MV1GetFrameMesh(m_modelHandle, f, fm);
+                    AppLogAdd(" (mesh %d)", mIdx);
+                }
+                AppLogAdd("\n");
+            }
+
             for (int m = 0; m < meshNum; ++m)
             {
                 VECTOR bMin = MV1GetMeshMinPosition(m_modelHandle, m);
@@ -210,6 +225,36 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                 MV1TerminateReferenceMesh(m_modelHandle, -1, TRUE);
             }
 
+            // 床メッシュの検出（House マップでは全高35未満のメッシュは床ブロック）
+            std::vector<bool> isFloorMesh(meshNum, false);
+            if (m_mapType == ModelConfig::MapType::House)
+            {
+                for (int m = 0; m < meshNum; ++m)
+                {
+                    VECTOR bMin = MV1GetMeshMinPosition(m_modelHandle, m);
+                    VECTOR bMax = MV1GetMeshMaxPosition(m_modelHandle, m);
+                    float meshH = (bMax.y - bMin.y) * m_scale;
+                    if (meshH < 35.0f)
+                    {
+                        isFloorMesh[m] = true;
+                        AppLogAdd("  Mesh[%d] detected as FLOOR mesh (height=%.1f < 35.0f) -> side-walls excluded from wall collision\n", m, meshH);
+                    }
+                }
+
+                // House マップにおける不要な原点キューブ (pCube55) の非表示化および除外
+                if (meshNum > 10)
+                {
+                    VECTOR bMin = MV1GetMeshMinPosition(m_modelHandle, 10);
+                    VECTOR bMax = MV1GetMeshMaxPosition(m_modelHandle, 10);
+                    if (std::abs(bMin.x - (-0.5f)) < 0.1f && std::abs(bMax.x - 0.5f) < 0.1f)
+                    {
+                        MV1SetMeshVisible(m_modelHandle, 10, FALSE);
+                        isFloorMesh[10] = true;
+                        AppLogAdd("  Mesh[10] (pCube55 default cube) hidden and excluded from wall collision\n");
+                    }
+                }
+            }
+
             // モデルから直接参照ポリゴンを取得し、面法線による壁ポリゴンリストを構築
             m_wallPolygons.clear();
 
@@ -234,6 +279,12 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                 {
                     const auto& poly = ref.Polygons[i];
 
+                    // 床メッシュ（地面）としてマークされたメッシュのポリゴンは壁として扱わない
+                    if (poly.MeshIndex < meshNum && isFloorMesh[poly.MeshIndex])
+                    {
+                        continue;
+                    }
+
                     VECTOR v0 = ref.Vertexs[poly.VIndex[0]].Position;
                     VECTOR v1 = ref.Vertexs[poly.VIndex[1]].Position;
                     VECTOR v2 = ref.Vertexs[poly.VIndex[2]].Position;
@@ -242,10 +293,21 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                     float polyMaxY = CalcMax3(v0.y, v1.y, v2.y);
                     float polyHeight = polyMaxY - polyMinY;
 
-                    // 床の分け目や段差などの微小ポリゴン（高さが3未満）は除外
-                    if (polyHeight < 3.0f)
+                    // House マップ: 床の分け目、段差、重なり合っている床ブロックの側面（高さ35未満、または上端が床上30未満）は除外
+                    // SlopeHills マップ: 微小ポリゴン（高さ3未満）のみ除外
+                    if (m_mapType == ModelConfig::MapType::House)
                     {
-                        continue;
+                        if (polyHeight < 35.0f || polyMaxY < 30.0f)
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        if (polyHeight < 3.0f)
+                        {
+                            continue;
+                        }
                     }
 
                     // 面法線の計算 (v1 - v0) x (v2 - v0)
@@ -353,13 +415,13 @@ bool Stage3D::ResolveWallCollision(VECTOR& outPos, float radius, VECTOR* outPush
                 // AABB による高速カリング（キャラクター判定範囲外のポリゴンは即座にスキップ）
                 if (outPos.x + radius < poly.minPos.x || outPos.x - radius > poly.maxPos.x ||
                     outPos.z + radius < poly.minPos.z || outPos.z - radius > poly.maxPos.z ||
-                    catTopY < poly.minPos.y || catBottomY > poly.maxPos.y)
+                    catTopY < poly.minPos.y || (catBottomY + 3.0f) > poly.maxPos.y)
                 {
                     continue;
                 }
 
                 // 足元より下、または頭より上にある無関係なポリゴン（床の凹凸や天井・梁）は除外
-                if (poly.maxPos.y < catBottomY || poly.minPos.y > catTopY)
+                if (poly.maxPos.y < catBottomY + 3.0f || poly.minPos.y > catTopY)
                 {
                     continue;
                 }
