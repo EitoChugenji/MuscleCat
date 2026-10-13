@@ -122,25 +122,26 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             }
             else if (autoTestFrame == 80)
             {
-                // マップ2（SlopeHills 10x）に切り替え
-                game.SwitchSelectedMap(ModelConfig::MapType::SlopeHills);
-                AppLogAdd("AutoTest: Switched to MAP 2: Slope Hills 10x\n");
+                // マップ2（NEW MAP）に切り替え
+                game.SwitchSelectedMap(ModelConfig::MapType::NewMap);
+                AppLogAdd("AutoTest: Switched to MAP 2: NEW MAP\n");
             }
             else if (autoTestFrame == 90)
             {
                 // マップ2でゲーム開始
                 game.StartGame();
-                AppLogAdd("AutoTest: Started game on MAP 2: Slope Hills 10x\n");
+                AppLogAdd("AutoTest: Started game on MAP 2: NEW MAP\n");
             }
             else if (autoTestFrame > 90 && autoTestFrame <= 140)
             {
-                // 北東スロープに向かって登攀移動
+                // 開けた通路方向に歩行移動
                 auto p = game.GetObjManager().GetPlayer();
                 if (p)
                 {
                     VECTOR pos = p->GetPos();
-                    pos.x += 35.0f;
-                    pos.z += 35.0f;
+                    pos.z += 4.0f;
+                    VECTOR pushNorm;
+                    bool hit = game.GetObjManager().GetStage().ResolveWallCollision(pos, p->GetRadius(), &pushNorm);
                     float gy = 0.0f;
                     if (game.GetObjManager().GetStage().GetGroundHeight(pos, gy))
                     {
@@ -150,8 +151,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     p->SetPos(pos);
                     if (autoTestFrame % 10 == 0)
                     {
-                        AppLogAdd("AutoTest MAP 2 Climb: Pos=(%.1f, %.1f, %.1f), GroundY=%.1f\n",
-                            pos.x, pos.y, pos.z, gy);
+                        AppLogAdd("AutoTest MAP 2 Move: Pos=(%.1f, %.1f, %.1f), GroundY=%.1f, HitWall=%s\n",
+                            pos.x, pos.y, pos.z, gy, (hit ? "YES" : "NO"));
                     }
                 }
             }

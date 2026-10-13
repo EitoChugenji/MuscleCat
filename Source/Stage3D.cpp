@@ -113,18 +113,18 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
         SetFogColor(175, 218, 252);
         SetFogStartEnd(2500.0f, 5500.0f);
     }
-    else // SlopeHills (10倍サイズスロープ)
+    else // NewMap (newmap.mv1, scale: 100.0f)
     {
         m_modelPath = ModelConfig::MAP2_SLOPE_PATH;
-        m_scale = ModelConfig::MAP2_SLOPE_SCALE; // 10.0f
-        m_halfWidth = 9500.0f;
-        m_halfDepth = 9500.0f;
-        m_wallHeight = 1200.0f;
+        m_scale = ModelConfig::MAP2_SLOPE_SCALE; // 100.0f
+        m_halfWidth = 2700.0f;
+        m_halfDepth = 2200.0f;
+        m_wallHeight = 250.0f;
 
-        // フォグ設定（広大屋外・スロープ用）
+        // フォグ設定（広めの室内空間用）
         SetFogEnable(TRUE);
         SetFogColor(175, 218, 252);
-        SetFogStartEnd(12000.0f, 30000.0f);
+        SetFogStartEnd(3500.0f, 7500.0f);
     }
 
     // 既存モデルハンドルの破棄
@@ -293,21 +293,10 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                     float polyMaxY = CalcMax3(v0.y, v1.y, v2.y);
                     float polyHeight = polyMaxY - polyMinY;
 
-                    // House マップ: 床の分け目、段差、重なり合っている床ブロックの側面（高さ35未満、または上端が床上30未満）は除外
-                    // SlopeHills マップ: 微小ポリゴン（高さ3未満）のみ除外
-                    if (m_mapType == ModelConfig::MapType::House)
+                    // 床の分け目、段差、重なり合っている床ブロックの側面（高さ35未満、または上端が床上30未満）は除外
+                    if (polyHeight < 35.0f || polyMaxY < 30.0f)
                     {
-                        if (polyHeight < 35.0f || polyMaxY < 30.0f)
-                        {
-                            continue;
-                        }
-                    }
-                    else
-                    {
-                        if (polyHeight < 3.0f)
-                        {
-                            continue;
-                        }
+                        continue;
                     }
 
                     // 面法線の計算 (v1 - v0) x (v2 - v0)
@@ -373,6 +362,8 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
 
             AppLogAdd("Stage wall polygons: total=%d (floor-level<=4: %d, player-level: %d, ceiling-level>=35: %d)\n",
                 static_cast<int>(m_wallPolygons.size()), lowPolyCount, midPolyCount, highPolyCount);
+
+
         }
     }
 }

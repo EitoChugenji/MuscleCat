@@ -33,33 +33,29 @@ namespace
     };
     const int NUM_PATROL_POINTS_HOUSE = sizeof(PATROL_POINTS_HOUSE) / sizeof(PATROL_POINTS_HOUSE[0]);
 
-    // スロープヒルズ (10倍 secondmap) 用の巡回目標ポイント
-    const VECTOR PATROL_POINTS_SLOPE_10X[] = {
-        {      0.0f,    0.0f,      0.0f },  // 中央平地
-        {    500.0f,    0.0f,    500.0f },  // 中央平地北東
-        {   -500.0f,    0.0f,    500.0f },  // 中央平地北西
-        {    500.0f,    0.0f,   -500.0f },  // 中央平地南東
-        {   -500.0f,    0.0f,   -500.0f },  // 中央平地南西
-        {   2000.0f,  500.0f,   2000.0f },  // 北東スロープ中腹
-        {  -2000.0f,  500.0f,   2000.0f },  // 北西スロープ中腹
-        {   2000.0f,  500.0f,  -2000.0f },  // 南東スロープ中腹
-        {  -2000.0f,  500.0f,  -2000.0f },  // 南西スロープ中腹
-        {   5300.0f, 1000.0f,   4700.0f },  // 北東高台中央
-        {   7300.0f, 1000.0f,   4700.0f },  // 北東高台東奥
-        {   5300.0f, 1000.0f,   2000.0f },  // 北東高台南側
-        {   6000.0f, 1000.0f,  -1000.0f },  // 東高台中央
-        {   6700.0f, 1000.0f,  -3300.0f },  // 南東高台
-        {   6000.0f, 1000.0f,  -6700.0f },  // 南東高台奥
-        {   2700.0f, 1000.0f,  -7000.0f },  // 南高台東
-        {      0.0f, 1000.0f,  -7000.0f },  // 南高台中央
-        {  -5000.0f, 1000.0f,  -6000.0f },  // 南西高台
-        {  -6000.0f, 1000.0f,  -2000.0f },  // 西高台南
-        {  -6000.0f, 1000.0f,   2000.0f },  // 西高台北
-        {  -5000.0f, 1000.0f,   5300.0f },  // 北西高台中央
-        {  -6700.0f, 1000.0f,   6000.0f },  // 北西高台奥
-        {      0.0f, 1000.0f,   6300.0f },  // 北高台中央
+    // NEW MAP (newmap.mv1) 用の巡回目標ポイント
+    const VECTOR PATROL_POINTS_NEWMAP[] = {
+        {     0.0f,  20.0f,  -400.0f },  // 中央南
+        {   400.0f,  20.0f,   400.0f },  // 中央北東
+        {  -400.0f,  20.0f,   400.0f },  // 中央北西
+        {   600.0f,  20.0f,   800.0f },  // 北東エリア手前
+        {  -600.0f,  20.0f,   800.0f },  // 北西エリア手前
+        {  1200.0f,  20.0f,     0.0f },  // 東中央通路
+        {  1600.0f,  20.0f,   400.0f },  // 東北エリア
+        {  1800.0f,  20.0f,  -400.0f },  // 東南エリア
+        {  1200.0f,  20.0f, -1200.0f },  // 南東エリア
+        {   400.0f,  20.0f, -1400.0f },  // 南通路東
+        {  -400.0f,  20.0f, -1200.0f },  // 南通路西
+        { -1200.0f,  20.0f, -1200.0f },  // 南西エリア奥
+        { -1600.0f,  20.0f,  -400.0f },  // 西通路南
+        { -1600.0f,  20.0f,   400.0f },  // 西通路北
+        { -1200.0f,  20.0f,   800.0f },  // 北西奥エリア
+        {     0.0f,  20.0f,  1000.0f },  // 北中央通路
+        {   800.0f,  20.0f,  1000.0f },  // 北東奥エリア
     };
-    const int NUM_PATROL_POINTS_SLOPE_10X = sizeof(PATROL_POINTS_SLOPE_10X) / sizeof(PATROL_POINTS_SLOPE_10X[0]);
+    const int NUM_PATROL_POINTS_NEWMAP = sizeof(PATROL_POINTS_NEWMAP) / sizeof(PATROL_POINTS_NEWMAP[0]);
+    const VECTOR* PATROL_POINTS_SLOPE_10X = PATROL_POINTS_NEWMAP;
+    const int NUM_PATROL_POINTS_SLOPE_10X = NUM_PATROL_POINTS_NEWMAP;
 }
 
 // MouseBase3D 実装
@@ -156,10 +152,10 @@ void MouseBase3D::Draw2D()
 
 void MouseBase3D::ChooseNewPatrolTarget()
 {
-    const VECTOR* points = PATROL_POINTS_SLOPE_10X;
-    int pointCount = NUM_PATROL_POINTS_SLOPE_10X;
-    float jitter = 120.0f;
-    float minDist = 600.0f;
+    const VECTOR* points = PATROL_POINTS_NEWMAP;
+    int pointCount = NUM_PATROL_POINTS_NEWMAP;
+    float jitter = 60.0f;
+    float minDist = 350.0f;
 
     if (m_mapType == ModelConfig::MapType::House)
     {

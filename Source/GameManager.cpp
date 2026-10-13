@@ -137,66 +137,71 @@ void GameManager::SetupRoomObstacles()
     }
     else
     {
-        // SlopeHills (15倍スロープマップ) 用の家具配置（中央平地および各高台）
+        // NEW MAP (newmap.mv1) 用の家具配置（各部屋・通路エリア）
+        // 1. 北東エリアのシステムキッチン
         PlaceObstacle(
             VGet(600.0f, 0.0f, 800.0f),
             300.0f, 75.0f, 70.0f,
             "", ModelConfig::KITCHEN_MODEL_PATH,
             GetColor(200, 200, 210), GetColor(150, 150, 160),
-            ModelConfig::KITCHEN_MODEL_SCALE * 1.5f,
+            ModelConfig::KITCHEN_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::KITCHEN_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::KITCHEN_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
+        // 2. 北東エリアの冷蔵庫
         PlaceObstacle(
-            VGet(950.0f, 0.0f, 800.0f),
+            VGet(850.0f, 0.0f, 800.0f),
             80.0f, 160.0f, 64.0f,
             "", ModelConfig::REFRIGERATOR_MODEL_PATH,
             GetColor(220, 220, 230), GetColor(160, 160, 170),
-            ModelConfig::REFRIGERATOR_MODEL_SCALE * 1.5f,
+            ModelConfig::REFRIGERATOR_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::REFRIGERATOR_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::REFRIGERATOR_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
+        // 3. 中央西エリアのテーブル
         PlaceObstacle(
             VGet(-500.0f, 0.0f, 600.0f),
             150.0f, 50.0f, 150.0f,
             "", ModelConfig::TABLE_MODEL_PATH,
             GetColor(180, 140, 100), GetColor(140, 100, 70),
-            ModelConfig::TABLE_MODEL_SCALE * 1.5f,
+            ModelConfig::TABLE_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
+        // 4. 中央西エリアのテレビ
         PlaceObstacle(
             VGet(-500.0f, 0.0f, 150.0f),
             30.0f, 60.0f, 120.0f,
             "", ModelConfig::TV_MODEL_PATH,
             GetColor(40, 40, 45), GetColor(20, 20, 25),
-            ModelConfig::TV_MODEL_SCALE * 1.5f,
+            ModelConfig::TV_MODEL_SCALE * 1.2f,
             DX_PI_F * 0.5f,
-            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
-        // 高台フロアの家具
+        // 5. 東エリアのテーブル
         PlaceObstacle(
-            VGet(8000.0f, 0.0f, 7000.0f),
+            VGet(1600.0f, 0.0f, -400.0f),
             150.0f, 50.0f, 150.0f,
             "", ModelConfig::TABLE_MODEL_PATH,
             GetColor(180, 140, 100), GetColor(140, 100, 70),
-            ModelConfig::TABLE_MODEL_SCALE * 1.5f,
+            ModelConfig::TABLE_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::TABLE_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
 
+        // 6. 南東エリアのテレビ
         PlaceObstacle(
-            VGet(-7500.0f, 0.0f, 8000.0f),
+            VGet(800.0f, 0.0f, -1400.0f),
             120.0f, 60.0f, 30.0f,
             "", ModelConfig::TV_MODEL_PATH,
             GetColor(40, 40, 45), GetColor(20, 20, 25),
-            ModelConfig::TV_MODEL_SCALE * 1.5f,
+            ModelConfig::TV_MODEL_SCALE * 1.2f,
             0.0f,
-            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.5f, 0.0f)
+            VGet(0.0f, ModelConfig::TV_MODEL_OFFSET_Y * 1.2f, 0.0f)
         );
     }
 }
@@ -276,13 +281,17 @@ void GameManager::StartGame()
     // 選択されたマップのステージ読み込み
     m_objManager.LoadStage(m_selectedMap);
 
-    // プレイヤー生成（原点）
-    auto player = std::make_shared<Player3D>(VGet(0.0f, 0.0f, 0.0f));
+    // プレイヤー生成（マップ別初期位置）
+    VECTOR startPos = (m_selectedMap == ModelConfig::MapType::House)
+        ? VGet(0.0f, 0.0f, 0.0f)
+        : VGet(0.0f, 0.0f, 450.0f);
+
+    auto player = std::make_shared<Player3D>(startPos);
     player->SetMapType(m_selectedMap);
     float playerGy = 0.0f;
-    if (m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), playerGy))
+    if (m_objManager.GetStage().GetGroundHeight(startPos, playerGy))
     {
-        player->SetPos(VGet(0.0f, playerGy, 0.0f));
+        player->SetPos(VGet(startPos.x, playerGy, startPos.z));
         player->SetGroundY(playerGy);
     }
     m_objManager.SetPlayer(player);
@@ -307,22 +316,22 @@ void GameManager::StartGame()
     };
     const int houseRoomCount = sizeof(spawnRoomsHouse) / sizeof(spawnRoomsHouse[0]);
 
-    const VECTOR spawnRoomsSlope[] = {
-        VGet(   500.0f, 0.0f,   500.0f),  // 中央平地北東
-        VGet(  -500.0f, 0.0f,   500.0f),  // 中央平地北西
-        VGet(   500.0f, 0.0f,  -500.0f),  // 中央平地南東
-        VGet(  -500.0f, 0.0f,  -500.0f),  // 中央平地南西
-        VGet(  1750.0f, 0.0f,   1750.0f),  // スロープ入口北東
-        VGet( -1750.0f, 0.0f,   1750.0f),  // スロープ入口北西
-        VGet(  6000.0f, 0.0f,   6000.0f),  // 北東高台
-        VGet( -6000.0f, 0.0f,   6000.0f),  // 北西高台
-        VGet(  6000.0f, 0.0f,  -6000.0f),  // 南東高台
-        VGet( -6000.0f, 0.0f,  -6000.0f),  // 南西高台
+    const VECTOR spawnRoomsNewMap[] = {
+        VGet(  400.0f, 0.0f,   400.0f),  // 中央東エリア
+        VGet( -600.0f, 0.0f,   400.0f),  // 中央西エリア
+        VGet(  400.0f, 0.0f,  -400.0f),  // 中央南東エリア
+        VGet( -600.0f, 0.0f,  -400.0f),  // 中央南西エリア
+        VGet( 1200.0f, 0.0f,     0.0f),  // 東通路エリア
+        VGet( 1600.0f, 0.0f,  -400.0f),  // 東奥エリア
+        VGet( 1600.0f, 0.0f,   800.0f),  // 北東エリア
+        VGet(-1200.0f, 0.0f,   800.0f),  // 北西エリア
+        VGet(-1600.0f, 0.0f, -1200.0f),  // 南西奥エリア
+        VGet(  800.0f, 0.0f, -1400.0f),  // 南奥エリア
     };
-    const int slopeRoomCount = sizeof(spawnRoomsSlope) / sizeof(spawnRoomsSlope[0]);
+    const int newMapRoomCount = sizeof(spawnRoomsNewMap) / sizeof(spawnRoomsNewMap[0]);
 
-    const VECTOR* spawnRooms = (m_selectedMap == ModelConfig::MapType::House) ? spawnRoomsHouse : spawnRoomsSlope;
-    int roomCount = (m_selectedMap == ModelConfig::MapType::House) ? houseRoomCount : slopeRoomCount;
+    const VECTOR* spawnRooms = (m_selectedMap == ModelConfig::MapType::House) ? spawnRoomsHouse : spawnRoomsNewMap;
+    int roomCount = (m_selectedMap == ModelConfig::MapType::House) ? houseRoomCount : newMapRoomCount;
 
     const auto& stage = m_objManager.GetStage();
     for (int i = 0; i < Config::NORMAL_MOUSE_COUNT; ++i)
@@ -1169,7 +1178,7 @@ void GameManager::DrawTitleScreen()
     bool isStageSelected = (m_selectedMenuItem == 1);
     const char* stageNameStr = (m_selectedMap == ModelConfig::MapType::House)
         ? "STAGE : MAP 1 (HOUSE)"
-        : "STAGE : MAP 2 (SLOPE 15x)";
+        : "STAGE : MAP 2 (NEW MAP)";
 
     if (isStageSelected)
     {
@@ -1236,7 +1245,7 @@ void GameManager::DrawTitleScreen()
 
     // ステージ切り替えガイドヒント（半透明コミックプレート付きで視認性抜群）
     const char* stageHint = (m_selectedMap == ModelConfig::MapType::House)
-        ? "★ [ ← / → ] またはクリックで MAP 2: 15倍スロープ に切替"
+        ? "★ [ ← / → ] またはクリックで MAP 2: NEW MAP に切替"
         : "★ [ ← / → ] またはクリックで MAP 1: 通常ハウス に切替";
     int hintW = GetDrawStringWidthToHandle(stageHint, static_cast<int>(strlen(stageHint)), font13);
     int hintX = (Config::SCREEN_WIDTH - hintW) / 2;
