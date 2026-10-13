@@ -209,6 +209,7 @@ void Player3D::Update()
 
 void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR>& targetPositions)
 {
+    m_prevPos = m_pos;
     m_animFrame++;
     m_animTime += 1.0f / 60.0f;
 

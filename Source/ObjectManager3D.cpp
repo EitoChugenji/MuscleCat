@@ -264,7 +264,7 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
             m_player->ApplyStun(90);
         }
 
-        // 床・坂道への接地判定
+        // 床・坂道への接地判定およびマップ外（足場のない空間・崖）への落下・はみ出し防止
         float groundY = 0.0f;
         if (m_stage.GetGroundHeight(pPos, groundY))
         {
@@ -273,6 +273,43 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
             {
                 pPos.y = groundY;
             }
+        }
+        else
+        {
+            // 床のない空間・マップ外・足場の端から外へ出ようとした場合
+            // まず X方向のみ移動を試行（壁・崖沿いスライド）
+            VECTOR prevPos = m_player->GetPrevPos();
+            float testGroundY = 0.0f;
+            VECTOR testPosX = VGet(pPos.x, prevPos.y, prevPos.z);
+            VECTOR testPosZ = VGet(prevPos.x, prevPos.y, pPos.z);
+
+            if (m_stage.GetGroundHeight(testPosX, testGroundY))
+            {
+                pPos.x = testPosX.x;
+                pPos.z = prevPos.z;
+                pPos.y = testGroundY;
+                m_player->SetGroundY(testGroundY);
+            }
+            else if (m_stage.GetGroundHeight(testPosZ, testGroundY))
+            {
+                pPos.x = prevPos.x;
+                pPos.z = testPosZ.z;
+                pPos.y = testGroundY;
+                m_player->SetGroundY(testGroundY);
+            }
+            else
+            {
+                // X・Zどちらも床外の場合は前フレームの有効位置に戻す
+                pPos.x = prevPos.x;
+                pPos.z = prevPos.z;
+                float prevGy = 0.0f;
+                if (m_stage.GetGroundHeight(prevPos, prevGy))
+                {
+                    pPos.y = prevGy;
+                    m_player->SetGroundY(prevGy);
+                }
+            }
+            collided = true;
         }
 
         m_player->SetPos(pPos);

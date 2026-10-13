@@ -7,6 +7,7 @@
 #include "Config.h"
 #include <cstdlib>
 #include <ctime>
+#include <fstream>
 
 // メイン関数 (WinMain)
 int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine, int nCmdShow)
@@ -63,6 +64,20 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     int autoTestFrame = 0;
     const char* fullCmd = GetCommandLineA();
     bool isAutoTest = (std::strstr(fullCmd, "--test") != nullptr);
+    std::ofstream testLog;
+    if (isAutoTest)
+    {
+        testLog.open("test_result.txt");
+        testLog << "=== AUTOTEST SUITE START ===" << std::endl;
+    }
+
+    auto LogTest = [&](const std::string& msg) {
+        AppLogAdd("%s", msg.c_str());
+        if (testLog.is_open())
+        {
+            testLog << msg << std::flush;
+        }
+    };
 
     while (ProcessMessage() == 0 && ClearDrawScreen() == 0)
     {
@@ -81,12 +96,13 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             {
                 // マップ1（House）に切り替え
                 game.SwitchSelectedMap(ModelConfig::MapType::House);
-                AppLogAdd("AutoTest: Switched to MAP 1: House\n");
+                LogTest("AutoTest: Switched to MAP 1: House\n");
             }
             else if (autoTestFrame == 40)
             {
                 // マップ1でゲーム開始
                 game.StartGame();
+                LogTest("AutoTest: Started game on MAP 1: House\n");
                 AppLogAdd("AutoTest: Started game on MAP 1: House\n");
             }
             else if (autoTestFrame > 40 && autoTestFrame <= 65)
@@ -132,38 +148,146 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 game.StartGame();
                 AppLogAdd("AutoTest: Started game on MAP 2: NEW MAP\n");
             }
-            else if (autoTestFrame > 90 && autoTestFrame <= 140)
+            else if (autoTestFrame == 95)
             {
-                // 開けた通路方向に歩行移動
+                // テスト1: 東側突出プラットフォーム (X=2000, Z=650) から東外側へ歩行
+                auto p = game.GetObjManager().GetPlayer();
+                if (p)
+                {
+                    p->SetPos(VGet(2000.0f, 20.0f, 650.0f));
+                }
+            }
+            else if (autoTestFrame > 95 && autoTestFrame <= 110)
+            {
                 auto p = game.GetObjManager().GetPlayer();
                 if (p)
                 {
                     VECTOR pos = p->GetPos();
-                    pos.z += 4.0f;
+                    pos.x += 6.0f; // 東側外周へ向かって前進
+                    VECTOR prevPos = p->GetPos();
                     VECTOR pushNorm;
-                    bool hit = game.GetObjManager().GetStage().ResolveWallCollision(pos, p->GetRadius(), &pushNorm);
+                    bool wallHit = game.GetObjManager().GetStage().ResolveWallCollision(pos, p->GetRadius(), &pushNorm);
                     float gy = 0.0f;
-                    if (game.GetObjManager().GetStage().GetGroundHeight(pos, gy))
+                    bool groundHit = game.GetObjManager().GetStage().GetGroundHeight(pos, gy);
+                    if (!groundHit)
+                    {
+                        pos = prevPos; // 足場外への踏み出し防止
+                    }
+                    else
                     {
                         pos.y = gy;
-                        p->SetGroundY(gy);
                     }
                     p->SetPos(pos);
-                    if (autoTestFrame % 10 == 0)
+                    if (autoTestFrame == 110)
                     {
-                        AppLogAdd("AutoTest MAP 2 Move: Pos=(%.1f, %.1f, %.1f), GroundY=%.1f, HitWall=%s\n",
-                            pos.x, pos.y, pos.z, gy, (hit ? "YES" : "NO"));
+                        char buf[256];
+                        snprintf(buf, sizeof(buf), "AutoTest PROTRUSION EAST: FinalPos=(%.1f, %.1f, %.1f), WallHit=%s, HasGround=%s, BlockedInside=%s\n",
+                            pos.x, pos.y, pos.z, (wallHit ? "YES" : "NO"), (groundHit ? "YES" : "NO"),
+                            (pos.x <= 2060.0f ? "PASS" : "FAIL"));
+                        LogTest(buf);
                     }
                 }
             }
-            else if (autoTestFrame > 150)
+            else if (autoTestFrame == 115)
+            {
+                // テスト2: 西側突出スタブ (X=-1220, Z=-1200) から外側へ歩行
+                auto p = game.GetObjManager().GetPlayer();
+                if (p)
+                {
+                    p->SetPos(VGet(-1220.0f, 20.0f, -1200.0f));
+                }
+            }
+            else if (autoTestFrame > 115 && autoTestFrame <= 130)
+            {
+                auto p = game.GetObjManager().GetPlayer();
+                if (p)
+                {
+                    VECTOR pos = p->GetPos();
+                    pos.x += 6.0f; // 行き止まり端から外へ向かって前進
+                    VECTOR prevPos = p->GetPos();
+                    VECTOR pushNorm;
+                    bool wallHit = game.GetObjManager().GetStage().ResolveWallCollision(pos, p->GetRadius(), &pushNorm);
+                    float gy = 0.0f;
+                    bool groundHit = game.GetObjManager().GetStage().GetGroundHeight(pos, gy);
+                    if (!groundHit)
+                    {
+                        pos = prevPos;
+                    }
+                    else
+                    {
+                        pos.y = gy;
+                    }
+                    p->SetPos(pos);
+                    if (autoTestFrame == 130)
+                    {
+                        char buf[256];
+                        snprintf(buf, sizeof(buf), "AutoTest PROTRUSION WEST: FinalPos=(%.1f, %.1f, %.1f), WallHit=%s, HasGround=%s, BlockedInside=%s\n",
+                            pos.x, pos.y, pos.z, (wallHit ? "YES" : "NO"), (groundHit ? "YES" : "NO"),
+                            (pos.x <= -1200.0f ? "PASS" : "FAIL"));
+                        LogTest(buf);
+                    }
+                }
+            }
+            else if (autoTestFrame == 135)
+            {
+                // テスト3: 南側大通路終端 (X=400, Z=-1800) から南外側へ歩行
+                auto p = game.GetObjManager().GetPlayer();
+                if (p)
+                {
+                    p->SetPos(VGet(400.0f, 20.0f, -1800.0f));
+                }
+            }
+            else if (autoTestFrame > 135 && autoTestFrame <= 150)
+            {
+                auto p = game.GetObjManager().GetPlayer();
+                if (p)
+                {
+                    VECTOR pos = p->GetPos();
+                    pos.z -= 6.0f; // 南端から外へ向かって前進
+                    VECTOR prevPos = p->GetPos();
+                    VECTOR pushNorm;
+                    bool wallHit = game.GetObjManager().GetStage().ResolveWallCollision(pos, p->GetRadius(), &pushNorm);
+                    float gy = 0.0f;
+                    bool groundHit = game.GetObjManager().GetStage().GetGroundHeight(pos, gy);
+                    if (!groundHit)
+                    {
+                        pos = prevPos;
+                    }
+                    else
+                    {
+                        pos.y = gy;
+                    }
+                    p->SetPos(pos);
+                    if (autoTestFrame == 150)
+                    {
+                        char buf[256];
+                        snprintf(buf, sizeof(buf), "AutoTest PROTRUSION SOUTH: FinalPos=(%.1f, %.1f, %.1f), WallHit=%s, HasGround=%s, BlockedInside=%s\n",
+                            pos.x, pos.y, pos.z, (wallHit ? "YES" : "NO"), (groundHit ? "YES" : "NO"),
+                            (pos.z >= -1830.0f ? "PASS" : "FAIL"));
+                        LogTest(buf);
+                    }
+                }
+            }
+            else if (autoTestFrame > 160)
             {
                 break;
             }
         }
 
-        // ゲームロジック更新
-        game.Update();
+        // 自動テスト用カメラオーバーライド
+        if (isAutoTest)
+        {
+            if (autoTestFrame == 145)
+            {
+                SetCameraNearFar(10.0f, 30000.0f);
+                SetCameraPositionAndTargetAndUpVec(VGet(150.0f, 4200.0f, -190.0f), VGet(150.0f, 0.0f, -190.0f), VGet(0.0f, 0.0f, 1.0f));
+            }
+            else if (autoTestFrame == 148)
+            {
+                SetCameraNearFar(10.0f, 30000.0f);
+                SetCameraPositionAndTarget_UpVecY(VGet(150.0f, 2600.0f, -2800.0f), VGet(150.0f, 0.0f, -190.0f));
+            }
+        }
 
         // 描画
         game.Draw();
@@ -195,6 +319,16 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             {
                 SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_game_map2_slope.png");
                 AppLogAdd("AutoTest: Saved screenshot_game_map2_slope.png\n");
+            }
+            else if (autoTestFrame == 145)
+            {
+                SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_map2_topdown.png");
+                AppLogAdd("AutoTest: Saved screenshot_map2_topdown.png\n");
+            }
+            else if (autoTestFrame == 148)
+            {
+                SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_map2_overview.png");
+                AppLogAdd("AutoTest: Saved screenshot_map2_overview.png\n");
             }
         }
 

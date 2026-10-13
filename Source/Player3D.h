@@ -39,6 +39,7 @@ private:
     int   m_sorenessTimer = 0;       // 筋肉痛残りフレーム (5秒 = 300f)
     int   m_pumpDecayTimer = 0;      // Rep維持残りフレーム (15秒 = 900f)
     float m_groundY = 0.0f;          // 現在の接地地面高さ（床・坂道対応）
+    VECTOR m_prevPos = VGet(0.0f, 0.0f, 0.0f); // 移動前の位置（崖・はみ出し防止用）
     ModelConfig::MapType m_mapType = ModelConfig::MapType::SlopeHills;
     int   m_animFrame = 0;
     float m_animTime = 0.0f;
@@ -153,6 +154,11 @@ public:
     float GetGroundY() const
     {
         return m_groundY;
+    }
+
+    const VECTOR& GetPrevPos() const
+    {
+        return m_prevPos;
     }
 
     void SetMapType(ModelConfig::MapType type)

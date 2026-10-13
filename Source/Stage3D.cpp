@@ -293,10 +293,21 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                     float polyMaxY = CalcMax3(v0.y, v1.y, v2.y);
                     float polyHeight = polyMaxY - polyMinY;
 
-                    // 床の分け目、段差、重なり合っている床ブロックの側面（高さ35未満、または上端が床上30未満）は除外
-                    if (polyHeight < 35.0f || polyMaxY < 30.0f)
+                    // House マップ: 床の分け目、段差、重なり合っている床ブロックの側面（高さ35未満、または上端が床上30未満）は除外
+                    // NewMap マップ: 高さ8未満の微小ポリゴンのみ除外（トラックの側壁・ガードレール（高さ20）を壁として正確に抽出）
+                    if (m_mapType == ModelConfig::MapType::House)
                     {
-                        continue;
+                        if (polyHeight < 35.0f || polyMaxY < 30.0f)
+                        {
+                            continue;
+                        }
+                    }
+                    else
+                    {
+                        if (polyHeight < 8.0f)
+                        {
+                            continue;
+                        }
                     }
 
                     // 面法線の計算 (v1 - v0) x (v2 - v0)
@@ -363,7 +374,69 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
             AppLogAdd("Stage wall polygons: total=%d (floor-level<=4: %d, player-level: %d, ceiling-level>=35: %d)\n",
                 static_cast<int>(m_wallPolygons.size()), lowPolyCount, midPolyCount, highPolyCount);
 
+            if (m_mapType != ModelConfig::MapType::House)
+            {
+                // NewMap用の補助壁・外周落下防止壁ポリゴンを追加
+                // 「横からちょこんと出ているところ」：
+                // 1. 東側（右側）の突出小正方形プラットフォーム (X ≈ 2000, Z ≈ 650) の外周端
+                // 2. 東側（右側）のS字カーブ通路終端 (X ≈ 1600, Z ≈ -1710)
+                // 3. 西側（左側）のカーブ通路終端・突出スタブ (X ≈ -1200, Z ≈ -1200)
+                // 4. 南側の2本の大通路終端 (Z ≈ -1830)
+                auto AddWallQuad = [&](const VECTOR& p0, const VECTOR& p1, float bottomY, float topY) {
+                    VECTOR v0 = VGet(p0.x, bottomY, p0.z);
+                    VECTOR v1 = VGet(p1.x, bottomY, p1.z);
+                    VECTOR v2 = VGet(p1.x, topY, p1.z);
+                    VECTOR v3 = VGet(p0.x, topY, p0.z);
 
+                    VECTOR e1 = VSub(v1, v0);
+                    VECTOR e2 = VSub(v3, v0);
+                    VECTOR cross = VCross(e1, e2);
+                    float lenSq = cross.x * cross.x + cross.y * cross.y + cross.z * cross.z;
+                    if (lenSq < 0.000001f) return;
+                    float invLen = 1.0f / std::sqrt(lenSq);
+                    VECTOR normal = VGet(cross.x * invLen, cross.y * invLen, cross.z * invLen);
+
+                    WallPolygon wp1;
+                    wp1.v0 = v0; wp1.v1 = v1; wp1.v2 = v2;
+                    wp1.normal = normal;
+                    wp1.minPos = VGet((std::min)({v0.x, v1.x, v2.x}), bottomY, (std::min)({v0.z, v1.z, v2.z}));
+                    wp1.maxPos = VGet((std::max)({v0.x, v1.x, v2.x}), topY, (std::max)({v0.z, v1.z, v2.z}));
+                    m_wallPolygons.push_back(wp1);
+
+                    WallPolygon wp2;
+                    wp2.v0 = v0; wp2.v1 = v2; wp2.v2 = v3;
+                    wp2.normal = normal;
+                    wp2.minPos = VGet((std::min)({v0.x, v2.x, v3.x}), bottomY, (std::min)({v0.z, v2.z, v3.z}));
+                    wp2.maxPos = VGet((std::max)({v0.x, v2.x, v3.x}), topY, (std::max)({v0.z, v2.z, v3.z}));
+                    m_wallPolygons.push_back(wp2);
+                };
+
+                float bY = -10.0f;
+                float tY = 80.0f;
+
+                // 1. 東側突出正方形プラットフォームの外周壁（東・北・南）
+                AddWallQuad(VGet(2060.0f, 0.0f, 480.0f), VGet(2060.0f, 0.0f, 780.0f), bY, tY);
+                AddWallQuad(VGet(2060.0f, 0.0f, 780.0f), VGet(1800.0f, 0.0f, 780.0f), bY, tY);
+                AddWallQuad(VGet(1800.0f, 0.0f, 480.0f), VGet(2060.0f, 0.0f, 480.0f), bY, tY);
+                AddWallQuad(VGet(1800.0f, 0.0f, 480.0f), VGet(1800.0f, 0.0f, 540.0f), bY, tY);
+
+                // 2. 西側カーブ通路の突出スタブ・行き止まり端壁
+                AddWallQuad(VGet(-1200.0f, 0.0f, -1350.0f), VGet(-1200.0f, 0.0f, -1050.0f), bY, tY);
+                AddWallQuad(VGet(-2310.0f, 0.0f, -1250.0f), VGet(-2310.0f, 0.0f, -850.0f), bY, tY);
+
+                // 3. 南東S字カーブ通路の行き止まり端壁
+                AddWallQuad(VGet(1500.0f, 0.0f, -1710.0f), VGet(1750.0f, 0.0f, -1710.0f), bY, tY);
+
+                // 4. 南側大通路の行き止まり端壁
+                AddWallQuad(VGet(-80.0f, 0.0f, -1830.0f), VGet(740.0f, 0.0f, -1830.0f), bY, tY);
+                AddWallQuad(VGet(740.0f, 0.0f, -1830.0f), VGet(1620.0f, 0.0f, -1830.0f), bY, tY);
+
+                // 5. 東側中央テーブルエリアの外縁
+                AddWallQuad(VGet(2120.0f, 0.0f, -500.0f), VGet(2120.0f, 0.0f, -200.0f), bY, tY);
+
+                AppLogAdd("Stage3D: Added boundary cap walls for NewMap protrusions (total wall polygons: %d)\n",
+                    static_cast<int>(m_wallPolygons.size()));
+            }
         }
     }
 }
