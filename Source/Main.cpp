@@ -89,25 +89,50 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 game.StartGame();
                 AppLogAdd("AutoTest: Started game on MAP 1: House\n");
             }
-            else if (autoTestFrame == 65)
+            else if (autoTestFrame > 40 && autoTestFrame <= 65)
+            {
+                // 部屋の境目（画像で光っていた重なり領域方向）へ歩行移動
+                auto p = game.GetObjManager().GetPlayer();
+                if (p)
+                {
+                    VECTOR pos = p->GetPos();
+                    pos.x += 12.0f;
+                    pos.z += 10.0f;
+                    VECTOR pushNorm;
+                    bool hit = game.GetObjManager().GetStage().ResolveWallCollision(pos, p->GetRadius(), &pushNorm);
+                    float gy = 0.0f;
+                    if (game.GetObjManager().GetStage().GetGroundHeight(pos, gy))
+                    {
+                        pos.y = gy;
+                        p->SetGroundY(gy);
+                    }
+                    p->SetPos(pos);
+                    if (autoTestFrame % 5 == 0)
+                    {
+                        AppLogAdd("AutoTest MAP 1 Move: Pos=(%.1f, %.1f, %.1f), HitWall=%s (push=%.2f, %.2f)\n",
+                            pos.x, pos.y, pos.z, (hit ? "YES" : "NO"), pushNorm.x, pushNorm.z);
+                    }
+                }
+            }
+            else if (autoTestFrame == 70)
             {
                 // タイトルに戻る
                 game.SetupTitle();
                 AppLogAdd("AutoTest: Returned to Title\n");
             }
-            else if (autoTestFrame == 75)
+            else if (autoTestFrame == 80)
             {
                 // マップ2（SlopeHills 10x）に切り替え
                 game.SwitchSelectedMap(ModelConfig::MapType::SlopeHills);
                 AppLogAdd("AutoTest: Switched to MAP 2: Slope Hills 10x\n");
             }
-            else if (autoTestFrame == 85)
+            else if (autoTestFrame == 90)
             {
                 // マップ2でゲーム開始
                 game.StartGame();
                 AppLogAdd("AutoTest: Started game on MAP 2: Slope Hills 10x\n");
             }
-            else if (autoTestFrame > 85 && autoTestFrame <= 140)
+            else if (autoTestFrame > 90 && autoTestFrame <= 140)
             {
                 // 北東スロープに向かって登攀移動
                 auto p = game.GetObjManager().GetPlayer();
@@ -130,7 +155,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     }
                 }
             }
-            else if (autoTestFrame > 145)
+            else if (autoTestFrame > 150)
             {
                 break;
             }
@@ -155,12 +180,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_title_map1.png");
                 AppLogAdd("AutoTest: Saved screenshot_title_map1.png\n");
             }
-            else if (autoTestFrame == 58)
+            else if (autoTestFrame == 60)
             {
                 SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_game_map1.png");
                 AppLogAdd("AutoTest: Saved screenshot_game_map1.png\n");
             }
-            else if (autoTestFrame == 100)
+            else if (autoTestFrame == 105)
             {
                 SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_game_map2.png");
                 AppLogAdd("AutoTest: Saved screenshot_game_map2.png\n");
