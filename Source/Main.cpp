@@ -268,6 +268,19 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     }
                 }
             }
+            else if (autoTestFrame == 155)
+            {
+                auto p = game.GetObjManager().GetPlayer();
+                if (p)
+                {
+                    bool canTackle = p->CanTackle();
+                    bool canPounce = p->CanPounce();
+                    char buf[256];
+                    snprintf(buf, sizeof(buf), "AutoTest ATTACKS LV0: CanTackle=%s, CanPounce=%s\n",
+                        (canTackle ? "PASS" : "FAIL"), (canPounce ? "PASS" : "FAIL"));
+                    LogTest(buf);
+                }
+            }
             else if (autoTestFrame > 160)
             {
                 break;
@@ -288,6 +301,9 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 SetCameraPositionAndTarget_UpVecY(VGet(150.0f, 2600.0f, -2800.0f), VGet(150.0f, 0.0f, -190.0f));
             }
         }
+
+        // ゲームロジック更新
+        game.Update();
 
         // 描画
         game.Draw();

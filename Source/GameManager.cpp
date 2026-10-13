@@ -849,15 +849,15 @@ void GameManager::Draw()
         {
             float catSpeed = player->GetCurrentSpeed();
             char spdBuf[48];
-            snprintf(spdBuf, sizeof(spdBuf), "猫速度: %.1f (%s)", catSpeed, (reps >= 4) ? "突進解放済" : "Lv.4で技解放");
-            DrawStringToHandle(infoX, pY + 58, spdBuf, (reps >= 4) ? GetColor(100, 245, 140) : GetColor(160, 175, 200), font13);
+            snprintf(spdBuf, sizeof(spdBuf), "猫速度: %.1f (Lv.%d 強化中)", catSpeed, reps);
+            DrawStringToHandle(infoX, pY + 58, spdBuf, GetColor(100, 245, 140), font13);
         }
 
         // =========================================================================
-        // 2. 画面右下：スマート操作ガイドカード（筋トレ長押し明記・見切れ防止）
+        // 2. 画面右下：スマート操作ガイドカード（マウス攻撃・視点移動対応）
         // =========================================================================
-        int gW = 450;
-        int gH = 70;
+        int gW = 540;
+        int gH = 72;
         int gX = Config::SCREEN_WIDTH - gW - 20;
         int gY = Config::SCREEN_HEIGHT - gH - 20;
 
@@ -868,22 +868,13 @@ void GameManager::Draw()
         DrawBox(gX - 1, gY - 1, gX + gW + 1, gY + gH + 1, GetColor(80, 100, 140), FALSE);
         DrawBox(gX, gY, gX + gW, gY + gH, GetColor(18, 22, 34), TRUE);
 
-        // 上段：アクションスキル（筋トレが長押しであることを明記）
-        DrawStringToHandle(gX + 14, gY + 10, "[SPACE] 筋トレ(長押し)", GetColor(100, 245, 140), font16);
-
-        if (reps >= 4)
-        {
-            DrawStringToHandle(gX + 195, gY + 10, "[E] タックル", GetColor(255, 150, 40), font16);
-            DrawStringToHandle(gX + 315, gY + 10, "[SHIFT] 飛びつき", GetColor(255, 90, 90), font16);
-        }
-        else
-        {
-            DrawStringToHandle(gX + 195, gY + 10, "[E] (Lv.4~)", GetColor(120, 130, 150), font16);
-            DrawStringToHandle(gX + 315, gY + 10, "[SHIFT] (Lv.4~)", GetColor(120, 130, 150), font16);
-        }
+        // 上段：アクションスキル（左クリック: 飛びつき、右クリック: スタン攻撃、SPACE: 筋トレ）
+        DrawStringToHandle(gX + 14, gY + 10, "[左クリック] 飛びつき", GetColor(255, 90, 90), font16);
+        DrawStringToHandle(gX + 185, gY + 10, "[右クリック] スタン攻撃", GetColor(255, 150, 40), font16);
+        DrawStringToHandle(gX + 365, gY + 10, "[SPACE] 筋トレ(長押し)", GetColor(100, 245, 140), font16);
 
         // 下段：基本移動・カメラ
-        DrawStringToHandle(gX + 14, gY + 40, "移動: WASD  |  視点: マウス / 矢印  |  視点リセット: [F]", GetColor(210, 225, 245), font13);
+        DrawStringToHandle(gX + 14, gY + 42, "移動: WASD  |  視点: マウス移動 / 矢印  |  視点リセット: [F]", GetColor(210, 225, 245), font13);
 
         // デバッグチートパネル表示
         auto cheatPlayer = m_objManager.GetPlayer();
@@ -1342,11 +1333,11 @@ void GameManager::DrawHowToPlayModal()
     DrawBox(c2X, cardY, c2X + cardW, cardY + cardH, GetColor(24, 30, 46), TRUE);
     DrawBox(c2X, cardY, c2X + cardW, cardY + 32, GetColor(55, 45, 40), TRUE);
     DrawBox(c2X, cardY + 30, c2X + cardW, cardY + 32, GetColor(255, 150, 40), TRUE);
-    DrawStringToHandle(c2X + 14, cardY + 6, "② 必殺技 (Lv.4以上)", GetColor(255, 150, 40), font16);
+    DrawStringToHandle(c2X + 14, cardY + 6, "② アクション攻撃", GetColor(255, 150, 40), font16);
 
-    DrawStringToHandle(c2X + 14, cardY + 46, "・[E] タックル", GetColor(255, 150, 40), font13);
+    DrawStringToHandle(c2X + 14, cardY + 46, "・[右クリック / E] スタン攻撃", GetColor(255, 150, 40), font13);
     DrawStringToHandle(c2X + 26, cardY + 68, "➔ 突進してネズミを気絶!", GetColor(255, 255, 255), font13);
-    DrawStringToHandle(c2X + 14, cardY + 104, "・[SHIFT] / [X] 飛びつき", GetColor(255, 90, 90), font13);
+    DrawStringToHandle(c2X + 14, cardY + 104, "・[左クリック / SHIFT] 飛びつき", GetColor(255, 90, 90), font13);
     DrawStringToHandle(c2X + 26, cardY + 126, "➔ 前方のネズミへ大跳躍!", GetColor(255, 255, 255), font13);
 
     // --- CARD 3: 目標 ---
@@ -1386,11 +1377,11 @@ void GameManager::DrawHowToPlayModal()
     DrawStringToHandle(col1X, row1Y + rowStep * 0, "[SPACE] 筋トレ (長押し)", GetColor(100, 245, 140), font16);
     DrawStringToHandle(col1X + 18, row1Y + rowStep * 0 + 20, "➔ 長押しして緑ゾーンで離す", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col1X, row1Y + rowStep * 1, "[E] タックル (Lv.4~)", GetColor(255, 150, 40), font16);
+    DrawStringToHandle(col1X, row1Y + rowStep * 1, "[右クリック / E] スタン攻撃 (突進)", GetColor(255, 150, 40), font16);
     DrawStringToHandle(col1X + 18, row1Y + rowStep * 1 + 20, "➔ 突進してネズミを気絶させる", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col1X, row1Y + rowStep * 2, "[SHIFT] / [X] 飛びつき (Lv.4~)", GetColor(255, 90, 90), font16);
-    DrawStringToHandle(col1X + 18, row1Y + rowStep * 2 + 20, "➔ 前方のネズミへ大ジャンプ", GetColor(210, 225, 245), font13);
+    DrawStringToHandle(col1X, row1Y + rowStep * 2, "[左クリック / SHIFT] 飛びつきジャンプ", GetColor(255, 90, 90), font16);
+    DrawStringToHandle(col1X + 18, row1Y + rowStep * 2 + 20, "➔ 前方のネズミへ跳躍して即捕獲", GetColor(210, 225, 245), font13);
 
     // 右列: 移動・カメラ
     DrawStringToHandle(col2X, row1Y + rowStep * 0, "移動: [W] [A] [S] [D]", GetColor(255, 255, 255), font16);

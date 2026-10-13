@@ -370,7 +370,7 @@ public:
             return !m_isPouncing && !m_isTackling;
         }
         
-        return (m_repCount >= 4) && (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isTackling && (m_pounceCooldown <= 0);
+        return (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isTackling && (m_pounceCooldown <= 0);
     }
     
     float GetPounceCooldownRatio() const
@@ -397,7 +397,7 @@ public:
             return !m_isTackling && !m_isPouncing;
         }
         
-        return (m_repCount >= 4) && (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isPouncing && !m_isTackling && (m_tackleCooldown <= 0);
+        return (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isPouncing && !m_isTackling && (m_tackleCooldown <= 0);
     }
     
     float GetTackleCooldownRatio() const

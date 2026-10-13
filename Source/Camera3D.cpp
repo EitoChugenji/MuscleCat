@@ -130,12 +130,16 @@ void Camera3D::Update(
             {
                 if (dx != 0 || dy != 0)
                 {
-                    // 滑らかで素直な視点旋回感度
-                    const float mouseSensitivityH = 0.0035f;
-                    const float mouseSensitivityV = 0.0028f;
+                    // ウィンドウ切り替え時等の極端なジャンプを制限
+                    float clampedDx = MathHelper::Clamp(static_cast<float>(dx), -150.0f, 150.0f);
+                    float clampedDy = MathHelper::Clamp(static_cast<float>(dy), -150.0f, 150.0f);
 
-                    m_angleH += static_cast<float>(dx) * mouseSensitivityH;
-                    m_angleV += static_cast<float>(dy) * mouseSensitivityV;
+                    // 滑らかで素直・軽快な視点旋回感度
+                    const float mouseSensitivityH = 0.0055f;
+                    const float mouseSensitivityV = 0.0040f;
+
+                    m_angleH += clampedDx * mouseSensitivityH;
+                    m_angleV += clampedDy * mouseSensitivityV;
                 }
 
                 // 画面端への突き当たりを防止するため中央にリセット

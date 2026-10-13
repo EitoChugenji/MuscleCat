@@ -22,6 +22,8 @@ Player3D::Player3D(const VECTOR& pos)
     , m_groundY(pos.y)
 {
     m_rotY = 0.0f;
+    m_prevPounceKey = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
+    m_prevTackleKey = ((GetMouseInput() & MOUSE_INPUT_RIGHT) != 0);
 
     // 3Dモデルおよびアニメーションの初期化
     InitModel();
@@ -215,18 +217,23 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
 
     bool isMoving = false;
 
-    // キー入力受付（筋トレ: SPACE/Z、飛びつき: SHIFT/X/C、タックル: E）
+    // キーおよびマウス入力受付（筋トレ: SPACE/Z、飛びつき: 左クリック/SHIFT/X/C、スタン攻撃: 右クリック/E）
+    int mouseInput = GetMouseInput();
+    bool mouseLeft = ((mouseInput & MOUSE_INPUT_LEFT) != 0);
+    bool mouseRight = ((mouseInput & MOUSE_INPUT_RIGHT) != 0);
+
     bool currentTriggerKey = (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_Z));
     bool isTriggerJustPressed = currentTriggerKey && !m_prevTriggerKey;
     bool isTriggerJustReleased = !currentTriggerKey && m_prevTriggerKey;
     m_prevTriggerKey = currentTriggerKey;
 
-    bool currentPounceKey = (CheckHitKey(KEY_INPUT_LSHIFT) || CheckHitKey(KEY_INPUT_RSHIFT) ||
+    bool currentPounceKey = (mouseLeft ||
+                             CheckHitKey(KEY_INPUT_LSHIFT) || CheckHitKey(KEY_INPUT_RSHIFT) ||
                              CheckHitKey(KEY_INPUT_X) || CheckHitKey(KEY_INPUT_C));
     bool isPounceJustPressed = currentPounceKey && !m_prevPounceKey;
     m_prevPounceKey = currentPounceKey;
 
-    bool currentTackleKey = CheckHitKey(KEY_INPUT_E);
+    bool currentTackleKey = (mouseRight || CheckHitKey(KEY_INPUT_E));
     bool isTackleJustPressed = currentTackleKey && !m_prevTackleKey;
     m_prevTackleKey = currentTackleKey;
 
@@ -437,12 +444,32 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
 
             if (!m_isSkillChecking)
             {
-                // タックル発動チェック（Eキー）
+                // スタン攻撃・タックル発動チェック（右クリック / Eキー）
                 if (CanTackle() && isTackleJustPressed)
                 {
                     m_isTackling = true;
                     m_tackleTimer = GetTackleDuration();
-                    m_tackleDir = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+
+                    VECTOR forwardXZ = camera.GetForwardXZ();
+                    VECTOR rightXZ   = camera.GetRightXZ();
+                    VECTOR inputDir  = VGet(0.0f, 0.0f, 0.0f);
+                    if (CheckHitKey(KEY_INPUT_W)) inputDir = VAdd(inputDir, forwardXZ);
+                    if (CheckHitKey(KEY_INPUT_S)) inputDir = VSub(inputDir, forwardXZ);
+                    if (CheckHitKey(KEY_INPUT_D)) inputDir = VAdd(inputDir, rightXZ);
+                    if (CheckHitKey(KEY_INPUT_A)) inputDir = VSub(inputDir, rightXZ);
+
+                    float inLenSq = inputDir.x * inputDir.x + inputDir.z * inputDir.z;
+                    if (inLenSq > 0.0001f)
+                    {
+                        float invL = 1.0f / std::sqrt(inLenSq);
+                        m_tackleDir = VGet(inputDir.x * invL, 0.0f, inputDir.z * invL);
+                        m_rotY = std::atan2(m_tackleDir.x, m_tackleDir.z);
+                    }
+                    else
+                    {
+                        m_tackleDir = forwardXZ;
+                        m_rotY = std::atan2(forwardXZ.x, forwardXZ.z);
+                    }
 
                     // Effekseer タックル衝撃波リングエフェクト再生
                     EffectManager::GetInstance().PlayTackleEffect(m_pos, m_tackleDir);
@@ -452,13 +479,33 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                     return;
                 }
 
-                // 飛びつき発動チェック（4 Rep以上特権）
+                // 飛びつき発動チェック（左クリック / SHIFTキー）
                 if (CanPounce() && isPounceJustPressed)
                 {
                     m_isPouncing = true;
                     m_pounceTimer = GetPounceDuration();
 
-                    VECTOR currentFacing = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+                    VECTOR forwardXZ = camera.GetForwardXZ();
+                    VECTOR rightXZ   = camera.GetRightXZ();
+                    VECTOR inputDir  = VGet(0.0f, 0.0f, 0.0f);
+                    if (CheckHitKey(KEY_INPUT_W)) inputDir = VAdd(inputDir, forwardXZ);
+                    if (CheckHitKey(KEY_INPUT_S)) inputDir = VSub(inputDir, forwardXZ);
+                    if (CheckHitKey(KEY_INPUT_D)) inputDir = VAdd(inputDir, rightXZ);
+                    if (CheckHitKey(KEY_INPUT_A)) inputDir = VSub(inputDir, rightXZ);
+
+                    float inLenSq = inputDir.x * inputDir.x + inputDir.z * inputDir.z;
+                    VECTOR currentFacing;
+                    if (inLenSq > 0.0001f)
+                    {
+                        float invL = 1.0f / std::sqrt(inLenSq);
+                        currentFacing = VGet(inputDir.x * invL, 0.0f, inputDir.z * invL);
+                        m_rotY = std::atan2(currentFacing.x, currentFacing.z);
+                    }
+                    else
+                    {
+                        currentFacing = forwardXZ;
+                        m_rotY = std::atan2(forwardXZ.x, forwardXZ.z);
+                    }
 
                     // 前方の最寄りネズミを探索して発動方向をアシスト補正（多少の追尾）
                     float bestDistSq = 260.0f * 260.0f;
