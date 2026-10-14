@@ -19,6 +19,7 @@ private:
     bool   m_resetMouseNextFrame = true;
     VECTOR m_prevPlayerPos = VGet(0.0f, 0.0f, 0.0f);
     int    m_manualControlTimer = 0;
+    float  m_mouseSensitivityScale = 1.0f; // マウス視点感度倍率 (0.2x ~ 3.0x, デフォルト 1.0x)
 
 public:
     Camera3D();
@@ -41,4 +42,9 @@ public:
     VECTOR GetCameraPos() const { return m_currentPos; }
     VECTOR GetForwardXZ() const;
     VECTOR GetRightXZ() const;
+
+    // マウス視点感度設定
+    float GetMouseSensitivity() const { return m_mouseSensitivityScale; }
+    void  SetMouseSensitivity(float scale);
+    void  AdjustMouseSensitivity(float delta);
 };

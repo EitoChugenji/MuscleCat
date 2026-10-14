@@ -604,6 +604,28 @@ void GameManager::Update()
 
         m_camera.Apply();
 
+        // マウス感度クイック調整（[-] / [[] でダウン、[+] / []] / [;] でアップ）
+        bool keyMinus = (CheckHitKey(KEY_INPUT_MINUS) != 0 || CheckHitKey(KEY_INPUT_SUBTRACT) != 0 || CheckHitKey(KEY_INPUT_LBRACKET) != 0);
+        bool keyPlus  = (CheckHitKey(KEY_INPUT_ADD) != 0 || CheckHitKey(KEY_INPUT_RBRACKET) != 0 || CheckHitKey(KEY_INPUT_SEMICOLON) != 0 || CheckHitKey(KEY_INPUT_COLON) != 0);
+
+        if (keyMinus && !m_prevKeyMinus)
+        {
+            m_camera.AdjustMouseSensitivity(-0.1f);
+            m_sensitivityNoticeTimer = 90; // 約1.5秒通知表示
+        }
+        if (keyPlus && !m_prevKeyPlus)
+        {
+            m_camera.AdjustMouseSensitivity(+0.1f);
+            m_sensitivityNoticeTimer = 90;
+        }
+        m_prevKeyMinus = keyMinus;
+        m_prevKeyPlus  = keyPlus;
+
+        if (m_sensitivityNoticeTimer > 0)
+        {
+            m_sensitivityNoticeTimer--;
+        }
+
         // デバッグチート入力処理（F1でON/OFF切り替え）
         bool keyF1 = (CheckHitKey(KEY_INPUT_F1) != 0);
 
@@ -906,7 +928,9 @@ void GameManager::Draw()
         DrawStringToHandle(gX + 400, gY + 10, "[SPACE] 筋トレ(長押し)", GetColor(100, 245, 140), font16);
 
         // 下段：基本移動・カメラ
-        DrawStringToHandle(gX + 14, gY + 42, "移動: WASD  |  視点: マウス移動 / 矢印  |  視点リセット: [F]", GetColor(210, 225, 245), font13);
+        char camInfo[128];
+        snprintf(camInfo, sizeof(camInfo), "移動: WASD  |  視点: マウス(感度:%.1fx) / 矢印  |  感度変更: [- / +]  |  視点リセット: [F]", m_camera.GetMouseSensitivity());
+        DrawStringToHandle(gX + 14, gY + 42, camInfo, GetColor(210, 225, 245), font13);
 
         // デバッグチートパネル表示
         auto cheatPlayer = m_objManager.GetPlayer();
@@ -951,6 +975,30 @@ void GameManager::Draw()
         {
             // チートOFF時は右上に小さく案内だけ表示
             DrawStringToHandle(Config::SCREEN_WIDTH - 220, 42, "[F1] DEBUG CHEAT", GetColor(100, 100, 120), font13);
+        }
+
+        // プレイ中の感度変更通知ポップアップ
+        if (m_sensitivityNoticeTimer > 0 && !m_isPaused)
+        {
+            float alphaRatio = (m_sensitivityNoticeTimer < 20) ? (m_sensitivityNoticeTimer / 20.0f) : 1.0f;
+            int alpha = static_cast<int>(230 * alphaRatio);
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+
+            int notW = 300;
+            int notH = 46;
+            int notX = (Config::SCREEN_WIDTH - notW) / 2;
+            int notY = 24;
+
+            DrawBox(notX + 4, notY + 4, notX + notW + 4, notY + notH + 4, GetColor(0, 0, 0), TRUE);
+            DrawBox(notX, notY, notX + notW, notY + notH, GetColor(18, 22, 36), TRUE);
+            DrawBox(notX, notY, notX + notW, notY + notH, GetColor(100, 220, 255), FALSE);
+
+            char notBuf[64];
+            snprintf(notBuf, sizeof(notBuf), "🎯 マウス感度: %.1fx", m_camera.GetMouseSensitivity());
+            int nW = GetDrawStringWidthToHandle(notBuf, static_cast<int>(strlen(notBuf)), font18);
+            DrawStringToHandle((Config::SCREEN_WIDTH - nW) / 2, notY + 12, notBuf, GetColor(255, 230, 70), font18);
+
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         }
 
         // ポーズ画面描画
@@ -1420,10 +1468,10 @@ void GameManager::DrawHowToPlayModal()
     DrawStringToHandle(col2X + 18, row1Y + rowStep * 0 + 20, "➔ キャラクターの前後左右移動", GetColor(210, 225, 245), font13);
 
     DrawStringToHandle(col2X, row1Y + rowStep * 1, "カメラ回転: マウス移動 / 矢印 [←→↑↓]", GetColor(100, 220, 255), font16);
-    DrawStringToHandle(col2X + 18, row1Y + rowStep * 1 + 20, "➔ マウス移動または矢印で自在に視点旋回", GetColor(210, 225, 245), font13);
+    DrawStringToHandle(col2X + 18, row1Y + rowStep * 1 + 20, "➔ 感度調整: [- / +] または ポーズ画面(ESC)", GetColor(210, 225, 245), font13);
 
-    DrawStringToHandle(col2X, row1Y + rowStep * 2, "視点リセット: [F] キー", GetColor(180, 210, 255), font16);
-    DrawStringToHandle(col2X + 18, row1Y + rowStep * 2 + 20, "➔ カメラを猫の背後に即戻す", GetColor(210, 225, 245), font13);
+    DrawStringToHandle(col2X, row1Y + rowStep * 2, "視点リセット: [F]  |  一時停止: [ESC]", GetColor(180, 210, 255), font16);
+    DrawStringToHandle(col2X + 18, row1Y + rowStep * 2 + 20, "➔ カメラを猫背後に戻す / ポーズ開閉", GetColor(210, 225, 245), font13);
 
     // 5. 閉じるボタン
     int closeBtnW = 140;
@@ -1454,7 +1502,7 @@ void GameManager::DrawHowToPlayModal()
 }
 
 // ============================================================================
-// ポーズ中の更新処理（ESC / リトライ / タイトルに戻る）
+// ポーズ中の更新処理（ESC / リトライ / タイトルに戻る / マウス感度調整）
 // ============================================================================
 void GameManager::UpdatePause(bool triggerEsc)
 {
@@ -1468,6 +1516,8 @@ void GameManager::UpdatePause(bool triggerEsc)
     // キー入力
     bool keyUp    = (CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
     bool keyDown  = (CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
+    bool keyLeft  = (CheckHitKey(KEY_INPUT_LEFT) != 0 || CheckHitKey(KEY_INPUT_A) != 0 || CheckHitKey(KEY_INPUT_MINUS) != 0 || CheckHitKey(KEY_INPUT_SUBTRACT) != 0 || CheckHitKey(KEY_INPUT_LBRACKET) != 0);
+    bool keyRight = (CheckHitKey(KEY_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_D) != 0 || CheckHitKey(KEY_INPUT_ADD) != 0 || CheckHitKey(KEY_INPUT_RBRACKET) != 0 || CheckHitKey(KEY_INPUT_SEMICOLON) != 0 || CheckHitKey(KEY_INPUT_COLON) != 0);
     bool isEnter  = (CheckHitKey(KEY_INPUT_RETURN) != 0);
     bool isSpace  = (CheckHitKey(KEY_INPUT_SPACE) != 0);
     bool keyR     = (CheckHitKey(KEY_INPUT_R) != 0);
@@ -1475,6 +1525,8 @@ void GameManager::UpdatePause(bool triggerEsc)
 
     bool triggerUp    = keyUp && !m_prevKeyUp;
     bool triggerDown  = keyDown && !m_prevKeyDown;
+    bool triggerLeft  = keyLeft && !m_prevKeyLeft;
+    bool triggerRight = keyRight && !m_prevKeyRight;
     bool triggerEnter = isEnter && !m_prevKeyEnter;
     bool triggerSpace = isSpace && !m_prevKeySpace;
     bool triggerR     = keyR && !m_prevKeyR;
@@ -1482,6 +1534,8 @@ void GameManager::UpdatePause(bool triggerEsc)
 
     m_prevKeyUp    = keyUp;
     m_prevKeyDown  = keyDown;
+    m_prevKeyLeft  = keyLeft;
+    m_prevKeyRight = keyRight;
     m_prevKeyEnter = isEnter;
     m_prevKeySpace = isSpace;
     m_prevKeyR     = keyR;
@@ -1497,35 +1551,60 @@ void GameManager::UpdatePause(bool triggerEsc)
         return;
     }
 
-    // 上下キーで選択切り替え (0: リトライ, 1: タイトルに戻る)
-    if (triggerUp || triggerDown)
+    // 上下キーで選択切り替え (0: リトライ, 1: タイトルに戻る, 2: マウス感度)
+    if (triggerUp)
     {
-        m_pauseMenuItem = (m_pauseMenuItem + 1) % 2;
+        m_pauseMenuItem = (m_pauseMenuItem + 2) % 3;
+    }
+    if (triggerDown)
+    {
+        m_pauseMenuItem = (m_pauseMenuItem + 1) % 3;
     }
 
-    // ボタン当たり判定座標
-    int modalW = 460;
-    int modalH = 340;
+    // ボタン・スライダー当たり判定座標
+    int modalW = 480;
+    int modalH = 400;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
-    int btnW = 340;
-    int btnH = 54;
+    int btnW = 360;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-    int retryBtnY = modalY + 76;
-    int titleBtnY = modalY + 148;
 
-    int resumeBtnW = 240;
+    int retryBtnY = modalY + 68;
+    int retryBtnH = 50;
+
+    int titleBtnY = modalY + 126;
+    int titleBtnH = 50;
+
+    int sensRowY  = modalY + 184;
+    int sensRowH  = 74;
+
+    int sensBtnW   = 46;
+    int sensBtnH   = 28;
+    int sensBtnY   = sensRowY + 36;
+    int minusBtnX  = btnX + 10;
+    int sliderBarX = btnX + 64;
+    int sliderBarW = 232;
+    int sliderBarY = sensRowY + 44;
+    int sliderBarH = 12;
+    int plusBtnX   = btnX + 304;
+
+    int resumeBtnW = 260;
     int resumeBtnH = 36;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 230;
+    int resumeBtnY = modalY + 280;
 
-    bool hoverRetry  = (mx >= btnX && mx <= btnX + btnW && my >= retryBtnY && my <= retryBtnY + btnH);
-    bool hoverTitle  = (mx >= btnX && mx <= btnX + btnW && my >= titleBtnY && my <= titleBtnY + btnH);
+    bool hoverRetry  = (mx >= btnX && mx <= btnX + btnW && my >= retryBtnY && my <= retryBtnY + retryBtnH);
+    bool hoverTitle  = (mx >= btnX && mx <= btnX + btnW && my >= titleBtnY && my <= titleBtnY + titleBtnH);
+    bool hoverSens   = (mx >= btnX && mx <= btnX + btnW && my >= sensRowY && my <= sensRowY + sensRowH);
+    bool hoverMinus  = (mx >= minusBtnX && mx <= minusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
+    bool hoverPlus   = (mx >= plusBtnX && mx <= plusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
+    bool hoverSlider = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= sliderBarY - 8 && my <= sliderBarY + sliderBarH + 8);
     bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW && my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
     if (hoverRetry) m_pauseMenuItem = 0;
     if (hoverTitle) m_pauseMenuItem = 1;
+    if (hoverSens)  m_pauseMenuItem = 2;
 
     // 1. リトライ判定（ボタンクリック / 選択中Enter/Space / Rキー）
     if ((hoverRetry && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_pauseMenuItem == 0) || triggerR)
@@ -1543,7 +1622,42 @@ void GameManager::UpdatePause(bool triggerEsc)
         return;
     }
 
-    // 3. ゲームに戻る判定（再開ボタンクリック）
+    // 3. マウス感度調整処理
+    // 左右キーまたは感度行選択中の左右操作
+    if (triggerLeft)
+    {
+        m_camera.AdjustMouseSensitivity(-0.1f);
+    }
+    if (triggerRight)
+    {
+        m_camera.AdjustMouseSensitivity(+0.1f);
+    }
+
+    // 感度行が選択されている状態で Enter / Space が押されたら標準(1.0x)に戻す
+    if ((triggerEnter || triggerSpace) && m_pauseMenuItem == 2 && !hoverMinus && !hoverPlus && !hoverSlider)
+    {
+        m_camera.SetMouseSensitivity(1.0f);
+    }
+
+    // マウスクリック操作: [◀ -] ボタン
+    if (hoverMinus && isMouseTrigger)
+    {
+        m_camera.AdjustMouseSensitivity(-0.1f);
+    }
+    // マウスクリック操作: [+ ▶] ボタン
+    if (hoverPlus && isMouseTrigger)
+    {
+        m_camera.AdjustMouseSensitivity(+0.1f);
+    }
+    // スライダーバー クリック / ドラッグ操作
+    if (hoverSlider && isLeftClick)
+    {
+        float ratio = static_cast<float>(mx - sliderBarX) / static_cast<float>(sliderBarW);
+        float newSens = 0.2f + MathHelper::Clamp(ratio, 0.0f, 1.0f) * (3.0f - 0.2f);
+        m_camera.SetMouseSensitivity(newSens);
+    }
+
+    // 4. ゲームに戻る判定（再開ボタンクリック）
     if (hoverResume && isMouseTrigger)
     {
         m_startCount += (GetNowCount() - m_pauseStartTime);
@@ -1562,6 +1676,7 @@ void GameManager::DrawPauseModal()
     auto& fm = FontManager::GetInstance();
     int font13 = fm.GetFont13();
     int font16 = fm.GetFont16();
+    int font18 = fm.GetFont18();
     int font24 = fm.GetFont24();
 
     // 1. 全画面暗転レイヤー（背面のゲーム画面が薄暗く透ける）
@@ -1570,14 +1685,14 @@ void GameManager::DrawPauseModal()
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
     // 2. モーダルウィンドウ外枠・本体
-    int modalW = 460;
-    int modalH = 340;
+    int modalW = 480;
+    int modalH = 400;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
     // ドロップシャドウ
     DrawBox(modalX + 8, modalY + 8, modalX + modalW + 8, modalY + modalH + 8, GetColor(0, 0, 0), TRUE);
-    // 極太黒枠
+    // 極太枠
     DrawBox(modalX - 3, modalY - 3, modalX + modalW + 3, modalY + modalH + 3, GetColor(0, 0, 0), TRUE);
     DrawBox(modalX - 1, modalY - 1, modalX + modalW + 1, modalY + modalH + 1, GetColor(255, 120, 30), FALSE);
     // 背景
@@ -1592,11 +1707,14 @@ void GameManager::DrawPauseModal()
     DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 13, pauseHeader, GetColor(255, 220, 60), font24);
 
     // ボタン配置
-    int btnW = 340;
-    int btnH = 54;
+    int btnW = 360;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-    int retryBtnY = modalY + 76;
-    int titleBtnY = modalY + 148;
+    int retryBtnY = modalY + 68;
+    int retryBtnH = 50;
+    int titleBtnY = modalY + 126;
+    int titleBtnH = 50;
+    int sensRowY  = modalY + 184;
+    int sensRowH  = 74;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
@@ -1604,64 +1722,133 @@ void GameManager::DrawPauseModal()
     bool isRetrySelected = (m_pauseMenuItem == 0);
     if (isRetrySelected)
     {
-        DrawBox(btnX + 5, retryBtnY + 5, btnX + btnW + 5, retryBtnY + btnH + 5, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 2, retryBtnY - 2, btnX + btnW + 2, retryBtnY + btnH + 2, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, retryBtnY, btnX + btnW, retryBtnY + btnH, GetColor(100, 230 + static_cast<int>(25 * btnPulse), 120), TRUE);
+        DrawBox(btnX + 5, retryBtnY + 5, btnX + btnW + 5, retryBtnY + retryBtnH + 5, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 2, retryBtnY - 2, btnX + btnW + 2, retryBtnY + retryBtnH + 2, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, retryBtnY, btnX + btnW, retryBtnY + retryBtnH, GetColor(100, 230 + static_cast<int>(25 * btnPulse), 120), TRUE);
         DrawBox(btnX + 3, retryBtnY + 3, btnX + btnW - 3, retryBtnY + 11, GetColor(210, 255, 220), TRUE);
 
-        DrawStringToHandle(btnX + 20, retryBtnY + 13, "🔄", GetColor(20, 20, 20), font24);
+        DrawStringToHandle(btnX + 20, retryBtnY + 11, "🔄", GetColor(20, 20, 20), font24);
         const char* retryTxt = "リトライ (R)";
         int tW = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 14, retryTxt, GetColor(15, 25, 20), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 12, retryTxt, GetColor(15, 25, 20), font24);
     }
     else
     {
-        DrawBox(btnX + 3, retryBtnY + 3, btnX + btnW + 3, retryBtnY + btnH + 3, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 1, retryBtnY - 1, btnX + btnW + 1, retryBtnY + btnH + 1, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, retryBtnY, btnX + btnW, retryBtnY + btnH, GetColor(32, 42, 65), TRUE);
+        DrawBox(btnX + 3, retryBtnY + 3, btnX + btnW + 3, retryBtnY + retryBtnH + 3, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 1, retryBtnY - 1, btnX + btnW + 1, retryBtnY + retryBtnH + 1, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, retryBtnY, btnX + btnW, retryBtnY + retryBtnH, GetColor(32, 42, 65), TRUE);
         DrawBox(btnX + 2, retryBtnY + 2, btnX + btnW - 2, retryBtnY + 8, GetColor(60, 75, 110), TRUE);
 
-        DrawStringToHandle(btnX + 20, retryBtnY + 13, "🔄", GetColor(140, 170, 210), font24);
+        DrawStringToHandle(btnX + 20, retryBtnY + 11, "🔄", GetColor(140, 170, 210), font24);
         const char* retryTxt = "リトライ";
         int tW = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 14, retryTxt, GetColor(210, 230, 255), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 12, retryTxt, GetColor(210, 230, 255), font24);
     }
 
     // --- ボタン2: タイトルに戻る ---
     bool isTitleSelected = (m_pauseMenuItem == 1);
     if (isTitleSelected)
     {
-        DrawBox(btnX + 5, titleBtnY + 5, btnX + btnW + 5, titleBtnY + btnH + 5, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 2, titleBtnY - 2, btnX + btnW + 2, titleBtnY + btnH + 2, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, titleBtnY, btnX + btnW, titleBtnY + btnH, GetColor(70, 190 + static_cast<int>(35 * btnPulse), 255), TRUE);
+        DrawBox(btnX + 5, titleBtnY + 5, btnX + btnW + 5, titleBtnY + titleBtnH + 5, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 2, titleBtnY - 2, btnX + btnW + 2, titleBtnY + titleBtnH + 2, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, titleBtnY, btnX + btnW, titleBtnY + titleBtnH, GetColor(70, 190 + static_cast<int>(35 * btnPulse), 255), TRUE);
         DrawBox(btnX + 3, titleBtnY + 3, btnX + btnW - 3, titleBtnY + 11, GetColor(210, 240, 255), TRUE);
 
-        DrawStringToHandle(btnX + 20, titleBtnY + 13, "🏠", GetColor(20, 20, 20), font24);
+        DrawStringToHandle(btnX + 20, titleBtnY + 11, "🏠", GetColor(20, 20, 20), font24);
         const char* titleTxt = "タイトルに戻る (T)";
         int tW = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 14, titleTxt, GetColor(15, 20, 30), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 12, titleTxt, GetColor(15, 20, 30), font24);
     }
     else
     {
-        DrawBox(btnX + 3, titleBtnY + 3, btnX + btnW + 3, titleBtnY + btnH + 3, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 1, titleBtnY - 1, btnX + btnW + 1, titleBtnY + btnH + 1, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, titleBtnY, btnX + btnW, titleBtnY + btnH, GetColor(32, 42, 65), TRUE);
+        DrawBox(btnX + 3, titleBtnY + 3, btnX + btnW + 3, titleBtnY + titleBtnH + 3, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX - 1, titleBtnY - 1, btnX + btnW + 1, titleBtnY + titleBtnH + 1, GetColor(0, 0, 0), TRUE);
+        DrawBox(btnX, titleBtnY, btnX + btnW, titleBtnY + titleBtnH, GetColor(32, 42, 65), TRUE);
         DrawBox(btnX + 2, titleBtnY + 2, btnX + btnW - 2, titleBtnY + 8, GetColor(60, 75, 110), TRUE);
 
-        DrawStringToHandle(btnX + 20, titleBtnY + 13, "🏠", GetColor(140, 170, 210), font24);
+        DrawStringToHandle(btnX + 20, titleBtnY + 11, "🏠", GetColor(140, 170, 210), font24);
         const char* titleTxt = "タイトルに戻る";
         int tW = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 14, titleTxt, GetColor(210, 230, 255), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 12, titleTxt, GetColor(210, 230, 255), font24);
     }
 
-    // --- 下部: ゲームに戻る (ESC) ガイドボタン ---
-    int resumeBtnW = 240;
-    int resumeBtnH = 36;
-    int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 230;
+    // --- コントロール3: マウス感度調整 ---
+    bool isSensSelected = (m_pauseMenuItem == 2);
+    int sensBtnW   = 46;
+    int sensBtnH   = 28;
+    int sensBtnY   = sensRowY + 36;
+    int minusBtnX  = btnX + 10;
+    int sliderBarX = btnX + 64;
+    int sliderBarW = 232;
+    int sliderBarY = sensRowY + 44;
+    int sliderBarH = 12;
+    int plusBtnX   = btnX + 304;
 
     int mx, my;
     GetMousePoint(&mx, &my);
+    bool hoverMinus = (mx >= minusBtnX && mx <= minusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
+    bool hoverPlus  = (mx >= plusBtnX && mx <= plusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
+
+    // 感度行の外枠・背景
+    DrawBox(btnX + 3, sensRowY + 3, btnX + btnW + 3, sensRowY + sensRowH + 3, GetColor(0, 0, 0), TRUE);
+    DrawBox(btnX - 1, sensRowY - 1, btnX + btnW + 1, sensRowY + sensRowH + 1, isSensSelected ? GetColor(255, 180, 50) : GetColor(0, 0, 0), TRUE);
+    DrawBox(btnX, sensRowY, btnX + btnW, sensRowY + sensRowH, isSensSelected ? GetColor(28, 38, 62) : GetColor(24, 30, 48), TRUE);
+    if (isSensSelected)
+    {
+        DrawBox(btnX, sensRowY, btnX + btnW, sensRowY + sensRowH, GetColor(255, 180, 50), FALSE);
+    }
+
+    // 感度テキスト表示（上段）
+    float currentSens = m_camera.GetMouseSensitivity();
+    char sensTxt[64];
+    snprintf(sensTxt, sizeof(sensTxt), "🎯 マウス感度: %.1fx", currentSens);
+    DrawStringToHandle(btnX + 14, sensRowY + 9, sensTxt, isSensSelected ? GetColor(255, 230, 90) : GetColor(220, 235, 255), font16);
+
+    const char* sensHint = "[←/→ で変更]";
+    DrawStringToHandle(btnX + btnW - 110, sensRowY + 11, sensHint, GetColor(140, 165, 195), font13);
+
+    // [◀ -] ボタン描画
+    DrawBox(minusBtnX, sensBtnY, minusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverMinus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), TRUE);
+    DrawBox(minusBtnX, sensBtnY, minusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverMinus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), FALSE);
+    DrawStringToHandle(minusBtnX + 11, sensBtnY + 5, "◀ -", hoverMinus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font16);
+
+    // スライダーバー背景（溝）
+    DrawBox(sliderBarX, sliderBarY, sliderBarX + sliderBarW, sliderBarY + sliderBarH, GetColor(12, 16, 26), TRUE);
+    DrawBox(sliderBarX, sliderBarY, sliderBarX + sliderBarW, sliderBarY + sliderBarH, GetColor(60, 75, 105), FALSE);
+
+    // 1.0x（標準位置）の目盛りマーク
+    float standardRatio = (1.0f - 0.2f) / (3.0f - 0.2f);
+    int standardX = sliderBarX + static_cast<int>(sliderBarW * standardRatio);
+    DrawLine(standardX, sliderBarY - 3, standardX, sliderBarY + sliderBarH + 3, GetColor(180, 200, 220));
+
+    // 現在感度に応じた塗りつぶしプログレス
+    float sensRatio = (currentSens - 0.2f) / (3.0f - 0.2f);
+    sensRatio = MathHelper::Clamp(sensRatio, 0.0f, 1.0f);
+    int fillW = static_cast<int>(sliderBarW * sensRatio);
+    if (fillW > 0)
+    {
+        unsigned int progColor = (currentSens >= 2.0f) ? GetColor(255, 120, 60) : ((currentSens >= 1.0f) ? GetColor(100, 220, 255) : GetColor(70, 180, 240));
+        DrawBox(sliderBarX + 1, sliderBarY + 1, sliderBarX + fillW, sliderBarY + sliderBarH - 1, progColor, TRUE);
+    }
+
+    // スライダーつまみ（ノブ）
+    int knobX = sliderBarX + fillW;
+    int knobY = sliderBarY + sliderBarH / 2;
+    DrawCircle(knobX, knobY, 8, GetColor(0, 0, 0), TRUE);
+    DrawCircle(knobX, knobY, 7, isSensSelected ? GetColor(255, 230, 80) : GetColor(220, 240, 255), TRUE);
+    DrawCircle(knobX, knobY, 4, GetColor(30, 40, 60), TRUE);
+
+    // [+ ▶] ボタン描画
+    DrawBox(plusBtnX, sensBtnY, plusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverPlus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), TRUE);
+    DrawBox(plusBtnX, sensBtnY, plusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverPlus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), FALSE);
+    DrawStringToHandle(plusBtnX + 11, sensBtnY + 5, "+ ▶", hoverPlus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font16);
+
+    // --- 下部: ゲームに戻る (ESC) ガイドボタン ---
+    int resumeBtnW = 260;
+    int resumeBtnH = 36;
+    int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
+    int resumeBtnY = modalY + 280;
+
     bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW &&
                        my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
@@ -1674,7 +1861,11 @@ void GameManager::DrawPauseModal()
     DrawStringToHandle((Config::SCREEN_WIDTH - rW) / 2, resumeBtnY + 9, resumeTxt, hoverResume ? GetColor(255, 255, 255) : GetColor(180, 205, 235), font16);
 
     // 操作説明ガイド
-    const char* guideTxt = "選択: [↑/↓]  決定: [ENTER] / [SPACE]";
-    int gW = GetDrawStringWidthToHandle(guideTxt, static_cast<int>(strlen(guideTxt)), font13);
-    DrawStringToHandle((Config::SCREEN_WIDTH - gW) / 2, modalY + 288, guideTxt, GetColor(140, 160, 190), font13);
+    const char* guideTxt1 = "選択: [↑/↓]  感度変更: [←/→] または クリック";
+    int gW1 = GetDrawStringWidthToHandle(guideTxt1, static_cast<int>(strlen(guideTxt1)), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW1) / 2, modalY + 338, guideTxt1, GetColor(160, 185, 220), font13);
+
+    const char* guideTxt2 = "決定: [ENTER] / [SPACE]  |  閉じる: [ESC]";
+    int gW2 = GetDrawStringWidthToHandle(guideTxt2, static_cast<int>(strlen(guideTxt2)), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 360, guideTxt2, GetColor(130, 150, 180), font13);
 }

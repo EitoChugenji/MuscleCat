@@ -320,7 +320,43 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     (pushBackOk ? "PASS" : "FAIL"));
                 LogTest(buf);
             }
-            else if (autoTestFrame > 165)
+            else if (autoTestFrame == 162)
+            {
+                // テスト: マウス視点感度調整の検証
+                auto& cam = game.GetCamera();
+                float initialSens = cam.GetMouseSensitivity();
+                bool defaultPass = (std::abs(initialSens - 1.0f) < 0.01f);
+
+                cam.AdjustMouseSensitivity(+0.1f);
+                bool adjustPass = (std::abs(cam.GetMouseSensitivity() - 1.1f) < 0.01f);
+
+                cam.SetMouseSensitivity(10.0f);
+                bool maxClampPass = (std::abs(cam.GetMouseSensitivity() - 3.0f) < 0.01f);
+
+                cam.SetMouseSensitivity(-5.0f);
+                bool minClampPass = (std::abs(cam.GetMouseSensitivity() - 0.2f) < 0.01f);
+
+                cam.SetMouseSensitivity(1.5f);
+                game.StartGame(); // リトライ
+                bool persistPass = (std::abs(cam.GetMouseSensitivity() - 1.5f) < 0.01f);
+
+                bool allSensPass = defaultPass && adjustPass && maxClampPass && minClampPass && persistPass;
+
+                char buf[256];
+                snprintf(buf, sizeof(buf), "AutoTest MOUSE SENSITIVITY: Default=%.1f(%s), Adjust=%s, ClampMax=%s, ClampMin=%s, PersistAfterRetry=%s (Overall=%s)\n",
+                    initialSens, (defaultPass ? "PASS" : "FAIL"),
+                    (adjustPass ? "PASS" : "FAIL"),
+                    (maxClampPass ? "PASS" : "FAIL"),
+                    (minClampPass ? "PASS" : "FAIL"),
+                    (persistPass ? "PASS" : "FAIL"),
+                    (allSensPass ? "PASS" : "FAIL"));
+                LogTest(buf);
+            }
+            else if (autoTestFrame == 164)
+            {
+                game.SetPaused(true, 2); // ポーズ画面（感度調整行を選択した状態）
+            }
+            else if (autoTestFrame > 170)
             {
                 break;
             }
@@ -389,6 +425,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
             {
                 SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_map2_overview.png");
                 AppLogAdd("AutoTest: Saved screenshot_map2_overview.png\n");
+            }
+            else if (autoTestFrame == 165)
+            {
+                SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_pause_sensitivity.png");
+                AppLogAdd("AutoTest: Saved screenshot_pause_sensitivity.png\n");
             }
         }
 

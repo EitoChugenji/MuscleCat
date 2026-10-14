@@ -64,8 +64,13 @@ private:
     // ポーズ状態
     bool  m_isPaused = false;
     int   m_pauseStartTime = 0;
-    int   m_pauseMenuItem = 0; // 0: リトライ, 1: タイトルに戻る
+    int   m_pauseMenuItem = 0; // 0: リトライ, 1: タイトルに戻る, 2: マウス感度
     bool  m_shouldQuit = false;
+
+    // マウス感度調整
+    int   m_sensitivityNoticeTimer = 0; // プレイ中の感度変更通知タイマー
+    bool  m_prevKeyMinus = false;
+    bool  m_prevKeyPlus = false;
 
     void SetupRoomObstacles();
     void DrawTitleScreen();
@@ -102,5 +107,20 @@ public:
     ObjectManager3D& GetObjManager()
     {
         return m_objManager;
+    }
+
+    Camera3D& GetCamera()
+    {
+        return m_camera;
+    }
+
+    void SetPaused(bool paused, int menuItem = 2)
+    {
+        m_isPaused = paused;
+        m_pauseMenuItem = menuItem;
+        if (paused)
+        {
+            m_pauseStartTime = GetNowCount();
+        }
     }
 };

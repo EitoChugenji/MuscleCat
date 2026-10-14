@@ -134,9 +134,9 @@ void Camera3D::Update(
                     float clampedDx = MathHelper::Clamp(static_cast<float>(dx), -150.0f, 150.0f);
                     float clampedDy = MathHelper::Clamp(static_cast<float>(dy), -150.0f, 150.0f);
 
-                    // 滑らかで素直・軽快な視点旋回感度
-                    const float mouseSensitivityH = 0.0055f;
-                    const float mouseSensitivityV = 0.0040f;
+                    // 滑らかで素直・軽快な視点旋回感度（感度倍率を反映）
+                    const float mouseSensitivityH = 0.0055f * m_mouseSensitivityScale;
+                    const float mouseSensitivityV = 0.0040f * m_mouseSensitivityScale;
 
                     m_angleH += clampedDx * mouseSensitivityH;
                     m_angleV += clampedDy * mouseSensitivityV;
@@ -315,4 +315,16 @@ VECTOR Camera3D::GetRightXZ() const
     float sinH = std::sin(m_angleH);
     float cosH = std::cos(m_angleH);
     return VGet(cosH, 0.0f, -sinH);
+}
+
+void Camera3D::SetMouseSensitivity(float scale)
+{
+    // 0.2x ~ 3.0x にクランプし、0.1刻みで丸める
+    float clamped = MathHelper::Clamp(scale, 0.2f, 3.0f);
+    m_mouseSensitivityScale = std::round(clamped * 10.0f) / 10.0f;
+}
+
+void Camera3D::AdjustMouseSensitivity(float delta)
+{
+    SetMouseSensitivity(m_mouseSensitivityScale + delta);
 }
