@@ -470,7 +470,8 @@ bool Stage3D::ResolveWallCollision(VECTOR& outPos, float radius, VECTOR* outPush
             float bestPushX = 0.0f;
             float bestPushZ = 0.0f;
 
-            float charHeight = (radius * 2.0f > 24.0f) ? (radius * 2.0f) : 24.0f;
+            // キャラクター判定高さ：垂直壁を猫もネズミも確実に検出できるよう最低60.0fを確保
+            float charHeight = (radius * 2.5f > 60.0f) ? (radius * 2.5f) : 60.0f;
             float catBottomY = outPos.y;
             float catTopY    = outPos.y + charHeight;
 
@@ -479,13 +480,13 @@ bool Stage3D::ResolveWallCollision(VECTOR& outPos, float radius, VECTOR* outPush
                 // AABB による高速カリング（キャラクター判定範囲外のポリゴンは即座にスキップ）
                 if (outPos.x + radius < poly.minPos.x || outPos.x - radius > poly.maxPos.x ||
                     outPos.z + radius < poly.minPos.z || outPos.z - radius > poly.maxPos.z ||
-                    catTopY < poly.minPos.y || (catBottomY + 3.0f) > poly.maxPos.y)
+                    catTopY < poly.minPos.y || (catBottomY + 1.0f) > poly.maxPos.y)
                 {
                     continue;
                 }
 
                 // 足元より下、または頭より上にある無関係なポリゴン（床の凹凸や天井・梁）は除外
-                if (poly.maxPos.y < catBottomY + 3.0f || poly.minPos.y > catTopY)
+                if (poly.maxPos.y < catBottomY + 1.0f || poly.minPos.y > catTopY)
                 {
                     continue;
                 }

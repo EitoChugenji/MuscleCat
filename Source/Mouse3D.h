@@ -15,6 +15,7 @@ protected:
     float m_speedBonus = 0.0f; // 仲間の被捕食数 * 0.1f
     float m_animTime = 0.0f;
     int   m_stunTimer = 0;     // スタン残りフレーム数
+    VECTOR m_prevPos = VGet(0.0f, 0.0f, 0.0f); // 移動前の位置（壁抜け・床外抜け防止用）
 
     // 建物徘徊・パトロール用
     VECTOR m_targetWaypoint = VGet(0.0f, 0.0f, 0.0f);
@@ -95,6 +96,32 @@ public:
 
     // 壁衝突イベント（押し出し法線を受け取り、反射・スライディングして方向転換）
     virtual void OnWallCollision(const VECTOR& pushNormal);
+
+    const VECTOR& GetPrevPos() const
+    {
+        return m_prevPos;
+    }
+
+    void SetPrevPos(const VECTOR& pos)
+    {
+        m_prevPos = pos;
+    }
+
+    float GetVelocityX() const
+    {
+        return m_vx;
+    }
+
+    float GetVelocityZ() const
+    {
+        return m_vz;
+    }
+
+    void SetVelocity(float vx, float vz)
+    {
+        m_vx = vx;
+        m_vz = vz;
+    }
 
     // 徘徊AI：新しい巡回部屋・地点を選択
     void ChooseNewPatrolTarget();

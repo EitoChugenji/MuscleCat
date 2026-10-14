@@ -299,7 +299,28 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     LogTest(buf);
                 }
             }
-            else if (autoTestFrame > 160)
+            else if (autoTestFrame == 158)
+            {
+                // テスト: 家具撤去確認（Obstacle 数が 0 であること）
+                int obstacleCount = static_cast<int>(game.GetObjManager().GetObstacles().size());
+                bool noObstacles = (obstacleCount == 0);
+
+                // テスト: ネズミの壁当たり判定確認（壁位置 X=2060 に向けてネズミを置いた時、壁を検出し内側へ押し戻すこと）
+                const auto& stage = game.GetObjManager().GetStage();
+                VECTOR testMousePos = VGet(2058.0f, 20.0f, 650.0f);
+                float mRadius = 12.0f;
+                VECTOR pushNormal = VGet(0.0f, 0.0f, 0.0f);
+                bool wallHit = stage.ResolveWallCollision(testMousePos, mRadius, &pushNormal);
+                bool pushBackOk = (testMousePos.x <= 2049.0f);
+
+                char buf[256];
+                snprintf(buf, sizeof(buf), "AutoTest FURNITURE & MOUSE WALL: NoObstacles=%s (count=%d), MouseWallCollision=%s, PushedInside=%s\n",
+                    (noObstacles ? "PASS" : "FAIL"), obstacleCount,
+                    (wallHit ? "PASS" : "FAIL"),
+                    (pushBackOk ? "PASS" : "FAIL"));
+                LogTest(buf);
+            }
+            else if (autoTestFrame > 165)
             {
                 break;
             }

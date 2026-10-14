@@ -323,29 +323,89 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
             continue;
         }
 
+        auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
         VECTOR mPos = obj->GetPos();
         float mRadius = obj->GetRadius();
+        VECTOR prevPos = mouse ? mouse->GetPrevPos() : mPos;
+        bool collided = false;
 
+        // 障害物との押し出し判定（家具が配置されている場合）
         for (const auto& obs : m_obstacles)
         {
-            obs->ResolveCollision(mPos, mRadius);
-        }
-
-        VECTOR pushNormal = VGet(0.0f, 0.0f, 0.0f);
-        if (m_stage.ResolveWallCollision(mPos, mRadius, &pushNormal))
-        {
-            auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
-            if (mouse)
+            if (obs->ResolveCollision(mPos, mRadius))
             {
-                mouse->OnWallCollision(pushNormal);
+                collided = true;
             }
         }
 
-        // ネズミの床・坂道への接地判定
+        // ステージ壁との押し出し判定
+        VECTOR pushNormal = VGet(0.0f, 0.0f, 0.0f);
+        if (m_stage.ResolveWallCollision(mPos, mRadius, &pushNormal))
+        {
+            collided = true;
+        }
+
+        // セーフティネット：外周境界ボックスによる制限
+        VECTOR preClampPos = mPos;
+        if (m_stage.ClampToBounds(mPos, mRadius))
+        {
+            collided = true;
+            if (pushNormal.x == 0.0f && pushNormal.z == 0.0f)
+            {
+                pushNormal.x = mPos.x - preClampPos.x;
+                pushNormal.z = mPos.z - preClampPos.z;
+            }
+        }
+
+        // 床・坂道接地判定および壁外・崖外への抜け落ち防止
         float groundY = 0.0f;
         if (m_stage.GetGroundHeight(mPos, groundY))
         {
             mPos.y = groundY;
+        }
+        else
+        {
+            // 床のない空間（壁の外側・マップ外）に出ようとした場合
+            // まず X方向のみ移動を試行（壁沿いスライディング）
+            float testGroundY = 0.0f;
+            VECTOR testPosX = VGet(mPos.x, prevPos.y, prevPos.z);
+            VECTOR testPosZ = VGet(prevPos.x, prevPos.y, mPos.z);
+
+            if (m_stage.GetGroundHeight(testPosX, testGroundY))
+            {
+                mPos.x = testPosX.x;
+                mPos.z = prevPos.z;
+                mPos.y = testGroundY;
+            }
+            else if (m_stage.GetGroundHeight(testPosZ, testGroundY))
+            {
+                mPos.x = prevPos.x;
+                mPos.z = testPosZ.z;
+                mPos.y = testGroundY;
+            }
+            else
+            {
+                // 両方床外なら前フレーム位置に戻す
+                mPos.x = prevPos.x;
+                mPos.z = prevPos.z;
+                float prevGy = 0.0f;
+                if (m_stage.GetGroundHeight(prevPos, prevGy))
+                {
+                    mPos.y = prevGy;
+                }
+            }
+            collided = true;
+            if (pushNormal.x == 0.0f && pushNormal.z == 0.0f && mouse)
+            {
+                pushNormal.x = -mouse->GetVelocityX();
+                pushNormal.z = -mouse->GetVelocityZ();
+            }
+        }
+
+        // 壁や境界に衝突した場合、ネズミの速度と方向を反射・更新
+        if (collided && mouse)
+        {
+            mouse->OnWallCollision(pushNormal);
         }
 
         obj->SetPos(mPos);

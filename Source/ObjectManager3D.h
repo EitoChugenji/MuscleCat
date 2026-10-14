@@ -48,6 +48,11 @@ public:
     void AddObject(std::shared_ptr<GameObject3D> obj);
     void AddObstacle(std::shared_ptr<Obstacle3D> obs);
 
+    const std::vector<std::shared_ptr<Obstacle3D>>& GetObstacles() const
+    {
+        return m_obstacles;
+    }
+
     // デバッグチート用メソッド
     void SetTimeFrozen(bool frozen)
     {

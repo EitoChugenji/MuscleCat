@@ -24,6 +24,9 @@ void GameManager::Init()
 
 void GameManager::SetupRoomObstacles()
 {
+    // ★ ユーザーリクエスト: 家具を一度どかす（家具配置を無効化）
+    return;
+
     // AccessoryModels（キッチン、冷蔵庫、テーブル、テレビ）を部屋・ステージに配置
     // 各家具の接地高さ（床・高台・スロープ）を自動取得して配置
     const auto& stage = m_objManager.GetStage();

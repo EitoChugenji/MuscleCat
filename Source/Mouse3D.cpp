@@ -200,25 +200,33 @@ void MouseBase3D::OnWallCollision(const VECTOR& pushNormal)
     // 壁に向かっていた速度成分（内積）
     float dot = m_vx * nx + m_vz * nz;
 
+    // 壁の接線ベクトル（壁沿いにスムーズに逃げる方向）
+    float tx = -nz;
+    float tz = nx;
+    float tDot = m_vx * tx + m_vz * tz;
+    if (tDot < 0.0f)
+    {
+        tx = -tx;
+        tz = -tz;
+    }
+
     if (dot < 0.0f)
     {
-        // 反射（リフレクション）＋法線方向へのプッシュ
-        m_vx = m_vx - 2.0f * dot * nx;
-        m_vz = m_vz - 2.0f * dot * nz;
+        // 壁に向かっていた場合: 壁法線への強い反発 + 壁沿いスライディング
+        float bounceVx = -dot * nx;
+        float bounceVz = -dot * nz;
+        float slideVx = tx * currentSpd * 0.75f;
+        float slideVz = tz * currentSpd * 0.75f;
+
+        m_vx = bounceVx * 1.3f + slideVx;
+        m_vz = bounceVz * 1.3f + slideVz;
     }
     else
     {
-        // すでに離れる方向なら、さらに法線方向へ加速
-        m_vx += nx * currentSpd * 0.8f;
-        m_vz += nz * currentSpd * 0.8f;
+        // すでに壁から離れる方向なら、さらに法線方向へ加速＋壁沿いスライド
+        m_vx = nx * currentSpd * 0.85f + tx * currentSpd * 0.5f;
+        m_vz = nz * currentSpd * 0.85f + tz * currentSpd * 0.5f;
     }
-
-    // ランダムな散乱（±35度）を加えて角に挟まらないようにする
-    float randAngle = static_cast<float>((rand() % 70) - 35) * MathHelper::DEG_TO_RAD;
-    float rx = m_vx * std::cos(randAngle) - m_vz * std::sin(randAngle);
-    float rz = m_vx * std::sin(randAngle) + m_vz * std::cos(randAngle);
-    m_vx = rx;
-    m_vz = rz;
 
     // スピードに合わせて正規化
     float vLen = std::sqrt(m_vx * m_vx + m_vz * m_vz);
@@ -231,7 +239,7 @@ void MouseBase3D::OnWallCollision(const VECTOR& pushNormal)
     // 向きを即座に更新
     m_rotY = std::atan2(m_vx, m_vz);
 
-    // 新たな安全な目標地点を再選択し、進行を継続
+    // 新たな安全な目標地点を再選択し、進行を継続（部屋の内側へ誘導）
     ChooseNewPatrolTarget();
     m_patrolTimer = 90 + rand() % 90;
 }
@@ -335,6 +343,7 @@ NormalMouse3D::NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player
 
 void NormalMouse3D::Update()
 {
+    m_prevPos = m_pos;
     m_animTime += 1.0f / 60.0f;
 
     // スタン時は完全に行動停止
@@ -402,6 +411,7 @@ FastMouse3D::FastMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
 
 void FastMouse3D::Update()
 {
+    m_prevPos = m_pos;
     m_animTime += 1.0f / 60.0f;
 
     // スタン時は完全に行動停止
