@@ -31,6 +31,7 @@ public:
     static constexpr float SPEED_SORENESS = 0.0f;
     static constexpr int   MAX_EFFECTIVE_REP = 15;  // 能力値反映上限 (レベル15)
     static constexpr int   PUMP_DECAY_FRAMES = 900; // Rep維持残りフレーム (15秒 = 900f)
+    static constexpr int   REQUIRED_ATTACK_REP = 4; // 飛びつき・スタン攻撃(タックル)解放に必要な最低Rep数
 
 private:
     float m_speed = SPEED_INITIAL;
@@ -56,6 +57,7 @@ private:
     bool  m_lastResultSuccess = false;
     bool  m_wasDecayed = false;
     int   m_scStoppedTimer = 0;      // キーを押した瞬間に針を止めて結果を見せる演出タイマー
+    int   m_needRepNoticeTimer = 0;  // Rep不足(Lv.4未満)時のアクション案内表示タイマー
 
     // 飛びつき（Pounce）関連
     bool   m_isPouncing = false;
@@ -370,9 +372,14 @@ public:
             return !m_isPouncing && !m_isTackling;
         }
         
-        return (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isTackling && (m_pounceCooldown <= 0);
+        return (m_repCount >= REQUIRED_ATTACK_REP) && (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isTackling && (m_pounceCooldown <= 0);
     }
     
+    int GetPounceCooldown() const
+    {
+        return m_pounceCooldown;
+    }
+
     float GetPounceCooldownRatio() const
     {
         if (m_cheatNoCooldown)
@@ -397,9 +404,19 @@ public:
             return !m_isTackling && !m_isPouncing;
         }
         
-        return (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isPouncing && !m_isTackling && (m_tackleCooldown <= 0);
+        return (m_repCount >= REQUIRED_ATTACK_REP) && (m_state != MuscleState::Soreness) && (m_stunTimer <= 0) && !m_isSkillChecking && !m_isPouncing && !m_isTackling && (m_tackleCooldown <= 0);
     }
     
+    int GetTackleCooldown() const
+    {
+        return m_tackleCooldown;
+    }
+
+    bool IsAttackUnlocked() const
+    {
+        return (m_repCount >= REQUIRED_ATTACK_REP);
+    }
+
     float GetTackleCooldownRatio() const
     {
         if (m_cheatNoCooldown)

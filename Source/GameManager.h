@@ -89,6 +89,11 @@ public:
         return m_shouldQuit;
     }
 
+    void SetShowHowToPlay(bool show)
+    {
+        m_showHowToPlay = show;
+    }
+
     void SetFrameProcessTime(float ms)
     {
         m_frameProcessTimeMs = ms;

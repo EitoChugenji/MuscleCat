@@ -92,7 +92,15 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         if (isAutoTest)
         {
             autoTestFrame++;
-            if (autoTestFrame == 25)
+            if (autoTestFrame == 8)
+            {
+                game.SetShowHowToPlay(true);
+            }
+            else if (autoTestFrame == 14)
+            {
+                game.SetShowHowToPlay(false);
+            }
+            else if (autoTestFrame == 25)
             {
                 // マップ1（House）に切り替え
                 game.SwitchSelectedMap(ModelConfig::MapType::House);
@@ -273,11 +281,21 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 auto p = game.GetObjManager().GetPlayer();
                 if (p)
                 {
-                    bool canTackle = p->CanTackle();
-                    bool canPounce = p->CanPounce();
+                    // Lv.0（初期状態）では攻撃アクションがロックされていることを検証
+                    bool canTackleLv0 = p->CanTackle();
+                    bool canPounceLv0 = p->CanPounce();
+                    bool passLv0 = (!canTackleLv0 && !canPounceLv0);
+
+                    // Lv.4（4 Rep到達時）で攻撃アクションが解放されることを検証
+                    p->AddRep(4);
+                    bool canTackleLv4 = p->CanTackle();
+                    bool canPounceLv4 = p->CanPounce();
+                    bool passLv4 = (canTackleLv4 && canPounceLv4);
+
                     char buf[256];
-                    snprintf(buf, sizeof(buf), "AutoTest ATTACKS LV0: CanTackle=%s, CanPounce=%s\n",
-                        (canTackle ? "PASS" : "FAIL"), (canPounce ? "PASS" : "FAIL"));
+                    snprintf(buf, sizeof(buf), "AutoTest ATTACKS: Lv0_Locked=%s, Lv4_Unlocked=%s (Overall=%s)\n",
+                        (passLv0 ? "PASS" : "FAIL"), (passLv4 ? "PASS" : "FAIL"),
+                        (passLv0 && passLv4 ? "PASS" : "FAIL"));
                     LogTest(buf);
                 }
             }
@@ -311,7 +329,12 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
         // 自動テストスクリーンショット保存（描画後に行う）
         if (isAutoTest)
         {
-            if (autoTestFrame == 18)
+            if (autoTestFrame == 11)
+            {
+                SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_how_to_play.png");
+                AppLogAdd("AutoTest: Saved screenshot_how_to_play.png\n");
+            }
+            else if (autoTestFrame == 18)
             {
                 SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_title_map2.png");
                 AppLogAdd("AutoTest: Saved screenshot_title_map2.png\n");

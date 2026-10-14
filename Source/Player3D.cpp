@@ -242,6 +242,11 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         m_resultShowTimer--;
     }
 
+    if (m_needRepNoticeTimer > 0)
+    {
+        m_needRepNoticeTimer--;
+    }
+
     if (m_cheatNoCooldown)
     {
         m_pounceCooldown = 0;
@@ -444,6 +449,12 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
 
             if (!m_isSkillChecking)
             {
+                // Rep不足（4 Rep未満）で飛びつきやスタン攻撃の入力があった場合、親切に案内テキストを表示
+                if ((isPounceJustPressed || isTackleJustPressed) && (m_repCount < REQUIRED_ATTACK_REP) && !m_cheatNoCooldown)
+                {
+                    m_needRepNoticeTimer = 90; // 1.5秒間案内表示
+                }
+
                 // スタン攻撃・タックル発動チェック（右クリック / Eキー）
                 if (CanTackle() && isTackleJustPressed)
                 {
@@ -1048,6 +1059,34 @@ void Player3D::Draw2D()
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
         DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 140, Config::SCREEN_HEIGHT / 2 - 70, GetColor(255, 230, 40), font24, "★ STUNNED!! 残り%.1fs ★", GetCatStunRemainingSeconds());
         DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 40, "壁・家具に激突して気絶中！", GetColor(255, 240, 120), font16);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    }
+
+    // 攻撃スキル解放に必要なRep不足案内（4 Rep未満で攻撃キー/マウスクリック時に通知）
+    if (m_needRepNoticeTimer > 0 && m_repCount < REQUIRED_ATTACK_REP && !m_isSkillChecking)
+    {
+        int alpha = (m_needRepNoticeTimer > 20) ? 255 : (m_needRepNoticeTimer * 255 / 20);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+
+        auto DrawOutlinedTextCenter = [](int x, int y, const char* str, unsigned int textColor, int fontHandle)
+        {
+            unsigned int black = GetColor(0, 0, 0);
+            for (int ox = -2; ox <= 2; ++ox)
+            {
+                for (int oy = -2; oy <= 2; ++oy)
+                {
+                    if (ox != 0 || oy != 0)
+                    {
+                        DrawStringToHandle(x + ox, y + oy, str, black, fontHandle);
+                    }
+                }
+            }
+            DrawStringToHandle(x, y, str, textColor, fontHandle);
+        };
+
+        char noticeBuf[128];
+        snprintf(noticeBuf, sizeof(noticeBuf), "★ 飛びつき・スタン攻撃は Lv.%d (4 Rep) で解放！ [SPACE] で筋トレ！ ★", REQUIRED_ATTACK_REP);
+        DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 250, Config::SCREEN_HEIGHT / 2 + 25, noticeBuf, GetColor(255, 210, 60), font18);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 }
