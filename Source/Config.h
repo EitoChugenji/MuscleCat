@@ -22,4 +22,16 @@ namespace Config
     constexpr float CAMERA_DISTANCE = 220.0f; // 猫からの距離（程よく見下ろせる引き具合）
     constexpr float CAMERA_HEIGHT   = 140.0f; // カメラの初期高さ
     constexpr float CAMERA_TARGET_OFFSET_Y = 20.0f; // 注視点のプレイヤー高さオフセット（猫の中心付近）
+
+    // CSV管理ファイルパス設定
+    constexpr const char* STATUS_CSV_PATH          = "Resource/CSV/Statu.csv";
+    constexpr const char* POSITION_CSV_PATH        = "Resource/CSV/Position.csv";
+    constexpr const char* STATUS_CSV_SOURCE_PATH   = "CSV元ファイル/Statu.csv";
+    constexpr const char* POSITION_CSV_SOURCE_PATH = "CSV元ファイル/Position.csv";
+
+    // 距離・スケール目測基準（猫の基準身長 = 1.8m としたときのワールド座標換算）
+    constexpr float CAT_BASE_HEIGHT_METERS = 1.8f;                                           // 猫の基準身長 (1.8m)
+    constexpr float CAT_BASE_HEIGHT_UNITS  = 104.496f;                                       // 猫モデルの基準高さ (435.4 * 0.24)
+    constexpr float WORLD_UNITS_PER_METER  = CAT_BASE_HEIGHT_UNITS / CAT_BASE_HEIGHT_METERS; // 1mあたりのワールド単位 (約58.05u)
+    constexpr float CUBE_10M_SIZE_UNITS    = WORLD_UNITS_PER_METER * 10.0f;                  // 10mのワールド単位 (約580.53u)
 }

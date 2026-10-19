@@ -3,6 +3,7 @@
 #include "FontManager.h"
 #include "ModelConfig.h"
 #include "ModelManager.h"
+#include "CsvManager.h"
 #include "Config.h"
 #include "Common.h"
 #include <cmath>
@@ -11,52 +12,11 @@
 #include <algorithm>
 
 // MouseBase3D 実装
-namespace
-{
-    // 通常ハウス (firstmap) 用の巡回目標ポイント（全地点で床面接地を検証済み）
-    const VECTOR PATROL_POINTS_HOUSE[] = {
-        {   0.0f, 5.0f,    0.0f },  // リビング中央
-        { -180.0f, 5.0f,  180.0f },  // リビング北西
-        {  180.0f, 5.0f,  180.0f },  // リビング北東
-        { -180.0f, 5.0f, -180.0f },  // リビング南西
-        {  550.0f, 5.0f,  450.0f },  // 北東大部屋中央
-        {  780.0f, 5.0f,  450.0f },  // 北東部屋東奥
-        {  550.0f, 5.0f,  200.0f },  // 北東部屋南側
-        {  600.0f, 5.0f, -100.0f },  // 東中央部屋
-        {  750.0f, 5.0f, -300.0f },  // 東部屋南奥
-        {  650.0f, 5.0f, -700.0f },  // 南東奥部屋
-        {  320.0f, 5.0f, -720.0f },  // 南通路中央
-        { -100.0f, 5.0f, -480.0f },  // 西通路南
-        { -200.0f, 5.0f,    0.0f },  // 玄関口
-    };
-    const int NUM_PATROL_POINTS_HOUSE = sizeof(PATROL_POINTS_HOUSE) / sizeof(PATROL_POINTS_HOUSE[0]);
-
-    // NEW MAP (newmap.mv1) 用の巡回目標ポイント（全地点でステージ床ポリゴン接地を検証済み）
-    const VECTOR PATROL_POINTS_NEWMAP[] = {
-        {     0.0f,  20.0f,  -400.0f },  // 中央南
-        {   600.0f,  20.0f,   800.0f },  // 北東エリア手前
-        {  -600.0f,  20.0f,   800.0f },  // 北西エリア手前
-        {  1200.0f,  20.0f,     0.0f },  // 東中央通路
-        {  1600.0f,  20.0f,   400.0f },  // 東北エリア
-        {  1800.0f,  20.0f,  -400.0f },  // 東南エリア
-        {  1400.0f,  20.0f,  -800.0f },  // 東南通路
-        {   400.0f,  20.0f, -1400.0f },  // 南通路東
-        {  -400.0f,  20.0f, -1200.0f },  // 南通路西
-        { -1200.0f,  20.0f, -1200.0f },  // 南西エリア奥
-        { -1600.0f,  20.0f,  -400.0f },  // 西通路南
-        { -1600.0f,  20.0f,   400.0f },  // 西通路北
-        { -1800.0f,  20.0f,     0.0f },  // 西奥中央
-        {     0.0f,  20.0f,  1000.0f },  // 北中央通路
-    };
-    const int NUM_PATROL_POINTS_NEWMAP = sizeof(PATROL_POINTS_NEWMAP) / sizeof(PATROL_POINTS_NEWMAP[0]);
-    const VECTOR* PATROL_POINTS_SLOPE_10X = PATROL_POINTS_NEWMAP;
-    const int NUM_PATROL_POINTS_SLOPE_10X = NUM_PATROL_POINTS_NEWMAP;
-}
-
-// MouseBase3D 実装
-MouseBase3D::MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float baseSpeed)
+MouseBase3D::MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float baseSpeed, float speedGrowth, float maxSpeed)
     : GameObject3D(pos, radius, type)
     , m_baseSpeed(baseSpeed)
+    , m_speedGrowthPerUnit(speedGrowth)
+    , m_maxSpeed(maxSpeed)
     , m_speedBonus(0.0f)
     , m_animTime(0.0f)
     , m_stunTimer(0)
@@ -148,18 +108,16 @@ void MouseBase3D::Draw2D()
 
 void MouseBase3D::ChooseNewPatrolTarget()
 {
-    const VECTOR* points = PATROL_POINTS_NEWMAP;
-    int pointCount = NUM_PATROL_POINTS_NEWMAP;
-    float jitter = 60.0f;
-    float minDist = 350.0f;
-
-    if (m_mapType == ModelConfig::MapType::House)
+    // Position.csv から読み込まれた巡回・スポーン座標リストを使用
+    std::vector<VECTOR> points = CsvManager::GetInstance().GetMousePositionsForMap(m_mapType);
+    if (points.empty())
     {
-        points = PATROL_POINTS_HOUSE;
-        pointCount = NUM_PATROL_POINTS_HOUSE;
-        jitter = 30.0f;
-        minDist = 120.0f;
+        points.push_back(VGet(0.0f, 5.0f, 0.0f));
     }
+
+    int pointCount = static_cast<int>(points.size());
+    float jitter = (m_mapType == ModelConfig::MapType::House) ? 30.0f : 60.0f;
+    float minDist = (m_mapType == ModelConfig::MapType::House) ? 120.0f : 350.0f;
 
     // 現在地から一定以上離れた地点を優先してランダムに選択
     int bestIdx = rand() % pointCount;
@@ -332,7 +290,14 @@ void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDis
 
 // NormalMouse3D 実装
 NormalMouse3D::NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
-    : MouseBase3D(pos, 12.0f, ObjectType::NormalMouse, 3.4f)
+    : MouseBase3D(
+        pos,
+        12.0f,
+        ObjectType::NormalMouse,
+        CsvManager::GetInstance().GetMouseStatus().baseSpeed,
+        CsvManager::GetInstance().GetMouseStatus().speedGrowthPerUnit,
+        CsvManager::GetInstance().GetMouseStatus().maxSpeed
+    )
     , m_targetPlayer(player)
 {
 }
@@ -360,14 +325,14 @@ void NormalMouse3D::Update()
         float dist = MathHelper::DistanceXZ(m_pos, pPos);
         if (dist < 130.0f)
         {
-            UpdateFleeMovement(pPos, currentSpeed * 1.25f);
+            UpdateFleeMovement(pPos, currentSpeed);
             m_isFleeingNow = true;
         }
     }
 
     if (!m_isFleeingNow)
     {
-        UpdateWanderMovement(currentSpeed);
+        UpdateWanderMovement(currentSpeed * 0.85f);
     }
 
     // 移動
@@ -398,10 +363,17 @@ void NormalMouse3D::Draw3D()
 
 // FastMouse3D 実装
 FastMouse3D::FastMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
-    : MouseBase3D(pos, 11.0f, ObjectType::FastMouse, 3.8f)
+    : MouseBase3D(
+        pos,
+        11.0f,
+        ObjectType::FastMouse,
+        CsvManager::GetInstance().GetFastMouseStatus().baseSpeed,
+        CsvManager::GetInstance().GetFastMouseStatus().speedGrowthPerUnit,
+        CsvManager::GetInstance().GetFastMouseStatus().maxSpeed
+    )
     , m_targetPlayer(player)
     , m_fleeDistance(160.0f)
-    , m_fleeSpeed(4.8f)
+    , m_fleeSpeed(CsvManager::GetInstance().GetFastMouseStatus().baseSpeed)
 {
 }
 

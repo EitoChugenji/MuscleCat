@@ -4,6 +4,7 @@
 #include "Mouse3D.h"
 #include "Obstacle3D.h"
 #include "Camera3D.h"
+#include "CsvManager.h"
 #include "Common.h"
 #include "DxLib.h"
 #include <algorithm>
@@ -42,57 +43,20 @@ void ObjectManager3D::AddObstacle(std::shared_ptr<Obstacle3D> obs)
     m_obstacles.push_back(obs);
 }
 
-namespace
-{
-    // スポーン候補地点（検証済み床面座標）
-    const VECTOR SPAWN_POINTS_HOUSE[] = {
-        {   0.0f, 5.0f,    0.0f },
-        { 180.0f, 5.0f,  180.0f },
-        { -180.0f, 5.0f,  180.0f },
-        { -180.0f, 5.0f, -180.0f },
-        {  550.0f, 5.0f,  450.0f },
-        {  780.0f, 5.0f,  450.0f },
-        {  550.0f, 5.0f,  200.0f },
-        {  600.0f, 5.0f, -100.0f },
-        {  750.0f, 5.0f, -300.0f },
-        {  650.0f, 5.0f, -700.0f },
-        {  320.0f, 5.0f, -720.0f },
-        { -100.0f, 5.0f, -480.0f },
-        { -200.0f, 5.0f,    0.0f },
-    };
-    const int NUM_SPAWN_POINTS_HOUSE = sizeof(SPAWN_POINTS_HOUSE) / sizeof(SPAWN_POINTS_HOUSE[0]);
-
-    const VECTOR SPAWN_POINTS_NEWMAP[] = {
-        {     0.0f,  20.0f,  -400.0f },
-        {   600.0f,  20.0f,   800.0f },
-        {  -600.0f,  20.0f,   800.0f },
-        {  1200.0f,  20.0f,     0.0f },
-        {  1600.0f,  20.0f,   400.0f },
-        {  1800.0f,  20.0f,  -400.0f },
-        {  1400.0f,  20.0f,  -800.0f },
-        {   400.0f,  20.0f, -1400.0f },
-        {  -400.0f,  20.0f, -1200.0f },
-        { -1200.0f,  20.0f, -1200.0f },
-        { -1600.0f,  20.0f,  -400.0f },
-        { -1600.0f,  20.0f,   400.0f },
-        { -1800.0f,  20.0f,     0.0f },
-        {     0.0f,  20.0f,  1000.0f },
-    };
-    const int NUM_SPAWN_POINTS_NEWMAP = sizeof(SPAWN_POINTS_NEWMAP) / sizeof(SPAWN_POINTS_NEWMAP[0]);
-}
-
 void ObjectManager3D::SpawnNormalMouse()
 {
-    const bool isHouse = (m_stage.GetMapType() == ModelConfig::MapType::House);
-    const VECTOR* pts = isHouse ? SPAWN_POINTS_HOUSE : SPAWN_POINTS_NEWMAP;
-    int count = isHouse ? NUM_SPAWN_POINTS_HOUSE : NUM_SPAWN_POINTS_NEWMAP;
+    std::vector<VECTOR> pts = CsvManager::GetInstance().GetMousePositionsForMap(m_stage.GetMapType());
+    if (pts.empty())
+    {
+        pts.push_back(VGet(0.0f, 5.0f, 0.0f));
+    }
 
-    VECTOR pos = pts[rand() % count];
+    VECTOR pos = pts[rand() % pts.size()];
     for (int attempt = 0; attempt < 8; ++attempt)
     {
-        float ox = static_cast<float>((rand() % 40) - 20);
-        float oz = static_cast<float>((rand() % 40) - 20);
-        VECTOR test = VGet(pos.x + ox, 0.0f, pos.z + oz);
+        float ox = (attempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
+        float oz = (attempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
+        VECTOR test = VGet(pos.x + ox, pos.y, pos.z + oz);
         float gy = 0.0f;
         if (m_stage.GetGroundHeight(test, gy))
         {
@@ -105,20 +69,23 @@ void ObjectManager3D::SpawnNormalMouse()
     auto mouse = std::make_shared<NormalMouse3D>(pos, m_player);
     mouse->SetMapType(m_stage.GetMapType());
     AddObject(mouse);
+    ApplyMouseSpeedBonus();
 }
 
 void ObjectManager3D::SpawnFastMouse()
 {
-    const bool isHouse = (m_stage.GetMapType() == ModelConfig::MapType::House);
-    const VECTOR* pts = isHouse ? SPAWN_POINTS_HOUSE : SPAWN_POINTS_NEWMAP;
-    int count = isHouse ? NUM_SPAWN_POINTS_HOUSE : NUM_SPAWN_POINTS_NEWMAP;
+    std::vector<VECTOR> pts = CsvManager::GetInstance().GetMousePositionsForMap(m_stage.GetMapType());
+    if (pts.empty())
+    {
+        pts.push_back(VGet(0.0f, 5.0f, 0.0f));
+    }
 
-    VECTOR pos = pts[rand() % count];
+    VECTOR pos = pts[rand() % pts.size()];
     for (int attempt = 0; attempt < 8; ++attempt)
     {
-        float ox = static_cast<float>((rand() % 40) - 20);
-        float oz = static_cast<float>((rand() % 40) - 20);
-        VECTOR test = VGet(pos.x + ox, 0.0f, pos.z + oz);
+        float ox = (attempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
+        float oz = (attempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
+        VECTOR test = VGet(pos.x + ox, pos.y, pos.z + oz);
         float gy = 0.0f;
         if (m_stage.GetGroundHeight(test, gy))
         {
@@ -131,6 +98,7 @@ void ObjectManager3D::SpawnFastMouse()
     auto mouse = std::make_shared<FastMouse3D>(pos, m_player);
     mouse->SetMapType(m_stage.GetMapType());
     AddObject(mouse);
+    ApplyMouseSpeedBonus();
 }
 
 void ObjectManager3D::Update(const Camera3D& camera)
@@ -480,9 +448,15 @@ int ObjectManager3D::GetRemainingMouseCount() const
     return count;
 }
 
+float ObjectManager3D::GetCurrentMouseSpeed() const
+{
+    const auto& stat = CsvManager::GetInstance().GetMouseStatus();
+    float s = stat.baseSpeed + static_cast<float>(m_caughtCount) * stat.speedGrowthPerUnit;
+    return (s > stat.maxSpeed) ? stat.maxSpeed : s;
+}
+
 void ObjectManager3D::ApplyMouseSpeedBonus()
 {
-    float bonus = static_cast<float>(m_caughtCount) * 0.15f;
     for (auto& obj : m_objects)
     {
         if (obj->IsAlive() && obj->IsMouse())
@@ -490,6 +464,7 @@ void ObjectManager3D::ApplyMouseSpeedBonus()
             auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
             if (mouse)
             {
+                float bonus = static_cast<float>(m_caughtCount) * mouse->GetSpeedGrowthPerUnit();
                 mouse->SetSpeedBonus(bonus);
             }
         }

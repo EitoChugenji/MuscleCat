@@ -27,11 +27,14 @@ class Camera3D;
 class Player3D : public GameObject3D
 {
 public:
-    static constexpr float SPEED_INITIAL  = 5.2f;
+    static constexpr float SPEED_INITIAL  = 4.0f;   // デフォルト基本速度 (Statu.csv: Cat base_speed)
     static constexpr float SPEED_SORENESS = 0.0f;
     static constexpr int   MAX_EFFECTIVE_REP = 15;  // 能力値反映上限 (レベル15)
     static constexpr int   PUMP_DECAY_FRAMES = 900; // Rep維持残りフレーム (15秒 = 900f)
     static constexpr int   REQUIRED_ATTACK_REP = 4; // 飛びつき・スタン攻撃(タックル)解放に必要な最低Rep数
+
+    // Statu.csv の設定値（base_speed, speed_growth_per_unit, max_speed）から現在Repに応じた速度を算出
+    float CalculateSpeedForRep(int effectiveRep) const;
 
 private:
     float m_speed = SPEED_INITIAL;
@@ -186,6 +189,19 @@ public:
         }
         
         return (m_stunTimer > 0) ? 0.0f : m_speed;
+    }
+
+    // 直前フレームからの実移動スピード（水平面距離 / frame）
+    float GetActualMoveSpeed() const
+    {
+        return MathHelper::DistanceXZ(m_pos, m_prevPos);
+    }
+
+    // 現在の猫の身長（メートル換算：初期1.80m、パンプアップで拡大）
+    float GetCurrentHeightMeters() const
+    {
+        float currentScale = ModelConfig::CAT_MODEL_SCALE + static_cast<float>(GetEffectiveRep()) * 0.0025f;
+        return 1.8f * (currentScale / ModelConfig::CAT_MODEL_SCALE);
     }
 
     int GetEffectiveRep() const

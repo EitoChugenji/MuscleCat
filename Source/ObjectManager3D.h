@@ -48,6 +48,11 @@ public:
     void AddObject(std::shared_ptr<GameObject3D> obj);
     void AddObstacle(std::shared_ptr<Obstacle3D> obs);
 
+    const std::vector<std::shared_ptr<GameObject3D>>& GetObjects() const
+    {
+        return m_objects;
+    }
+
     const std::vector<std::shared_ptr<Obstacle3D>>& GetObstacles() const
     {
         return m_obstacles;
@@ -86,11 +91,7 @@ public:
         return m_caughtCount;
     }
     
-    float GetCurrentMouseSpeed() const
-    {
-        float s = 2.4f + static_cast<float>(m_caughtCount) * 0.15f;
-        return (s > 5.3f) ? 5.3f : s;
-    }
+    float GetCurrentMouseSpeed() const;
     
     void ApplyMouseSpeedBonus();
 };

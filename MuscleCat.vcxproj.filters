@@ -20,6 +20,12 @@
     <ClInclude Include="Source\Config.h">
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\CsvManager.h">
+      <Filter>ヘッダーファイル</Filter>
+    </ClInclude>
+    <ClInclude Include="Source\EffectManager.h">
+      <Filter>ヘッダーファイル</Filter>
+    </ClInclude>
     <ClInclude Include="Source\FontManager.h">
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
@@ -53,6 +59,12 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Camera3D.cpp">
+      <Filter>ソースファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\CsvManager.cpp">
+      <Filter>ソースファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\EffectManager.cpp">
       <Filter>ソースファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\FontManager.cpp">

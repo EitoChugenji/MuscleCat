@@ -4,6 +4,7 @@
 #include "ModelManager.h"
 #include "FontManager.h"
 #include "EffectManager.h"
+#include "CsvManager.h"
 #include "Config.h"
 #include "DxLib.h"
 #include <cmath>
@@ -13,6 +14,17 @@
 #include <cctype>
 #include <algorithm>
 
+float Player3D::CalculateSpeedForRep(int effectiveRep) const
+{
+    const auto& stat = CsvManager::GetInstance().GetCatStatus();
+    float spd = stat.baseSpeed + static_cast<float>(effectiveRep) * stat.speedGrowthPerUnit;
+    if (spd > stat.maxSpeed)
+    {
+        spd = stat.maxSpeed;
+    }
+    return spd;
+}
+
 Player3D::Player3D(const VECTOR& pos)
     : GameObject3D(pos, 18.0f, ObjectType::Player)
     , m_speed(SPEED_INITIAL)
@@ -21,6 +33,7 @@ Player3D::Player3D(const VECTOR& pos)
     , m_pumpDecayTimer(0)
     , m_groundY(pos.y)
 {
+    m_speed = CalculateSpeedForRep(0);
     m_rotY = 0.0f;
     m_prevPounceKey = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
     m_prevTackleKey = ((GetMouseInput() & MOUSE_INPUT_RIGHT) != 0);
@@ -405,7 +418,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                 m_sorenessTimer = 0;
                 m_state = MuscleState::Normal;
                 m_repCount = 0;
-                m_speed = SPEED_INITIAL;
+                m_speed = CalculateSpeedForRep(0);
             }
         }
         
@@ -429,7 +442,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                         m_state = MuscleState::Normal;
                     }
 
-                    m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.16f;
+                    m_speed = CalculateSpeedForRep(GetEffectiveRep());
                     m_resultShowTimer = 60;
                     m_wasDecayed = true;
                 }
@@ -437,13 +450,13 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
 
             if (m_repCount > 0)
             {
-                m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.16f;
+                m_speed = CalculateSpeedForRep(GetEffectiveRep());
                 m_state = MuscleState::Muscular;
             }
             
             else
             {
-                m_speed = SPEED_INITIAL;
+                m_speed = CalculateSpeedForRep(0);
                 m_state = MuscleState::Normal;
             }
 
@@ -596,10 +609,9 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                     float targetAngle = std::atan2(moveDir.x, moveDir.z);
                     m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.25f);
 
-                    // 移動
-                    float speedMult = (m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f;
-                    m_pos.x += moveDir.x * (m_speed * speedMult);
-                    m_pos.z += moveDir.z * (m_speed * speedMult);
+                    // 移動（Statu.csvのCat速度パラメータに基づく）
+                    m_pos.x += moveDir.x * m_speed;
+                    m_pos.z += moveDir.z * m_speed;
                 }
 
                 // 筋トレ開始チェック
@@ -1096,7 +1108,7 @@ void Player3D::AddRep(int amount)
     m_repCount += amount;
     m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒リセット
     m_state = MuscleState::Muscular;
-    m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.16f;
+    m_speed = CalculateSpeedForRep(GetEffectiveRep());
     m_lastResultSuccess = true;
     m_resultShowTimer = 60;
 

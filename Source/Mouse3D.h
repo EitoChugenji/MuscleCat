@@ -11,8 +11,10 @@ class MouseBase3D : public GameObject3D
 protected:
     float m_vx = 0.0f;
     float m_vz = 0.0f;
-    float m_baseSpeed = 2.4f;
-    float m_speedBonus = 0.0f; // 仲間の被捕食数 * 0.1f
+    float m_baseSpeed = 4.2f;
+    float m_speedGrowthPerUnit = 0.05f;
+    float m_maxSpeed = 4.7f;
+    float m_speedBonus = 0.0f; // 仲間の被捕食数 * m_speedGrowthPerUnit
     float m_animTime = 0.0f;
     int   m_stunTimer = 0;     // スタン残りフレーム数
     VECTOR m_prevPos = VGet(0.0f, 0.0f, 0.0f); // 移動前の位置（壁抜け・床外抜け防止用）
@@ -22,12 +24,11 @@ protected:
     int    m_patrolTimer = 0;
     bool   m_isFleeingNow = false;
 
-    // 猫の最大レベル(Lv15)の速度(6.05f)より少し遅いスピードを上限に
-    static constexpr float MOUSE_MAX_SPEED = 5.3f;
+    static constexpr float MOUSE_MAX_SPEED = 4.7f;
     ModelConfig::MapType   m_mapType = ModelConfig::MapType::SlopeHills;
 
 public:
-    MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float baseSpeed);
+    MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float baseSpeed, float speedGrowth = 0.05f, float maxSpeed = MOUSE_MAX_SPEED);
     virtual ~MouseBase3D() = default;
 
     void SetMapType(ModelConfig::MapType mapType)
@@ -50,6 +51,16 @@ public:
     {
         return m_speedBonus;
     }
+
+    float GetSpeedGrowthPerUnit() const
+    {
+        return m_speedGrowthPerUnit;
+    }
+
+    float GetMaxSpeed() const
+    {
+        return m_maxSpeed;
+    }
     
     virtual float GetCurrentSpeed() const
     {
@@ -58,15 +69,8 @@ public:
             return 0.0f;
         }
         
-        float baseSpd = m_baseSpeed;
-        float maxSpd  = MOUSE_MAX_SPEED;
-        if (m_mapType == ModelConfig::MapType::SlopeHills)
-        {
-            baseSpd *= 1.25f;
-            maxSpd  *= 1.25f;
-        }
-        float s = baseSpd + m_speedBonus;
-        return (s > maxSpd) ? maxSpd : s;
+        float s = m_baseSpeed + m_speedBonus;
+        return (s > m_maxSpeed) ? m_maxSpeed : s;
     }
 
     // スタン管理
@@ -158,8 +162,8 @@ class FastMouse3D : public MouseBase3D
 {
 private:
     std::shared_ptr<Player3D> m_targetPlayer;
-    float m_fleeDistance = 140.0f;
-    float m_fleeSpeed    = 2.6f;
+    float m_fleeDistance = 160.0f;
+    float m_fleeSpeed    = 4.62f;
     int   m_wanderTimer  = 0;
     bool  m_isFleeingNow = false;
 
@@ -169,28 +173,22 @@ public:
 
     float GetCurrentFleeSpeed() const
     {
-        float fleeSpd = m_fleeSpeed;
-        float maxSpd  = MOUSE_MAX_SPEED;
-        if (m_mapType == ModelConfig::MapType::SlopeHills)
+        if (IsStunned())
         {
-            fleeSpd *= 1.8f;
-            maxSpd  *= 1.8f;
+            return 0.0f;
         }
-        float s = fleeSpd + m_speedBonus;
-        return (s > maxSpd) ? maxSpd : s;
+        float s = m_fleeSpeed + m_speedBonus;
+        return (s > m_maxSpeed) ? m_maxSpeed : s;
     }
     
     float GetCurrentWanderSpeed() const
     {
-        float wanderSpd = m_baseSpeed;
-        float maxSpd    = MOUSE_MAX_SPEED;
-        if (m_mapType == ModelConfig::MapType::SlopeHills)
+        if (IsStunned())
         {
-            wanderSpd *= 1.8f;
-            maxSpd    *= 1.8f;
+            return 0.0f;
         }
-        float s = wanderSpd + m_speedBonus * 0.5f;
-        return (s > maxSpd) ? maxSpd : s;
+        float s = (m_baseSpeed * 0.85f) + m_speedBonus * 0.5f;
+        return (s > m_maxSpeed) ? m_maxSpeed : s;
     }
 
     void Update() override;

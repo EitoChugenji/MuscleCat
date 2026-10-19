@@ -32,8 +32,10 @@ private:
     // 入力履歴
     bool  m_prevMouseLeft = false;
 
-    // デバッグチート関連
+    // デバッグチート・F1詳細情報＆10m目測キューブ関連
     bool  m_cheatEnabled = false;
+    int   m_debugCubeMode = 0; // 0: 猫追従10m■+全体グリッド, 1: 猫前方10m■+全体グリッド, 2: 原点10m■+全体グリッド, 3: 3D枠OFF
+    bool  m_debugWideCamera = true; // F1時の10m全体目測用・広角俯瞰カメラ切替（初期ON、[8]で通常視点と切替）
     bool  m_prevKeyF1 = false;
     bool  m_prevKey1  = false;
     bool  m_prevKey2  = false;
@@ -41,6 +43,8 @@ private:
     bool  m_prevKey4  = false;
     bool  m_prevKey5  = false;
     bool  m_prevKey6  = false;
+    bool  m_prevKey7  = false;
+    bool  m_prevKey8  = false;
     int   m_prevUpdateTime = 0;
 
     // タイトル画面用演出・メニュー状態
@@ -77,6 +81,8 @@ private:
     void DrawHowToPlayModal();
     void UpdatePause(bool triggerEsc);
     void DrawPauseModal();
+    void DrawDebug3DOverlay();
+    void DrawDebug2DOverlay();
 
 public:
     GameManager() = default;
@@ -88,6 +94,31 @@ public:
     void SwitchSelectedMap(ModelConfig::MapType newMap);
     void Update();
     void Draw();
+
+    void SetCheatEnabled(bool enabled)
+    {
+        m_cheatEnabled = enabled;
+    }
+
+    bool IsCheatEnabled() const
+    {
+        return m_cheatEnabled;
+    }
+
+    void SetDebugWideCamera(bool wide)
+    {
+        m_debugWideCamera = wide;
+    }
+
+    bool IsDebugWideCamera() const
+    {
+        return m_debugWideCamera;
+    }
+
+    int GetDebugCubeMode() const
+    {
+        return m_debugCubeMode;
+    }
 
     bool ShouldQuit() const
     {

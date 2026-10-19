@@ -4,6 +4,7 @@
 #include "FontManager.h"
 #include "ModelManager.h"
 #include "EffectManager.h"
+#include "CsvManager.h"
 #include "Config.h"
 #include <cstdlib>
 #include <ctime>
@@ -47,7 +48,8 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     SetWriteZBuffer3D(TRUE);
     SetUseBackCulling(TRUE);
 
-    // フォント・モデル・エフェクトマネージャー初期化
+    // CSV・フォント・モデル・エフェクトマネージャー初期化
+    CsvManager::GetInstance().Init();
     FontManager::GetInstance().Init();
     ModelManager::GetInstance().Init();
     EffectManager::GetInstance().Init();
@@ -352,11 +354,64 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                     (allSensPass ? "PASS" : "FAIL"));
                 LogTest(buf);
             }
+            else if (autoTestFrame == 163)
+            {
+                // テスト: CSV読み込み（Statu.csv / Position.csv）の検証
+                const auto& csv = CsvManager::GetInstance();
+                const auto& catStat = csv.GetCatStatus();
+                const auto& mouseStat = csv.GetMouseStatus();
+                const auto& catPos = csv.GetCatPositions();
+                const auto& mousePos = csv.GetMousePositions();
+
+                bool catStatOk = (std::abs(catStat.baseSpeed - 4.0f) < 0.01f &&
+                                  std::abs(catStat.speedGrowthPerUnit - 0.1f) < 0.01f &&
+                                  std::abs(catStat.maxSpeed - 5.5f) < 0.01f);
+                bool mouseStatOk = (std::abs(mouseStat.baseSpeed - 4.2f) < 0.01f &&
+                                    std::abs(mouseStat.speedGrowthPerUnit - 0.05f) < 0.01f &&
+                                    std::abs(mouseStat.maxSpeed - 4.7f) < 0.01f);
+                bool posOk = (!catPos.empty() && mousePos.size() == 8);
+
+                auto p = game.GetObjManager().GetPlayer();
+                bool playerSpdOk = false;
+                if (p)
+                {
+                    float spd0 = p->CalculateSpeedForRep(0);
+                    float spd15 = p->CalculateSpeedForRep(15);
+                    playerSpdOk = (std::abs(spd0 - 4.0f) < 0.01f && std::abs(spd15 - 5.5f) < 0.01f);
+                }
+
+                char buf[256];
+                snprintf(buf, sizeof(buf), "AutoTest CSV MANAGER: CatStat=%s(%.1f,%.2f,%.1f), MouseStat=%s(%.1f,%.2f,%.1f), PosCount=%s(Cat:%d,Mouse:%d), PlayerSpdCalc=%s\n",
+                    (catStatOk ? "PASS" : "FAIL"), catStat.baseSpeed, catStat.speedGrowthPerUnit, catStat.maxSpeed,
+                    (mouseStatOk ? "PASS" : "FAIL"), mouseStat.baseSpeed, mouseStat.speedGrowthPerUnit, mouseStat.maxSpeed,
+                    (posOk ? "PASS" : "FAIL"), static_cast<int>(catPos.size()), static_cast<int>(mousePos.size()),
+                    (playerSpdOk ? "PASS" : "FAIL"));
+                LogTest(buf);
+            }
             else if (autoTestFrame == 164)
             {
+                // F1デバッグモード（10m×10m×10m目測キューブ・速度数値・2Dミニマップ）の検証
+                game.SetPaused(false);
+                game.SetCheatEnabled(true);
+                game.SetDebugWideCamera(true);
+                auto p = game.GetObjManager().GetPlayer();
+                bool f1ScaleOk = (std::abs(Config::CAT_BASE_HEIGHT_METERS - 1.8f) < 0.001f &&
+                                  std::abs(Config::CUBE_10M_SIZE_UNITS - 580.5333f) < 0.1f);
+                bool f1SpeedOk = (p != nullptr && p->GetCurrentSpeed() >= 4.0f);
+                char buf[256];
+                snprintf(buf, sizeof(buf), "AutoTest F1 DEBUG OVERLAY: Enabled=%s, Scale10m=%.1fu(%s), PlayerSpeed=%.2f(%s)\n",
+                    (game.IsCheatEnabled() ? "PASS" : "FAIL"),
+                    Config::CUBE_10M_SIZE_UNITS, (f1ScaleOk ? "PASS" : "FAIL"),
+                    (p ? p->GetCurrentSpeed() : 0.0f), (f1SpeedOk ? "PASS" : "FAIL"));
+                LogTest(buf);
+            }
+            else if (autoTestFrame == 167)
+            {
+                game.SetDebugWideCamera(false);
+                game.SetCheatEnabled(false);
                 game.SetPaused(true, 2); // ポーズ画面（感度調整行を選択した状態）
             }
-            else if (autoTestFrame > 170)
+            else if (autoTestFrame > 172)
             {
                 break;
             }
@@ -427,6 +482,11 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
                 AppLogAdd("AutoTest: Saved screenshot_map2_overview.png\n");
             }
             else if (autoTestFrame == 165)
+            {
+                SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_f1_debug.png");
+                AppLogAdd("AutoTest: Saved screenshot_f1_debug.png\n");
+            }
+            else if (autoTestFrame == 168)
             {
                 SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "screenshot_pause_sensitivity.png");
                 AppLogAdd("AutoTest: Saved screenshot_pause_sensitivity.png\n");

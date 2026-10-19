@@ -4,6 +4,7 @@
 #include "Obstacle3D.h"
 #include "FontManager.h"
 #include "EffectManager.h"
+#include "CsvManager.h"
 #include "ModelConfig.h"
 #include "Config.h"
 #include "Common.h"
@@ -275,6 +276,9 @@ void GameManager::SetupTitle()
 
 void GameManager::StartGame()
 {
+    // ゲーム開始・リトライ時に最新のCSV設定（Statu.csv / Position.csv）を読み込み反映
+    CsvManager::GetInstance().ReloadAll();
+
     m_objManager.Clear();
     EffectManager::GetInstance().StopMuscleAura();
     m_isPaused = false;
@@ -283,16 +287,29 @@ void GameManager::StartGame()
 
     // 選択されたマップのステージ読み込み
     m_objManager.LoadStage(m_selectedMap);
+    const auto& stage = m_objManager.GetStage();
 
-    // プレイヤー生成（マップ別初期位置）
-    VECTOR startPos = (m_selectedMap == ModelConfig::MapType::House)
+    // プレイヤー生成（Position.csv の Cat 行から初期位置を取得）
+    VECTOR defaultStartPos = (m_selectedMap == ModelConfig::MapType::House)
         ? VGet(0.0f, 0.0f, 0.0f)
         : VGet(0.0f, 0.0f, 450.0f);
+
+    VECTOR startPos = defaultStartPos;
+    std::vector<VECTOR> catPositions = CsvManager::GetInstance().GetCatPositionsForMap(m_selectedMap);
+    if (!catPositions.empty())
+    {
+        VECTOR candidate = catPositions[rand() % catPositions.size()];
+        float testGy = 0.0f;
+        if (stage.GetGroundHeight(candidate, testGy))
+        {
+            startPos = VGet(candidate.x, testGy, candidate.z);
+        }
+    }
 
     auto player = std::make_shared<Player3D>(startPos);
     player->SetMapType(m_selectedMap);
     float playerGy = 0.0f;
-    if (m_objManager.GetStage().GetGroundHeight(startPos, playerGy))
+    if (stage.GetGroundHeight(startPos, playerGy))
     {
         player->SetPos(VGet(startPos.x, playerGy, startPos.z));
         player->SetGroundY(playerGy);
@@ -306,46 +323,13 @@ void GameManager::StartGame()
     // 部屋・ステージの家具配置
     SetupRoomObstacles();
 
-    // ネズミの生成（マップ別のスポーン位置：全地点でステージ床ポリゴン接地を検証済み）
-    const VECTOR spawnRoomsHouse[] = {
-        VGet(   0.0f, 0.0f,    0.0f),  // リビング中央
-        VGet( 180.0f, 0.0f,  180.0f),  // リビング北東
-        VGet(-180.0f, 0.0f,  180.0f),  // リビング北西
-        VGet(-180.0f, 0.0f, -180.0f),  // リビング南西
-        VGet( 550.0f, 0.0f,  450.0f),  // 北東大部屋中央
-        VGet( 780.0f, 0.0f,  450.0f),  // 北東部屋東奥
-        VGet( 550.0f, 0.0f,  200.0f),  // 北東部屋南側
-        VGet( 600.0f, 0.0f, -100.0f),  // 東中央部屋
-        VGet( 750.0f, 0.0f, -300.0f),  // 東部屋南奥
-        VGet( 650.0f, 0.0f, -700.0f),  // 南東奥部屋
-        VGet( 320.0f, 0.0f, -720.0f),  // 南通路中央
-        VGet(-100.0f, 0.0f, -480.0f),  // 西通路南
-        VGet(-200.0f, 0.0f,    0.0f),  // 玄関口
-    };
-    const int houseRoomCount = sizeof(spawnRoomsHouse) / sizeof(spawnRoomsHouse[0]);
-
-    const VECTOR spawnRoomsNewMap[] = {
-        VGet(   0.0f, 0.0f,  -400.0f),  // 中央南
-        VGet( 600.0f, 0.0f,   800.0f),  // 北東エリア手前
-        VGet(-600.0f, 0.0f,   800.0f),  // 北西エリア手前
-        VGet(1200.0f, 0.0f,     0.0f),  // 東中央通路
-        VGet(1600.0f, 0.0f,   400.0f),  // 東北エリア
-        VGet(1800.0f, 0.0f,  -400.0f),  // 東南エリア
-        VGet(1400.0f, 0.0f,  -800.0f),  // 東南通路
-        VGet( 400.0f, 0.0f, -1400.0f),  // 南通路東
-        VGet(-400.0f, 0.0f, -1200.0f),  // 南通路西
-        VGet(-1200.0f, 0.0f, -1200.0f), // 南西エリア奥
-        VGet(-1600.0f, 0.0f,  -400.0f), // 西通路南
-        VGet(-1600.0f, 0.0f,   400.0f), // 西通路北
-        VGet(-1800.0f, 0.0f,     0.0f), // 西奥中央
-        VGet(   0.0f, 0.0f,  1000.0f),  // 北中央通路
-    };
-    const int newMapRoomCount = sizeof(spawnRoomsNewMap) / sizeof(spawnRoomsNewMap[0]);
-
-    const VECTOR* spawnRooms = (m_selectedMap == ModelConfig::MapType::House) ? spawnRoomsHouse : spawnRoomsNewMap;
-    int roomCount = (m_selectedMap == ModelConfig::MapType::House) ? houseRoomCount : newMapRoomCount;
-
-    const auto& stage = m_objManager.GetStage();
+    // ネズミの生成（Position.csv の Mouse 行からスポーン候補座標を取得）
+    std::vector<VECTOR> spawnRooms = CsvManager::GetInstance().GetMousePositionsForMap(m_selectedMap);
+    if (spawnRooms.empty())
+    {
+        spawnRooms.push_back(defaultStartPos);
+    }
+    int roomCount = static_cast<int>(spawnRooms.size());
 
     // ステージモデルの床上に確実に接地させるスポーン座標決定ヘルパー
     auto FindGuaranteedGroundSpawnPos = [&](int candidateIndex) -> VECTOR
@@ -359,7 +343,7 @@ void GameManager::StartGame()
             {
                 float ox = (jitterAttempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
                 float oz = (jitterAttempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
-                VECTOR testPos = VGet(basePos.x + ox, 0.0f, basePos.z + oz);
+                VECTOR testPos = VGet(basePos.x + ox, basePos.y, basePos.z + oz);
                 float gy = 0.0f;
                 if (stage.GetGroundHeight(testPos, gy))
                 {
@@ -371,9 +355,7 @@ void GameManager::StartGame()
 
         // 万一のセーフティネット：猫の初期位置近傍
         float fallbackGy = 0.0f;
-        VECTOR fallbackPos = (m_selectedMap == ModelConfig::MapType::House)
-            ? VGet(0.0f, 0.0f, 0.0f)
-            : VGet(0.0f, 0.0f, 450.0f);
+        VECTOR fallbackPos = defaultStartPos;
         if (stage.GetGroundHeight(fallbackPos, fallbackGy))
         {
             fallbackPos.y = fallbackGy;
@@ -727,7 +709,38 @@ void GameManager::Update()
             m_prevKey6 = key6;
         }
 
+        // [7] 10m×10m×10m目測キューブ表示モード切替 / [8] 10m全体目測用・広角カメラ切替
+        if (m_cheatEnabled)
+        {
+            bool key7 = (CheckHitKey(KEY_INPUT_7) != 0);
+            if (key7 && !m_prevKey7)
+            {
+                m_debugCubeMode = (m_debugCubeMode + 1) % 4;
+            }
+            m_prevKey7 = key7;
+
+            bool key8 = (CheckHitKey(KEY_INPUT_8) != 0);
+            if (key8 && !m_prevKey8)
+            {
+                m_debugWideCamera = !m_debugWideCamera;
+            }
+            m_prevKey8 = key8;
+        }
+
         m_objManager.Update(m_camera);
+
+        // F1デバッグ広角カメラがONの場合は、10m×10m×10mの■全体と猫の1.8m身長が一目で比較できる俯瞰視点にセット
+        if (m_cheatEnabled && m_debugWideCamera && player)
+        {
+            VECTOR pPos = player->GetPos();
+            float yaw = m_camera.GetAngleH();
+            float dist = 780.0f; // 約13.4m後方から10m×10m×10mキューブ全体を収める
+            float height = 520.0f; // 約9.0m高さから見下ろす
+            VECTOR camPos = VGet(pPos.x - std::sin(yaw) * dist, pPos.y + height, pPos.z - std::cos(yaw) * dist);
+            VECTOR target = VGet(pPos.x, pPos.y + 180.0f, pPos.z);
+            SetCameraNearFar(10.0f, 30000.0f);
+            SetCameraPositionAndTarget_UpVecY(camPos, target);
+        }
 
         // クリア判定
         if (m_objManager.GetRemainingMouseCount() == 0)
@@ -778,6 +791,12 @@ void GameManager::Draw()
 
     m_objManager.Draw3D();
 
+    // F1デバッグモード時の3Dオーバーレイ描画（10m×10m×10m目測キューブ・1.8m身長バー・スポーン位置・当たり判定リング）
+    if (m_state == GameState::Playing && m_cheatEnabled)
+    {
+        DrawDebug3DOverlay();
+    }
+
     // Effekseer 3Dエフェクト描画
     EffectManager::GetInstance().SyncCamera();
     EffectManager::GetInstance().Draw3D();
@@ -814,7 +833,7 @@ void GameManager::Draw()
         m_fpsTimer = now;
     }
 
-    DrawFormatStringToHandle(Config::SCREEN_WIDTH - 170, 18, GetColor(140, 240, 140), font13, "FPS: %.1f (%.1fms)", m_currentFps, m_frameProcessTimeMs);
+    DrawFormatStringToHandle(Config::SCREEN_WIDTH - 170, 14, GetColor(140, 240, 140), font13, "FPS: %.1f (%.1fms)", m_currentFps, m_frameProcessTimeMs);
 
     if (m_state == GameState::Title)
     {
@@ -827,11 +846,11 @@ void GameManager::Draw()
         float currentSec = (m_isPaused ? (m_pauseStartTime - m_startCount) : (GetNowCount() - m_startCount)) / 1000.0f;
 
         // =========================================================================
-        // 1. 左上：プレイヤーステータス ＆ 特大レベルバッジ（一目で現在Lvがわかる）
+        // 1. 左上：プレイヤーステータス ＆ 特大レベルバッジ（一目で現在Lv・現在スピードがわかる）
         // =========================================================================
         int pX = 14;
         int pY = 14;
-        int pW = 340;
+        int pW = 365;
         int pH = 84;
 
         // 白いステージ床でもクッキリ浮き立つ黒半透明プレート＆オレンジ太縁
@@ -885,7 +904,7 @@ void GameManager::Draw()
             DrawStringToHandle(badgeX + 12, badgeY + badgeH - 16, "筋肉痛!", GetColor(100, 180, 255), font13);
         }
 
-        // --- 右側：ミッション＆タイム情報 ---
+        // --- 右側：ミッション＆タイム＆プレイヤースピード情報 ---
         int infoX = badgeX + badgeW + 14;
 
         int remainMice = m_objManager.GetRemainingMouseCount();
@@ -896,13 +915,15 @@ void GameManager::Draw()
 
         char timeBuf[32];
         snprintf(timeBuf, sizeof(timeBuf), "タイム: %.1f 秒", currentSec);
-        DrawStringToHandle(infoX, pY + 34, timeBuf, white, font16);
+        DrawStringToHandle(infoX, pY + 32, timeBuf, white, font16);
 
         if (player)
         {
             float catSpeed = player->GetCurrentSpeed();
-            char spdBuf[48];
-            snprintf(spdBuf, sizeof(spdBuf), "猫速度: %.1f (Lv.%d 強化中)", catSpeed, reps);
+            float actualSpd = player->GetActualMoveSpeed();
+            float mPerSec = (catSpeed * 60.0f) / Config::WORLD_UNITS_PER_METER;
+            char spdBuf[96];
+            snprintf(spdBuf, sizeof(spdBuf), "現在速度: %.2f (実移動:%.2f / %.1fm/s)", catSpeed, actualSpd, mPerSec);
             DrawStringToHandle(infoX, pY + 58, spdBuf, GetColor(100, 245, 140), font13);
         }
 
@@ -960,49 +981,21 @@ void GameManager::Draw()
         snprintf(camInfo, sizeof(camInfo), "移動: WASD  |  視点: マウス(感度:%.1fx) / 矢印  |  感度変更: [- / +]  |  視点リセット: [F]", m_camera.GetMouseSensitivity());
         DrawStringToHandle(gX + 14, gY + 42, camInfo, GetColor(210, 225, 245), font13);
 
-        // デバッグチートパネル表示
-        auto cheatPlayer = m_objManager.GetPlayer();
-        // F1を押したらON（どの状態でも表示を出す）
+        // =========================================================================
+        // 3. F1 デバッグ情報＆ミニマップ＆10m距離目測オーバーレイ
+        // =========================================================================
         if (m_cheatEnabled)
         {
-            // 半透明背景
-            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 200);
-            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 246, GetColor(15, 15, 30), TRUE);
-            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 246, GetColor(255, 80, 80), FALSE);
-
-            DrawStringToHandle(Config::SCREEN_WIDTH - 370, 48, "★ DEBUG CHEAT MODE ON ★", GetColor(255, 80, 80), font16);
-
-            bool tf  = m_objManager.IsTimeFrozen();
-            bool ncd = cheatPlayer ? cheatPlayer->IsNoCooldown() : false;
-            int  rep = cheatPlayer ? cheatPlayer->GetRepCount() : 0;
-            bool eff = EffectManager::GetInstance().IsEffectEnabled();
-
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 76,  GetColor(180, 230, 255), font16,
-                "[1] 通常ネズミ追加  [2] 高速ネズミ追加");
-
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 100, GetColor(180, 230, 255), font16,
-                "[3] Rep+1  現在Rep: %d %s", rep, (rep >= 15) ? "(能力MAX)" : "");
-
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 124, tf ? GetColor(255, 240, 60) : GetColor(180, 230, 255), font16,
-                "[4] 時間停止: %s", tf ? "ON" : "OFF");
-
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 148, ncd ? GetColor(255, 240, 60) : GetColor(180, 230, 255), font16,
-                "[5] クールタイム無効: %s", ncd ? "ON (スタンも無効)" : "OFF");
-
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 172, eff ? GetColor(255, 240, 60) : GetColor(180, 230, 255), font16,
-                "[6] エフェクト表示: %s", eff ? "ON" : "OFF");
-
-            DrawStringToHandle(Config::SCREEN_WIDTH - 370, 196, "[F1] チートOFF", GetColor(255, 120, 120), font16);
-            
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 220, GetColor(140, 200, 140), font13,
-                "ネズミ残り: %d 体", m_objManager.GetRemainingMouseCount());
+            DrawDebug2DOverlay();
         }
-        
         else
         {
-            // チートOFF時は右上に小さく案内だけ表示
-            DrawStringToHandle(Config::SCREEN_WIDTH - 220, 42, "[F1] DEBUG CHEAT", GetColor(100, 100, 120), font13);
+            // F1 OFF時は右上に案内バッジを表示
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 185);
+            DrawBox(Config::SCREEN_WIDTH - 270, 34, Config::SCREEN_WIDTH - 10, 56, GetColor(15, 20, 35), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+            DrawBox(Config::SCREEN_WIDTH - 270, 34, Config::SCREEN_WIDTH - 10, 56, GetColor(80, 120, 170), FALSE);
+            DrawStringToHandle(Config::SCREEN_WIDTH - 262, 38, "[F1] デバッグ情報・マップ・10m目測表示", GetColor(160, 210, 255), font13);
         }
 
         // プレイ中の感度変更通知ポップアップ
@@ -1897,3 +1890,758 @@ void GameManager::DrawPauseModal()
     int gW2 = GetDrawStringWidthToHandle(guideTxt2, static_cast<int>(strlen(guideTxt2)), font13);
     DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 360, guideTxt2, GetColor(130, 150, 180), font13);
 }
+
+void GameManager::DrawDebug3DOverlay()
+{
+    auto player = m_objManager.GetPlayer();
+    if (!player)
+    {
+        return;
+    }
+
+    // 3Dデバッグ辺（DrawCapsule3D）がステージ照明の影で暗くならないようライティングを一時OFFにして鮮やかな色で描画
+    SetUseLighting(FALSE);
+
+    const auto& stage = m_objManager.GetStage();
+    const VECTOR pPos = player->GetPos();
+    const float unitPerMeter = Config::WORLD_UNITS_PER_METER; // 58.0533f (猫身長1.8m = 104.496u 基準)
+    const float cubeSize = Config::CUBE_10M_SIZE_UNITS;       // 580.5333f (10m)
+    const float halfCube = cubeSize * 0.5f;                   // 290.2667f (5m)
+
+    // 白いステージ床の上でもクッキリ視認できる3Dソリッド辺描画ヘルパー (DrawCapsule3D)
+    auto drawBeam3D = [](VECTOR a, VECTOR b, float radius, unsigned int col)
+    {
+        DrawCapsule3D(a, b, radius, 4, col, col, TRUE);
+    };
+
+    // 3D水平サークル描画ヘルパー
+    auto drawCircle3D = [](const VECTOR& center, float radius, float yOffset, unsigned int col, int segments = 32)
+    {
+        const float step = (DX_PI_F * 2.0f) / static_cast<float>(segments);
+        for (int i = 0; i < segments; ++i)
+        {
+            float a0 = step * static_cast<float>(i);
+            float a1 = step * static_cast<float>(i + 1);
+            VECTOR p0 = VGet(center.x + std::cos(a0) * radius, center.y + yOffset, center.z + std::sin(a0) * radius);
+            VECTOR p1 = VGet(center.x + std::cos(a1) * radius, center.y + yOffset, center.z + std::sin(a1) * radius);
+            DrawLine3D(p0, p1, col);
+        }
+    };
+
+    // =========================================================================
+    // 1. ステージ全体の10mグリッド目盛り（モード0, 1, 2のとき床面に10m間隔ラインを描画）
+    // =========================================================================
+    if (m_debugCubeMode != 3)
+    {
+        VECTOR minB = stage.GetMinBounds();
+        VECTOR maxB = stage.GetMaxBounds();
+        float floorY = pPos.y + 1.5f;
+
+        unsigned int stageGridCol = GetColor(70, 130, 180);
+        unsigned int stageAxisCol = GetColor(20, 90, 210);
+
+        int minIdxX = static_cast<int>(std::floor(minB.x / cubeSize));
+        int maxIdxX = static_cast<int>(std::ceil(maxB.x / cubeSize));
+        int minIdxZ = static_cast<int>(std::floor(minB.z / cubeSize));
+        int maxIdxZ = static_cast<int>(std::ceil(maxB.z / cubeSize));
+
+        for (int ix = minIdxX; ix <= maxIdxX; ++ix)
+        {
+            float x = static_cast<float>(ix) * cubeSize;
+            if (x < minB.x || x > maxB.x) continue;
+            unsigned int c = (ix == 0) ? stageAxisCol : stageGridCol;
+            DrawLine3D(VGet(x, floorY, minB.z), VGet(x, floorY, maxB.z), c);
+        }
+        for (int iz = minIdxZ; iz <= maxIdxZ; ++iz)
+        {
+            float z = static_cast<float>(iz) * cubeSize;
+            if (z < minB.z || z > maxB.z) continue;
+            unsigned int c = (iz == 0) ? stageAxisCol : stageGridCol;
+            DrawLine3D(VGet(minB.x, floorY, z), VGet(maxB.x, floorY, z), c);
+        }
+    }
+
+    // =========================================================================
+    // 2. 10m × 10m × 10m の■（ワイヤーフレーム立方体）を12本の辺で再現（距離目測用）
+    //    猫の基本身長 104.496u = 1.8m としたとき、1m = 58.053u、10m = 580.533u
+    // =========================================================================
+    if (m_debugCubeMode != 3)
+    {
+        VECTOR cubeCenter = pPos;
+        if (m_debugCubeMode == 1)
+        {
+            // モード1: カメラ前方へ10m伸びる配置（通常カメラでも足元0m〜前方10mの奥行き全体が一目で見える）
+            float yaw = m_camera.GetAngleH();
+            cubeCenter = VGet(pPos.x + std::sin(yaw) * halfCube, pPos.y, pPos.z + std::cos(yaw) * halfCube);
+        }
+        else if (m_debugCubeMode == 2)
+        {
+            // モード2: ステージ原点(0,0,0)中心
+            cubeCenter = VGet(0.0f, pPos.y, 0.0f);
+        }
+
+        float baseY = cubeCenter.y + 2.2f; // 床と重ならない高さ
+        float topY  = baseY + cubeSize;    // +10m (580.53u)
+        float midY  = baseY + halfCube;    // +5m  (290.27u)
+
+        float x0 = cubeCenter.x - halfCube;
+        float x1 = cubeCenter.x + halfCube;
+        float z0 = cubeCenter.z - halfCube;
+        float z1 = cubeCenter.z + halfCube;
+
+        // 底面4頂点 (0m) と 上面4頂点 (+10m)
+        VECTOR b00 = VGet(x0, baseY, z0);
+        VECTOR b10 = VGet(x1, baseY, z0);
+        VECTOR b11 = VGet(x1, baseY, z1);
+        VECTOR b01 = VGet(x0, baseY, z1);
+
+        VECTOR t00 = VGet(x0, topY, z0);
+        VECTOR t10 = VGet(x1, topY, z0);
+        VECTOR t11 = VGet(x1, topY, z1);
+        VECTOR t01 = VGet(x0, topY, z1);
+
+        // 中間5m高さの4頂点 (+5m)
+        VECTOR m00 = VGet(x0, midY, z0);
+        VECTOR m10 = VGet(x1, midY, z0);
+        VECTOR m11 = VGet(x1, midY, z1);
+        VECTOR m01 = VGet(x0, midY, z1);
+
+        // 底面1m刻みグリッド（10m×10mの内部を1m=58.05u間隔で分割して距離目測しやすくする）
+        unsigned int grid1mCol = GetColor(30, 145, 175);
+        unsigned int grid5mCol = GetColor(0, 110, 235);
+        for (int i = 1; i < 10; ++i)
+        {
+            float offset = -halfCube + static_cast<float>(i) * unitPerMeter;
+            VECTOR gx0 = VGet(x0, baseY, cubeCenter.z + offset);
+            VECTOR gx1 = VGet(x1, baseY, cubeCenter.z + offset);
+            VECTOR gz0 = VGet(cubeCenter.x + offset, baseY, z0);
+            VECTOR gz1 = VGet(cubeCenter.x + offset, baseY, z1);
+
+            if (i == 5)
+            {
+                // 中心5m十字ラインは太めのビームで強調
+                drawBeam3D(gx0, gx1, 1.3f, grid5mCol);
+                drawBeam3D(gz0, gz1, 1.3f, grid5mCol);
+            }
+            else
+            {
+                DrawLine3D(gx0, gx1, grid1mCol);
+                DrawLine3D(gz0, gz1, grid1mCol);
+            }
+        }
+
+        // 10m×10m×10m 立方体の12本のメイン辺をソリッド3Dビームで描画（白い床でも鮮明に見える高コントラスト色）
+        unsigned int bottomEdgeCol = GetColor(0, 95, 255);    // 底面4辺(10m×10m): 鮮やかなエレクトリックブルー
+        unsigned int pillarEdgeCol = GetColor(255, 55, 20);   // 垂直4辺(高さ10m): 鮮やかなクリムゾンレッド
+        unsigned int topEdgeCol    = GetColor(0, 170, 240);   // 上面4辺(10m天井): ディープシアン
+        unsigned int midBeltCol    = GetColor(235, 135, 0);   // 中間5mベルト: アンバーオレンジ
+
+        const float mainEdgeR = 2.6f;
+        const float subEdgeR  = 1.3f;
+
+        // 底面4辺 (10m × 10m)
+        drawBeam3D(b00, b10, mainEdgeR, bottomEdgeCol);
+        drawBeam3D(b10, b11, mainEdgeR, bottomEdgeCol);
+        drawBeam3D(b11, b01, mainEdgeR, bottomEdgeCol);
+        drawBeam3D(b01, b00, mainEdgeR, bottomEdgeCol);
+
+        // 上面4辺 (高さ10m)
+        drawBeam3D(t00, t10, mainEdgeR, topEdgeCol);
+        drawBeam3D(t10, t11, mainEdgeR, topEdgeCol);
+        drawBeam3D(t11, t01, mainEdgeR, topEdgeCol);
+        drawBeam3D(t01, t00, mainEdgeR, topEdgeCol);
+
+        // 垂直の4柱 (0m -> 10m)
+        drawBeam3D(b00, t00, mainEdgeR, pillarEdgeCol);
+        drawBeam3D(b10, t10, mainEdgeR, pillarEdgeCol);
+        drawBeam3D(b11, t11, mainEdgeR, pillarEdgeCol);
+        drawBeam3D(b01, t01, mainEdgeR, pillarEdgeCol);
+
+        // 高さ5mの中間ベルト
+        drawBeam3D(m00, m10, subEdgeR, midBeltCol);
+        drawBeam3D(m10, m11, subEdgeR, midBeltCol);
+        drawBeam3D(m11, m01, subEdgeR, midBeltCol);
+        drawBeam3D(m01, m00, subEdgeR, midBeltCol);
+
+        // 垂直4柱に1mごとの高さ目盛りティック（1m〜9m）を入れる
+        float tickLen = 16.0f;
+        for (int m = 1; m < 10; ++m)
+        {
+            float ty = baseY + static_cast<float>(m) * unitPerMeter;
+            float tLen = (m == 5) ? tickLen * 1.8f : tickLen;
+            unsigned int tCol = (m == 5) ? midBeltCol : pillarEdgeCol;
+
+            drawBeam3D(VGet(x0, ty, z0), VGet(x0 + tLen, ty, z0 + tLen), 1.0f, tCol);
+            drawBeam3D(VGet(x1, ty, z0), VGet(x1 - tLen, ty, z0 + tLen), 1.0f, tCol);
+            drawBeam3D(VGet(x1, ty, z1), VGet(x1 - tLen, ty, z1 - tLen), 1.0f, tCol);
+            drawBeam3D(VGet(x0, ty, z1), VGet(x0 + tLen, ty, z1 - tLen), 1.0f, tCol);
+        }
+    }
+
+    // =========================================================================
+    // 3. 猫の横の「身長1.8m基準ルーラー（物差し）」と当たり判定・攻撃範囲リング
+    // =========================================================================
+    {
+        float rulerX = pPos.x + player->GetBodyRadius() + 26.0f;
+        float rulerZ = pPos.z;
+        float baseH  = Config::CAT_BASE_HEIGHT_UNITS; // 104.496u (1.80m)
+        float curH   = baseH * (player->GetCurrentHeightMeters() / Config::CAT_BASE_HEIGHT_METERS);
+
+        unsigned int rulerCol = GetColor(215, 0, 160);
+        drawBeam3D(VGet(rulerX, pPos.y, rulerZ), VGet(rulerX, pPos.y + baseH, rulerZ), 1.5f, rulerCol);
+
+        // 0m, 0.5m, 1.0m, 1.5m, 1.8m の目盛り横線
+        const float marksM[] = { 0.0f, 0.5f, 1.0f, 1.5f, 1.8f };
+        for (float m : marksM)
+        {
+            float my = pPos.y + m * unitPerMeter;
+            float w = (m == 1.8f || m == 0.0f) ? 16.0f : 9.0f;
+            drawBeam3D(VGet(rulerX - w, my, rulerZ), VGet(rulerX + w, my, rulerZ), 1.0f, rulerCol);
+        }
+
+        // パンプアップで1.8mより大きくなっている場合は現在身長までオレンジ線を延長
+        if (curH > baseH + 1.0f)
+        {
+            unsigned int pumpCol = GetColor(255, 120, 0);
+            drawBeam3D(VGet(rulerX, pPos.y + baseH, rulerZ), VGet(rulerX, pPos.y + curH, rulerZ), 1.5f, pumpCol);
+            drawBeam3D(VGet(rulerX - 18.0f, pPos.y + curH, rulerZ), VGet(rulerX + 18.0f, pPos.y + curH, rulerZ), 1.1f, pumpCol);
+        }
+
+        // プレイヤーの体当たり半径・飛びつき半径・タックル半径リング
+        drawCircle3D(pPos, player->GetBodyRadius(), 2.5f, GetColor(0, 190, 90), 28);
+        if (player->GetRepCount() >= 4)
+        {
+            drawCircle3D(pPos, player->GetPounceRadius(), 3.0f, GetColor(240, 40, 40), 32);
+            drawCircle3D(pPos, player->GetTackleRadius(), 3.5f, GetColor(240, 120, 0), 36);
+        }
+    }
+
+    // =========================================================================
+    // 4. Position.csv のスポーン/巡回座標 (Pos1〜Pos8) の3Dピン表示
+    // =========================================================================
+    std::vector<VECTOR> csvPositions = CsvManager::GetInstance().GetMousePositionsForMap(m_selectedMap);
+    {
+        unsigned int posCol = GetColor(20, 190, 60);
+        for (size_t i = 0; i < csvPositions.size(); ++i)
+        {
+            VECTOR wp = csvPositions[i];
+            float gy = wp.y;
+            stage.GetGroundHeight(VGet(wp.x, wp.y + 100.0f, wp.z), gy);
+
+            VECTOR groundPt = VGet(wp.x, gy + 2.0f, wp.z);
+            VECTOR topPt    = VGet(wp.x, gy + 120.0f, wp.z);
+            drawBeam3D(groundPt, topPt, 1.8f, posCol);
+            drawCircle3D(VGet(wp.x, gy, wp.z), 28.0f, 2.5f, posCol, 20);
+        }
+    }
+
+    // =========================================================================
+    // 5. 生存ネズミへの3D距離ライン＆逃走感知リング
+    // =========================================================================
+    for (const auto& obj : m_objManager.GetObjects())
+    {
+        if (!obj || !obj->IsAlive()) continue;
+        if (obj->GetType() == ObjectType::NormalMouse || obj->GetType() == ObjectType::FastMouse)
+        {
+            VECTOR mPos = obj->GetPos();
+            bool isFast = (obj->GetType() == ObjectType::FastMouse);
+            unsigned int mCol = isFast ? GetColor(235, 45, 45) : GetColor(220, 140, 0);
+
+            // 猫からネズミへの3D直線
+            DrawLine3D(VGet(pPos.x, pPos.y + 25.0f, pPos.z), VGet(mPos.x, mPos.y + 15.0f, mPos.z), mCol);
+            // ネズミの当たり判定リング
+            drawCircle3D(mPos, obj->GetRadius(), 2.5f, mCol, 20);
+            // FastMouseの逃走開始距離リング (160u = 2.76m)
+            if (isFast)
+            {
+                drawCircle3D(mPos, 160.0f, 2.5f, GetColor(210, 40, 150), 28);
+            }
+        }
+    }
+
+    SetUseLighting(TRUE);
+}
+
+void GameManager::DrawDebug2DOverlay()
+{
+    auto player = m_objManager.GetPlayer();
+    if (!player)
+    {
+        return;
+    }
+
+    const auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
+    int font16 = fm.GetFont16();
+
+    const auto& stage = m_objManager.GetStage();
+    const VECTOR pPos = player->GetPos();
+    const float unitPerMeter = Config::WORLD_UNITS_PER_METER; // 58.0533f
+    const float cubeSize = Config::CUBE_10M_SIZE_UNITS;       // 580.5333f (10m)
+    const float halfCube = cubeSize * 0.5f;                   // 290.2667f (5m)
+
+    // 3Dワールド座標を2D画面上にタグ描画するヘルパー（左右のUIパネル領域と重なる場合はスキップ）
+    auto drawWorldLabel = [&](const VECTOR& worldPos, const char* text, unsigned int textCol, unsigned int bgCol = GetColor(10, 16, 28))
+    {
+        VECTOR sp = ConvWorldPosToScreenPos(worldPos);
+        if (sp.z > 0.0f && sp.z < 1.0f &&
+            sp.x >= 0.0f && sp.x <= static_cast<float>(Config::SCREEN_WIDTH) &&
+            sp.y >= 0.0f && sp.y <= static_cast<float>(Config::SCREEN_HEIGHT))
+        {
+            int tw = GetDrawStringWidthToHandle(text, static_cast<int>(strlen(text)), font13);
+            int tx = static_cast<int>(sp.x) - tw / 2;
+            int ty = static_cast<int>(sp.y) - 10;
+
+            // 左側ステータス/デバッグパネル領域または右側ミニマップ領域と重なる場合は描画しない
+            if (tx < 435 && ty < 608) return;
+            if (tx + tw > Config::SCREEN_WIDTH - 365 && ty < 530) return;
+            if (tx + tw > Config::SCREEN_WIDTH - 615 && ty > Config::SCREEN_HEIGHT - 95) return;
+
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 205);
+            DrawBox(tx - 4, ty - 2, tx + tw + 4, ty + 17, bgCol, TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+            DrawBox(tx - 4, ty - 2, tx + tw + 4, ty + 17, textCol, FALSE);
+            DrawStringToHandle(tx, ty, text, textCol, font13);
+        }
+    };
+
+    // =========================================================================
+    // 1. 3D空間上の距離目測ラベル投影（10m×10m×10mキューブ・猫1.8m身長・Pos1〜8・ネズミ距離）
+    // =========================================================================
+    VECTOR cubeCenter = pPos;
+    if (m_debugCubeMode == 1)
+    {
+        float yaw = m_camera.GetAngleH();
+        cubeCenter = VGet(pPos.x + std::sin(yaw) * halfCube, pPos.y, pPos.z + std::cos(yaw) * halfCube);
+    }
+    else if (m_debugCubeMode == 2)
+    {
+        cubeCenter = VGet(0.0f, pPos.y, 0.0f);
+    }
+
+    if (m_debugCubeMode != 3)
+    {
+        float baseY = cubeCenter.y + 2.2f;
+        float topY  = baseY + cubeSize;
+        float midY  = baseY + halfCube;
+
+        unsigned int cyanCol   = GetColor(80, 235, 255);
+        unsigned int yellowCol = GetColor(255, 220, 80);
+
+        // 底面4辺の中央に「10m (580.5u)」ラベルを表示
+        drawWorldLabel(VGet(cubeCenter.x, baseY, cubeCenter.z - halfCube), "◀ 10m辺 (580.5u) ▶", cyanCol);
+        drawWorldLabel(VGet(cubeCenter.x, baseY, cubeCenter.z + halfCube), "◀ 10m辺 (580.5u) ▶", cyanCol);
+        drawWorldLabel(VGet(cubeCenter.x - halfCube, baseY, cubeCenter.z), "▲ 10m辺 (580.5u) ▼", cyanCol);
+        drawWorldLabel(VGet(cubeCenter.x + halfCube, baseY, cubeCenter.z), "▲ 10m辺 (580.5u) ▼", cyanCol);
+
+        // 垂直柱に「高さ 5m」「高さ 10m」ラベルを表示
+        drawWorldLabel(VGet(cubeCenter.x - halfCube, midY, cubeCenter.z - halfCube), "高さ 5.0m (290.3u)", yellowCol);
+        drawWorldLabel(VGet(cubeCenter.x - halfCube, topY, cubeCenter.z - halfCube), "■ 高さ 10.0m (580.5u)", yellowCol);
+        drawWorldLabel(VGet(cubeCenter.x + halfCube, topY, cubeCenter.z + halfCube), "■ 10m×10m×10m 頂点", yellowCol);
+
+        // 中心から前後左右2m・4m地点の目盛りラベル
+        for (int m : { -4, -2, 2, 4 })
+        {
+            char mBuf[24];
+            snprintf(mBuf, sizeof(mBuf), "%+dm", m);
+            drawWorldLabel(VGet(cubeCenter.x + m * unitPerMeter, baseY, cubeCenter.z), mBuf, GetColor(160, 240, 255));
+            drawWorldLabel(VGet(cubeCenter.x, baseY, cubeCenter.z + m * unitPerMeter), mBuf, GetColor(160, 240, 255));
+        }
+    }
+
+    // 猫の1.8m身長ルーラーのラベル
+    {
+        float rulerX = pPos.x + player->GetBodyRadius() + 26.0f;
+        float baseH  = Config::CAT_BASE_HEIGHT_UNITS;
+        float curHm  = player->GetCurrentHeightMeters();
+        char hBuf[64];
+        if (curHm > Config::CAT_BASE_HEIGHT_METERS + 0.02f)
+        {
+            snprintf(hBuf, sizeof(hBuf), "猫身長 1.80m基準 (現在:%.2fm)", curHm);
+        }
+        else
+        {
+            snprintf(hBuf, sizeof(hBuf), "猫身長 1.80m (104.5u)");
+        }
+        drawWorldLabel(VGet(rulerX, pPos.y + baseH + 8.0f, pPos.z), hBuf, GetColor(255, 150, 235));
+    }
+
+    // Position.csv (Pos1〜Pos8) の3Dラベル
+    std::vector<VECTOR> csvPositions = CsvManager::GetInstance().GetMousePositionsForMap(m_selectedMap);
+    for (size_t i = 0; i < csvPositions.size(); ++i)
+    {
+        VECTOR wp = csvPositions[i];
+        float gy = wp.y;
+        stage.GetGroundHeight(VGet(wp.x, wp.y + 100.0f, wp.z), gy);
+        char pLabel[48];
+        snprintf(pLabel, sizeof(pLabel), "Pos%zu (%.0f, %.0f)", i + 1, wp.x, wp.z);
+        drawWorldLabel(VGet(wp.x, gy + 125.0f, wp.z), pLabel, GetColor(130, 255, 130));
+    }
+
+    // 生存ネズミ頭上のスピード＆距離タグ
+    for (const auto& obj : m_objManager.GetObjects())
+    {
+        if (!obj || !obj->IsAlive()) continue;
+        if (obj->GetType() == ObjectType::NormalMouse || obj->GetType() == ObjectType::FastMouse)
+        {
+            auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
+            if (!mouse) continue;
+
+            VECTOR mPos = mouse->GetPos();
+            float dx = mPos.x - pPos.x;
+            float dy = mPos.y - pPos.y;
+            float dz = mPos.z - pPos.z;
+            float distU = std::sqrt(dx * dx + dy * dy + dz * dz);
+            float distM = distU / unitPerMeter;
+
+            bool isFast = (obj->GetType() == ObjectType::FastMouse);
+            float mSpd = mouse->GetCurrentSpeed();
+            char mTag[64];
+            snprintf(mTag, sizeof(mTag), "%s SPD:%.2f (%.1fm)", isFast ? "Fast" : "Norm", mSpd, distM);
+            drawWorldLabel(VGet(mPos.x, mPos.y + 42.0f, mPos.z), mTag, isFast ? GetColor(255, 120, 120) : GetColor(255, 220, 100));
+        }
+    }
+
+    // =========================================================================
+    // 2. 左側：詳細デバッグパネル（スピード数値・10m目測スケール・座標・ステージ＆CSV情報）
+    // =========================================================================
+    int panelX = 14;
+    int panelY = 106;
+    int panelW = 415;
+    int panelH = 495;
+
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 220);
+    DrawBox(panelX, panelY, panelX + panelW, panelY + panelH, GetColor(10, 16, 28), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    DrawBox(panelX, panelY, panelX + panelW, panelY + panelH, GetColor(0, 220, 200), FALSE);
+
+    int ty = panelY + 8;
+    int lx = panelX + 10;
+
+    DrawStringToHandle(lx, ty, "■ [F1] 統合デバッグ情報 (速度・10m目測・マップ)", GetColor(80, 255, 230), font16);
+    ty += 24;
+    DrawLine(lx, ty, panelX + panelW - 10, ty, GetColor(50, 90, 110));
+    ty += 6;
+
+    // --- (A) プレイヤー現在スピード数値セクション ---
+    float cfgSpd    = player->GetCurrentSpeed();
+    float actSpd    = player->GetActualMoveSpeed();
+    float cfgUnitS  = cfgSpd * 60.0f;
+    float cfgMeterS = cfgUnitS / unitPerMeter;
+    float cfgKmH    = cfgMeterS * 3.6f;
+    float actMeterS = (actSpd * 60.0f) / unitPerMeter;
+
+    DrawStringToHandle(lx, ty, "【プレイヤー現在スピード (数値)】", GetColor(255, 230, 80), font13);
+    ty += 18;
+
+    char spdLine1[96];
+    snprintf(spdLine1, sizeof(spdLine1), "・設定スピード : %.2f u/f  (%.1f u/s)", cfgSpd, cfgUnitS);
+    DrawStringToHandle(lx, ty, spdLine1, GetColor(120, 255, 150), font16);
+    ty += 21;
+
+    char spdLine2[96];
+    snprintf(spdLine2, sizeof(spdLine2), "・実移動スピード: %.2f u/f  (%.2f m/s)", actSpd, actMeterS);
+    DrawStringToHandle(lx, ty, spdLine2, GetColor(180, 240, 255), font13);
+    ty += 18;
+
+    char spdLine3[96];
+    snprintf(spdLine3, sizeof(spdLine3), "・1.8m換算速度 : 秒速 %.2f m/s (時速 %.1f km/h)", cfgMeterS, cfgKmH);
+    DrawStringToHandle(lx, ty, spdLine3, GetColor(255, 210, 110), font13);
+    ty += 18;
+
+    // スピード視覚バー (0.0 〜 6.0 u/f)
+    int barX = lx + 4;
+    int barW = panelW - 28;
+    int barH = 10;
+    DrawBox(barX, ty, barX + barW, ty + barH, GetColor(22, 30, 48), TRUE);
+    float spdRatio = MathHelper::Clamp(cfgSpd / 6.0f, 0.0f, 1.0f);
+    float actRatio = MathHelper::Clamp(actSpd / 6.0f, 0.0f, 1.0f);
+    DrawBox(barX, ty, barX + static_cast<int>(barW * spdRatio), ty + barH, GetColor(40, 180, 100), TRUE);
+    DrawBox(barX, ty + 2, barX + static_cast<int>(barW * actRatio), ty + barH - 2, GetColor(120, 255, 160), TRUE);
+    DrawBox(barX, ty, barX + barW, ty + barH, GetColor(80, 120, 150), FALSE);
+    ty += 15;
+
+    const auto& catCsv = CsvManager::GetInstance().GetCatStatus();
+    {
+        char csvCatBuf[96];
+        snprintf(csvCatBuf, sizeof(csvCatBuf), "・Statu.csv[Cat]: 初速%.2f / +%.2f(1Lv) / 上限%.2f",
+                 catCsv.baseSpeed, catCsv.speedGrowthPerUnit, catCsv.maxSpeed);
+        DrawStringToHandle(lx, ty, csvCatBuf, GetColor(180, 205, 230), font13);
+        ty += 17;
+    }
+
+    char skillSpdBuf[96];
+    snprintf(skillSpdBuf, sizeof(skillSpdBuf), "・スキル突進速度: 飛びつき 14.0u/f | タックル 11.5u/f");
+    DrawStringToHandle(lx, ty, skillSpdBuf, GetColor(180, 205, 230), font13);
+    ty += 20;
+
+    DrawLine(lx, ty, panelX + panelW - 10, ty, GetColor(50, 90, 110));
+    ty += 6;
+
+    // --- (B) 10m×10m×10m 距離目測スケール ＆ 座標セクション ---
+    const char* cubeModeNames[] = {
+        "猫中心 10m×10m×10m ■ + 10mグリッド",
+        "猫前方 10m×10m×10m ■ + 10mグリッド",
+        "原点(0,0,0) 10m×10m×10m ■ + グリッド",
+        "OFF (非表示)"
+    };
+    DrawStringToHandle(lx, ty, "【距離目測スケール (猫の身長=1.8m基準)】", GetColor(255, 230, 80), font13);
+    ty += 18;
+
+    char scaleBuf1[96];
+    snprintf(scaleBuf1, sizeof(scaleBuf1), "・基準: 猫身長 1.80m = %.1fu (現在身長: %.2fm)",
+             Config::CAT_BASE_HEIGHT_UNITS, player->GetCurrentHeightMeters());
+    DrawStringToHandle(lx, ty, scaleBuf1, GetColor(255, 180, 235), font13);
+    ty += 17;
+
+    char scaleBuf2[96];
+    snprintf(scaleBuf2, sizeof(scaleBuf2), "・1m = %.2fu  |  ■10m×10m×10m 1辺 = %.1fu", unitPerMeter, cubeSize);
+    DrawStringToHandle(lx, ty, scaleBuf2, GetColor(100, 255, 230), font13);
+    ty += 17;
+
+    char modeBuf[112];
+    snprintf(modeBuf, sizeof(modeBuf), "・[7] ■配置: %s", cubeModeNames[m_debugCubeMode % 4]);
+    DrawStringToHandle(lx, ty, modeBuf, GetColor(255, 240, 130), font13);
+    ty += 18;
+
+    char posBuf[112];
+    snprintf(posBuf, sizeof(posBuf), "・現在座標: X=%.1f, Y=%.1f, Z=%.1f (CSV用 %d:%d:%d)",
+             pPos.x, pPos.y, pPos.z,
+             static_cast<int>(std::round(pPos.x)),
+             static_cast<int>(std::round(pPos.y)),
+             static_cast<int>(std::round(pPos.z)));
+    DrawStringToHandle(lx, ty, posBuf, GetColor(220, 240, 255), font13);
+    ty += 18;
+
+    VECTOR minB = stage.GetMinBounds();
+    VECTOR maxB = stage.GetMaxBounds();
+    float mapW_U = maxB.x - minB.x;
+    float mapD_U = maxB.z - minB.z;
+    float mapW_M = mapW_U / unitPerMeter;
+    float mapD_M = mapD_U / unitPerMeter;
+    const char* mapName = (m_selectedMap == ModelConfig::MapType::NewMap) ? "Map2(NewMap)" : "Map1(House)";
+
+    char stageBuf[112];
+    snprintf(stageBuf, sizeof(stageBuf), "・%s: %.0f×%.0fu (約 %.1fm × %.1fm) 壁:%zu枚",
+             mapName, mapW_U, mapD_U, mapW_M, mapD_M, stage.GetWallPolygons().size());
+    DrawStringToHandle(lx, ty, stageBuf, GetColor(190, 220, 250), font13);
+    ty += 20;
+
+    DrawLine(lx, ty, panelX + panelW - 10, ty, GetColor(50, 90, 110));
+    ty += 6;
+
+    // --- (C) ネズミ(Mouse) CSV設定＆個体別スピード・距離一覧 ---
+    DrawStringToHandle(lx, ty, "【ネズミ速度 (Statu.csv) & 生存個体との距離】", GetColor(255, 230, 80), font13);
+    ty += 18;
+
+    const auto& mouseCsv = CsvManager::GetInstance().GetMouseStatus();
+    {
+        char mCsvBuf[96];
+        snprintf(mCsvBuf, sizeof(mCsvBuf), "・Statu.csv[Mouse]: 初速%.2f / +%.2f(1匹) / 上限%.2f",
+                 mouseCsv.baseSpeed, mouseCsv.speedGrowthPerUnit, mouseCsv.maxSpeed);
+        DrawStringToHandle(lx, ty, mCsvBuf, GetColor(200, 220, 240), font13);
+        ty += 17;
+    }
+
+    int mouseIdx = 1;
+    for (const auto& obj : m_objManager.GetObjects())
+    {
+        if (!obj || !obj->IsAlive()) continue;
+        if (obj->GetType() == ObjectType::NormalMouse || obj->GetType() == ObjectType::FastMouse)
+        {
+            auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
+            if (!mouse) continue;
+
+            VECTOR mPos = mouse->GetPos();
+            float dx = mPos.x - pPos.x;
+            float dy = mPos.y - pPos.y;
+            float dz = mPos.z - pPos.z;
+            float distU = std::sqrt(dx * dx + dy * dy + dz * dz);
+            float distM = distU / unitPerMeter;
+            float mSpd  = mouse->GetCurrentSpeed();
+            float mSpdM = (mSpd * 60.0f) / unitPerMeter;
+            bool isFast = (obj->GetType() == ObjectType::FastMouse);
+
+            char mLine[112];
+            snprintf(mLine, sizeof(mLine), " #%d [%s] 速度:%.2fu/f(%.1fm/s) | 距離:%.1fm(%.0fu)%s",
+                     mouseIdx,
+                     isFast ? "Fast" : "Norm",
+                     mSpd, mSpdM, distM, distU,
+                     mouse->IsStunned() ? " [スタン]" : "");
+            DrawStringToHandle(lx, ty, mLine, isFast ? GetColor(255, 150, 150) : GetColor(240, 230, 160), font13);
+            ty += 16;
+            mouseIdx++;
+            if (ty > panelY + panelH - 18) break;
+        }
+    }
+
+    // =========================================================================
+    // 3. 右上：2Dトップダウン・ミニマップ（壁形状・10mグリッド・Pos1〜8・ネズミ・10m×10m枠）
+    // =========================================================================
+    int mapBoxW = 345;
+    int mapBoxH = 265;
+    int mapBoxX = Config::SCREEN_WIDTH - mapBoxW - 16;
+    int mapBoxY = 38;
+
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 220);
+    DrawBox(mapBoxX, mapBoxY, mapBoxX + mapBoxW, mapBoxY + mapBoxH, GetColor(10, 16, 28), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    DrawBox(mapBoxX, mapBoxY, mapBoxX + mapBoxW, mapBoxY + mapBoxH, GetColor(0, 220, 200), FALSE);
+
+    DrawStringToHandle(mapBoxX + 10, mapBoxY + 6, "■ 2D マップ & 10m×10m レーダー", GetColor(80, 255, 230), font16);
+
+    int drawAreaX = mapBoxX + 14;
+    int drawAreaY = mapBoxY + 30;
+    int drawAreaW = mapBoxW - 28;
+    int drawAreaH = mapBoxH - 54;
+
+    DrawBox(drawAreaX, drawAreaY, drawAreaX + drawAreaW, drawAreaY + drawAreaH, GetColor(6, 10, 18), TRUE);
+
+    float spanX = (maxB.x - minB.x);
+    float spanZ = (maxB.z - minB.z);
+    if (spanX < 100.0f) spanX = 1000.0f;
+    if (spanZ < 100.0f) spanZ = 1000.0f;
+
+    float scaleX = static_cast<float>(drawAreaW - 12) / spanX;
+    float scaleZ = static_cast<float>(drawAreaH - 12) / spanZ;
+    float mapScale = (scaleX < scaleZ) ? scaleX : scaleZ;
+
+    float centerWorldX = (minB.x + maxB.x) * 0.5f;
+    float centerWorldZ = (minB.z + maxB.z) * 0.5f;
+    int centerScreenX = drawAreaX + drawAreaW / 2;
+    int centerScreenY = drawAreaY + drawAreaH / 2;
+
+    auto worldToMinimap = [&](float wx, float wz, int& outSx, int& outSy)
+    {
+        outSx = centerScreenX + static_cast<int>((wx - centerWorldX) * mapScale);
+        // 3D空間の+Zが上になるようにY座標を反転
+        outSy = centerScreenY - static_cast<int>((wz - centerWorldZ) * mapScale);
+    };
+
+    // ミニマップ上の10mグリッド描画
+    int minIdxX = static_cast<int>(std::floor(minB.x / cubeSize));
+    int maxIdxX = static_cast<int>(std::ceil(maxB.x / cubeSize));
+    int minIdxZ = static_cast<int>(std::floor(minB.z / cubeSize));
+    int maxIdxZ = static_cast<int>(std::ceil(maxB.z / cubeSize));
+
+    for (int ix = minIdxX; ix <= maxIdxX; ++ix)
+    {
+        float wx = static_cast<float>(ix) * cubeSize;
+        if (wx < minB.x || wx > maxB.x) continue;
+        int sx0, sy0, sx1, sy1;
+        worldToMinimap(wx, minB.z, sx0, sy0);
+        worldToMinimap(wx, maxB.z, sx1, sy1);
+        DrawLine(sx0, sy0, sx1, sy1, (ix == 0) ? GetColor(60, 120, 150) : GetColor(28, 52, 70));
+    }
+    for (int iz = minIdxZ; iz <= maxIdxZ; ++iz)
+    {
+        float wz = static_cast<float>(iz) * cubeSize;
+        if (wz < minB.z || wz > maxB.z) continue;
+        int sx0, sy0, sx1, sy1;
+        worldToMinimap(minB.x, wz, sx0, sy0);
+        worldToMinimap(maxB.x, wz, sx1, sy1);
+        DrawLine(sx0, sy0, sx1, sy1, (iz == 0) ? GetColor(60, 120, 150) : GetColor(28, 52, 70));
+    }
+
+    // ステージ外周バウンディングボックス
+    int bMinX, bMinY, bMaxX, bMaxY;
+    worldToMinimap(minB.x, maxB.z, bMinX, bMinY);
+    worldToMinimap(maxB.x, minB.z, bMaxX, bMaxY);
+    DrawBox(bMinX, bMinY, bMaxX, bMaxY, GetColor(70, 110, 150), FALSE);
+
+    // ステージ壁ポリゴンの描画
+    unsigned int wallMapCol = GetColor(90, 165, 220);
+    for (const auto& wp : stage.GetWallPolygons())
+    {
+        int x0, y0, x1, y1;
+        worldToMinimap(wp.v0.x, wp.v0.z, x0, y0);
+        worldToMinimap(wp.v1.x, wp.v1.z, x1, y1);
+        DrawLine(x0, y0, x1, y1, wallMapCol);
+    }
+
+    // Position.csv (Pos1〜Pos8) のミニマップピン
+    for (size_t i = 0; i < csvPositions.size(); ++i)
+    {
+        int px, py;
+        worldToMinimap(csvPositions[i].x, csvPositions[i].z, px, py);
+        DrawCircle(px, py, 3, GetColor(80, 230, 100), TRUE);
+        char pNum[8];
+        snprintf(pNum, sizeof(pNum), "P%zu", i + 1);
+        DrawStringToHandle(px + 4, py - 6, pNum, GetColor(130, 255, 140), font13);
+    }
+
+    // ミニマップ上の10m×10mキューブ領域（シアン枠）
+    if (m_debugCubeMode != 3)
+    {
+        int cx0, cy0, cx1, cy1;
+        worldToMinimap(cubeCenter.x - halfCube, cubeCenter.z + halfCube, cx0, cy0);
+        worldToMinimap(cubeCenter.x + halfCube, cubeCenter.z - halfCube, cx1, cy1);
+        DrawBox(cx0, cy0, cx1, cy1, GetColor(0, 255, 220), FALSE);
+    }
+
+    // 生存ネズミのミニマップ位置
+    for (const auto& obj : m_objManager.GetObjects())
+    {
+        if (!obj || !obj->IsAlive()) continue;
+        if (obj->GetType() == ObjectType::NormalMouse || obj->GetType() == ObjectType::FastMouse)
+        {
+            VECTOR mPos = obj->GetPos();
+            int mx, my;
+            worldToMinimap(mPos.x, mPos.z, mx, my);
+            bool isFast = (obj->GetType() == ObjectType::FastMouse);
+            DrawCircle(mx, my, 4, isFast ? GetColor(255, 70, 70) : GetColor(255, 210, 60), TRUE);
+        }
+    }
+
+    // プレイヤー(猫)のミニマップ位置と向きベクトル
+    int pMapX, pMapY;
+    worldToMinimap(pPos.x, pPos.z, pMapX, pMapY);
+    float rotY = player->GetRotY();
+    int dirX = pMapX + static_cast<int>(std::sin(rotY) * 12.0f);
+    int dirY = pMapY - static_cast<int>(std::cos(rotY) * 12.0f);
+    DrawLine(pMapX, pMapY, dirX, dirY, GetColor(255, 255, 255));
+    DrawCircle(pMapX, pMapY, 5, GetColor(0, 255, 180), TRUE);
+    DrawCircle(pMapX, pMapY, 5, GetColor(255, 255, 255), FALSE);
+
+    DrawBox(drawAreaX, drawAreaY, drawAreaX + drawAreaW, drawAreaY + drawAreaH, GetColor(60, 100, 130), FALSE);
+    DrawStringToHandle(mapBoxX + 12, mapBoxY + mapBoxH - 20, "緑:猫  水色枠:10m×10m  赤/黄:鼠  P1-8:CSV座標", GetColor(170, 205, 230), font13);
+
+    // =========================================================================
+    // 4. 右側中段：F1 デバッグ＆チートショートカット操作パネル
+    // =========================================================================
+    int cheatW = 345;
+    int cheatH = 212;
+    int cheatX = Config::SCREEN_WIDTH - cheatW - 16;
+    int cheatY = mapBoxY + mapBoxH + 8;
+
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 215);
+    DrawBox(cheatX, cheatY, cheatX + cheatW, cheatY + cheatH, GetColor(15, 18, 30), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    DrawBox(cheatX, cheatY, cheatX + cheatW, cheatY + cheatH, GetColor(255, 220, 40), FALSE);
+
+    int cy = cheatY + 8;
+    DrawStringToHandle(cheatX + 10, cy, "★ F1 デバッグ＆目測・チート操作", GetColor(255, 240, 60), font16);
+    cy += 23;
+    DrawStringToHandle(cheatX + 12, cy, "[1] 通常ネズミ +1体追加スポーン", GetColor(220, 230, 245), font13);
+    cy += 18;
+    DrawStringToHandle(cheatX + 12, cy, "[2] 高速ネズミ +1体追加スポーン", GetColor(220, 230, 245), font13);
+    cy += 18;
+    DrawStringToHandle(cheatX + 12, cy, "[3] パンプアップ Lv +1 (速度・身長UP)", GetColor(220, 230, 245), font13);
+    cy += 18;
+    DrawFormatStringToHandle(cheatX + 12, cy, GetColor(220, 230, 245), font13,
+                             "[4] ネズミ時間停止: %s", m_objManager.IsTimeFrozen() ? "ON" : "OFF");
+    cy += 18;
+    DrawFormatStringToHandle(cheatX + 12, cy, GetColor(220, 230, 245), font13,
+                             "[5] スキルCT無効  : %s", player->IsNoCooldown() ? "ON" : "OFF");
+    cy += 18;
+    DrawFormatStringToHandle(cheatX + 12, cy, GetColor(220, 230, 245), font13,
+                             "[6] エフェクト表示: %s", EffectManager::GetInstance().IsEffectEnabled() ? "ON" : "OFF");
+    cy += 18;
+    DrawStringToHandle(cheatX + 12, cy, "[7] 10m×10m×10m ■表示モード切替", GetColor(100, 255, 220), font13);
+    cy += 18;
+    DrawFormatStringToHandle(cheatX + 12, cy, GetColor(255, 220, 100), font13,
+                             "[8] 10m全体目測・広角カメラ: %s", m_debugWideCamera ? "ON (俯瞰)" : "OFF (通常)");
+    cy += 18;
+    DrawStringToHandle(cheatX + 12, cy, "[F1] デバッグオーバーレイ ON/OFF", GetColor(180, 195, 215), font13);
+}
+
