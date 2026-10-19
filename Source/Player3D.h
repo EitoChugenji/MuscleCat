@@ -27,7 +27,7 @@ class Camera3D;
 class Player3D : public GameObject3D
 {
 public:
-    static constexpr float SPEED_INITIAL  = 3.8f;
+    static constexpr float SPEED_INITIAL  = 5.2f;
     static constexpr float SPEED_SORENESS = 0.0f;
     static constexpr int   MAX_EFFECTIVE_REP = 15;  // 能力値反映上限 (レベル15)
     static constexpr int   PUMP_DECAY_FRAMES = 900; // Rep維持残りフレーム (15秒 = 900f)
@@ -229,20 +229,20 @@ public:
 
         if (eff <= 4)
         {
-            return 7.5f;
+            return 11.0f;
         }
 
         if (eff == 5)
         {
-            return 9.5f;
+            return 13.5f;
         }
 
         if (eff == 6)
         {
-            return 12.0f;
+            return 16.0f;
         }
 
-        return 14.0f + static_cast<float>(eff - 7) * 1.0f;
+        return 18.0f + static_cast<float>(eff - 7) * 1.5f;
     }
 
     int GetPounceDuration() const

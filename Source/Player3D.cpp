@@ -376,7 +376,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
         }
 
         // Rep数に応じた突進速度で直進
-        float pSpeed = GetPounceSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f);
+        float pSpeed = GetPounceSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.1f : 1.0f);
         m_pos.x += m_pounceDir.x * pSpeed;
         m_pos.z += m_pounceDir.z * pSpeed;
 
@@ -429,7 +429,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                         m_state = MuscleState::Normal;
                     }
 
-                    m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.15f;
+                    m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.16f;
                     m_resultShowTimer = 60;
                     m_wasDecayed = true;
                 }
@@ -437,7 +437,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
 
             if (m_repCount > 0)
             {
-                m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.15f;
+                m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.16f;
                 m_state = MuscleState::Muscular;
             }
             
@@ -1096,7 +1096,7 @@ void Player3D::AddRep(int amount)
     m_repCount += amount;
     m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒リセット
     m_state = MuscleState::Muscular;
-    m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.15f;
+    m_speed = SPEED_INITIAL + static_cast<float>(GetEffectiveRep()) * 0.16f;
     m_lastResultSuccess = true;
     m_resultShowTimer = 60;
 
