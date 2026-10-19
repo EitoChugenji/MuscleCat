@@ -306,30 +306,39 @@ void GameManager::StartGame()
     // 部屋・ステージの家具配置
     SetupRoomObstacles();
 
-    // ネズミの生成（マップ別のスポーン位置）
+    // ネズミの生成（マップ別のスポーン位置：全地点でステージ床ポリゴン接地を検証済み）
     const VECTOR spawnRoomsHouse[] = {
-        VGet(  0.0f, 0.0f,  150.0f),  // リビング北
-        VGet(600.0f, 0.0f,  400.0f),  // 北東大部屋
-        VGet(600.0f, 0.0f, -150.0f),  // 東中央部屋
-        VGet(600.0f, 0.0f, -700.0f),  // 南東奥部屋
-        VGet( 50.0f, 0.0f, -700.0f),  // 南西奥部屋
-        VGet(-150.0f, 0.0f, -200.0f), // リビング南西
-        VGet(-500.0f, 0.0f,  500.0f), // 北西高台
-        VGet(-600.0f, 0.0f, -200.0f), // 西高台
+        VGet(   0.0f, 0.0f,    0.0f),  // リビング中央
+        VGet( 180.0f, 0.0f,  180.0f),  // リビング北東
+        VGet(-180.0f, 0.0f,  180.0f),  // リビング北西
+        VGet(-180.0f, 0.0f, -180.0f),  // リビング南西
+        VGet( 550.0f, 0.0f,  450.0f),  // 北東大部屋中央
+        VGet( 780.0f, 0.0f,  450.0f),  // 北東部屋東奥
+        VGet( 550.0f, 0.0f,  200.0f),  // 北東部屋南側
+        VGet( 600.0f, 0.0f, -100.0f),  // 東中央部屋
+        VGet( 750.0f, 0.0f, -300.0f),  // 東部屋南奥
+        VGet( 650.0f, 0.0f, -700.0f),  // 南東奥部屋
+        VGet( 320.0f, 0.0f, -720.0f),  // 南通路中央
+        VGet(-100.0f, 0.0f, -480.0f),  // 西通路南
+        VGet(-200.0f, 0.0f,    0.0f),  // 玄関口
     };
     const int houseRoomCount = sizeof(spawnRoomsHouse) / sizeof(spawnRoomsHouse[0]);
 
     const VECTOR spawnRoomsNewMap[] = {
-        VGet(  400.0f, 0.0f,   400.0f),  // 中央東エリア
-        VGet( -600.0f, 0.0f,   400.0f),  // 中央西エリア
-        VGet(  400.0f, 0.0f,  -400.0f),  // 中央南東エリア
-        VGet( -600.0f, 0.0f,  -400.0f),  // 中央南西エリア
-        VGet( 1200.0f, 0.0f,     0.0f),  // 東通路エリア
-        VGet( 1600.0f, 0.0f,  -400.0f),  // 東奥エリア
-        VGet( 1600.0f, 0.0f,   800.0f),  // 北東エリア
-        VGet(-1200.0f, 0.0f,   800.0f),  // 北西エリア
-        VGet(-1600.0f, 0.0f, -1200.0f),  // 南西奥エリア
-        VGet(  800.0f, 0.0f, -1400.0f),  // 南奥エリア
+        VGet(   0.0f, 0.0f,  -400.0f),  // 中央南
+        VGet( 600.0f, 0.0f,   800.0f),  // 北東エリア手前
+        VGet(-600.0f, 0.0f,   800.0f),  // 北西エリア手前
+        VGet(1200.0f, 0.0f,     0.0f),  // 東中央通路
+        VGet(1600.0f, 0.0f,   400.0f),  // 東北エリア
+        VGet(1800.0f, 0.0f,  -400.0f),  // 東南エリア
+        VGet(1400.0f, 0.0f,  -800.0f),  // 東南通路
+        VGet( 400.0f, 0.0f, -1400.0f),  // 南通路東
+        VGet(-400.0f, 0.0f, -1200.0f),  // 南通路西
+        VGet(-1200.0f, 0.0f, -1200.0f), // 南西エリア奥
+        VGet(-1600.0f, 0.0f,  -400.0f), // 西通路南
+        VGet(-1600.0f, 0.0f,   400.0f), // 西通路北
+        VGet(-1800.0f, 0.0f,     0.0f), // 西奥中央
+        VGet(   0.0f, 0.0f,  1000.0f),  // 北中央通路
     };
     const int newMapRoomCount = sizeof(spawnRoomsNewMap) / sizeof(spawnRoomsNewMap[0]);
 
@@ -337,17 +346,44 @@ void GameManager::StartGame()
     int roomCount = (m_selectedMap == ModelConfig::MapType::House) ? houseRoomCount : newMapRoomCount;
 
     const auto& stage = m_objManager.GetStage();
+
+    // ステージモデルの床上に確実に接地させるスポーン座標決定ヘルパー
+    auto FindGuaranteedGroundSpawnPos = [&](int candidateIndex) -> VECTOR
+    {
+        for (int offsetAttempt = 0; offsetAttempt < roomCount; ++offsetAttempt)
+        {
+            int rIdx = (candidateIndex + offsetAttempt) % roomCount;
+            const VECTOR& basePos = spawnRooms[rIdx];
+
+            for (int jitterAttempt = 0; jitterAttempt < 6; ++jitterAttempt)
+            {
+                float ox = (jitterAttempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
+                float oz = (jitterAttempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
+                VECTOR testPos = VGet(basePos.x + ox, 0.0f, basePos.z + oz);
+                float gy = 0.0f;
+                if (stage.GetGroundHeight(testPos, gy))
+                {
+                    testPos.y = gy;
+                    return testPos;
+                }
+            }
+        }
+
+        // 万一のセーフティネット：猫の初期位置近傍
+        float fallbackGy = 0.0f;
+        VECTOR fallbackPos = (m_selectedMap == ModelConfig::MapType::House)
+            ? VGet(0.0f, 0.0f, 0.0f)
+            : VGet(0.0f, 0.0f, 450.0f);
+        if (stage.GetGroundHeight(fallbackPos, fallbackGy))
+        {
+            fallbackPos.y = fallbackGy;
+        }
+        return fallbackPos;
+    };
+
     for (int i = 0; i < Config::NORMAL_MOUSE_COUNT; ++i)
     {
-        int rIdx = i % roomCount;
-        float ox = static_cast<float>((rand() % 40) - 20);
-        float oz = static_cast<float>((rand() % 40) - 20);
-        VECTOR spawnPos = VGet(spawnRooms[rIdx].x + ox, 0.0f, spawnRooms[rIdx].z + oz);
-        float gy = 0.0f;
-        if (stage.GetGroundHeight(spawnPos, gy))
-        {
-            spawnPos.y = gy;
-        }
+        VECTOR spawnPos = FindGuaranteedGroundSpawnPos(i);
         auto mouse = std::make_shared<NormalMouse3D>(spawnPos, player);
         mouse->SetMapType(m_selectedMap);
         m_objManager.AddObject(mouse);
@@ -355,15 +391,7 @@ void GameManager::StartGame()
 
     for (int i = 0; i < Config::FAST_MOUSE_COUNT; ++i)
     {
-        int rIdx = (Config::NORMAL_MOUSE_COUNT + i) % roomCount;
-        float ox = static_cast<float>((rand() % 40) - 20);
-        float oz = static_cast<float>((rand() % 40) - 20);
-        VECTOR spawnPos = VGet(spawnRooms[rIdx].x + ox, 0.0f, spawnRooms[rIdx].z + oz);
-        float gy = 0.0f;
-        if (stage.GetGroundHeight(spawnPos, gy))
-        {
-            spawnPos.y = gy;
-        }
+        VECTOR spawnPos = FindGuaranteedGroundSpawnPos(Config::NORMAL_MOUSE_COUNT + i);
         auto mouse = std::make_shared<FastMouse3D>(spawnPos, player);
         mouse->SetMapType(m_selectedMap);
         m_objManager.AddObject(mouse);
