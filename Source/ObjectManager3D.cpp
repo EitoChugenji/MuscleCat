@@ -5,6 +5,7 @@
 #include "Obstacle3D.h"
 #include "Camera3D.h"
 #include "CsvManager.h"
+#include "FontManager.h"
 #include "Common.h"
 #include "DxLib.h"
 #include <algorithm>
@@ -15,7 +16,11 @@ void ObjectManager3D::Clear()
     m_obstacles.clear();
     m_player.reset();
     m_caughtCount = 0;
+    m_caughtNormalCount = 0;
+    m_caughtFastCount = 0;
     m_isTimeFrozen = false;
+    m_hitStopFrames = 0;
+    m_catchPopups.clear();
 }
 
 void ObjectManager3D::InitStage(ModelConfig::MapType mapType)
@@ -101,8 +106,29 @@ void ObjectManager3D::SpawnFastMouse()
     ApplyMouseSpeedBonus();
 }
 
-void ObjectManager3D::Update(const Camera3D& camera)
+void ObjectManager3D::Update(Camera3D& camera)
 {
+    // ポップアップタイマー更新
+    for (auto it = m_catchPopups.begin(); it != m_catchPopups.end(); )
+    {
+        it->timer--;
+        if (it->timer <= 0)
+        {
+            it = m_catchPopups.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // ヒットストップ中（捕獲時などの一瞬の静止演出）
+    if (m_hitStopFrames > 0)
+    {
+        m_hitStopFrames--;
+        return;
+    }
+
     // プレイヤー更新（TPSカメラ基準・飛びつき追尾用ネズミ座標収集）
     if (m_player && m_player->IsAlive())
     {
@@ -135,10 +161,10 @@ void ObjectManager3D::Update(const Camera3D& camera)
     }
 
     // 障害物・ステージ壁との衝突押し出し
-    CheckObstacleAndStageCollisions();
+    CheckObstacleAndStageCollisions(camera);
 
     // ネズミと猫の捕獲当たり判定
-    CheckCollisions();
+    CheckCollisions(camera);
 
     // 死亡（捕獲された）オブジェクトの削除
     m_objects.erase
@@ -201,9 +227,34 @@ void ObjectManager3D::Draw2D()
     {
         m_player->Draw2D();
     }
+
+    // 捕獲ポップアップ（+1 CATCH! 演出）
+    int font24 = FontManager::GetInstance().GetFont24();
+    for (const auto& popup : m_catchPopups)
+    {
+        // 3D座標から画面座標(2D)に変換
+        VECTOR screenPos = ConvWorldPosToScreenPos(popup.worldPos);
+        if (screenPos.z >= 0.0f && screenPos.z <= 1.0f)
+        {
+            float progress = 1.0f - static_cast<float>(popup.timer) / static_cast<float>(popup.maxTimer);
+            int yOffset = static_cast<int>(progress * 40.0f);
+            int x = static_cast<int>(screenPos.x);
+            int y = static_cast<int>(screenPos.y) - 30 - yOffset;
+
+            int textW = GetDrawStringWidthToHandle(popup.text.c_str(), static_cast<int>(popup.text.length()), font24);
+            int drawX = x - textW / 2;
+
+            // ポップな縁取り描画
+            DrawStringToHandle(drawX - 2, y, popup.text.c_str(), GetColor(0, 0, 0), font24);
+            DrawStringToHandle(drawX + 2, y, popup.text.c_str(), GetColor(0, 0, 0), font24);
+            DrawStringToHandle(drawX, y - 2, popup.text.c_str(), GetColor(0, 0, 0), font24);
+            DrawStringToHandle(drawX, y + 2, popup.text.c_str(), GetColor(0, 0, 0), font24);
+            DrawStringToHandle(drawX, y, popup.text.c_str(), GetColor(255, 230, 40), font24);
+        }
+    }
 }
 
-void ObjectManager3D::CheckCollisions()
+void ObjectManager3D::CheckCollisions(Camera3D& camera)
 {
     if (!m_player || !m_player->IsAlive())
     {
@@ -227,7 +278,7 @@ void ObjectManager3D::CheckCollisions()
             float mRadius = obj->GetRadius();
 
             float distSq = (pPos.x - mPos.x) * (pPos.x - mPos.x) +
-                           (pPos.y - mPos.y) * (pPos.y - mPos.y) +
+                           ((pPos.y - mPos.y) * 0.5f) * ((pPos.y - mPos.y) * 0.5f) +
                            (pPos.z - mPos.z) * (pPos.z - mPos.z);
             float totalR = pRadius + mRadius;
 
@@ -247,16 +298,39 @@ void ObjectManager3D::CheckCollisions()
                 else
                 {
                     // 通常接触時：捕獲成功（スタン中のネズミも通常接触で捕獲可能！）
+                    bool isFast = (obj->GetType() == ObjectType::FastMouse);
+                    if (isFast)
+                    {
+                        m_caughtFastCount++;
+                    }
+                    else
+                    {
+                        m_caughtNormalCount++;
+                    }
                     obj->SetAlive(false);
                     m_caughtCount++;
                     ApplyMouseSpeedBonus();
+
+                    // カメラシェイク演出発動
+                    camera.TriggerShake(8.0f, 10);
+
+                    // ヒットストップ発動（捕獲瞬間の手応え・重量感）
+                    TriggerHitStop(6);
+
+                    // 捕獲ポップアップ追加
+                    CatchPopup cp;
+                    cp.worldPos = mPos;
+                    cp.timer = 45;
+                    cp.maxTimer = 45;
+                    cp.text = isFast ? "FAST GET! +1" : "GET! +1";
+                    m_catchPopups.push_back(cp);
                 }
             }
         }
     }
 }
 
-void ObjectManager3D::CheckObstacleAndStageCollisions()
+void ObjectManager3D::CheckObstacleAndStageCollisions(Camera3D& camera)
 {
     // 1. プレイヤーと障害物・壁の衝突解決
     if (m_player && m_player->IsAlive())
@@ -285,6 +359,7 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
         {
             // 猫が1.5秒（90フレーム）気絶スタン
             m_player->ApplyStun(90);
+            camera.TriggerShake(12.0f, 15);
         }
 
         // 床・坂道への接地判定およびマップ外（足場のない空間・崖）への落下・はみ出し防止
