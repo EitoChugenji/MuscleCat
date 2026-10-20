@@ -21,6 +21,12 @@ private:
     int    m_manualControlTimer = 0;
     float  m_mouseSensitivityScale = 1.0f; // マウス視点感度倍率 (0.2x ~ 3.0x, デフォルト 1.0x)
 
+    // カメラシェイク（画面揺れ演出）
+    float  m_shakeIntensity = 0.0f;
+    int    m_shakeFrames = 0;
+    int    m_shakeMaxFrames = 0;
+    VECTOR m_shakeOffset = VGet(0.0f, 0.0f, 0.0f);
+
 public:
     Camera3D();
     ~Camera3D() = default;
@@ -37,6 +43,9 @@ public:
         const VECTOR* maxBounds = nullptr
     );
     void Apply() const;
+
+    // カメラシェイク発動
+    void TriggerShake(float intensity, int frames);
 
     float GetAngleH() const { return m_angleH; }
     VECTOR GetCameraPos() const { return m_currentPos; }

@@ -26,7 +26,7 @@ float Player3D::CalculateSpeedForRep(int effectiveRep) const
 }
 
 Player3D::Player3D(const VECTOR& pos)
-    : GameObject3D(pos, 18.0f, ObjectType::Player)
+    : GameObject3D(pos, 25.0f, ObjectType::Player)
     , m_speed(SPEED_INITIAL)
     , m_state(MuscleState::Normal)
     , m_repCount(0)
@@ -222,7 +222,7 @@ void Player3D::Update()
     // 通常のUpdate（後方互換）
 }
 
-void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR>& targetPositions)
+void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& targetPositions)
 {
     m_prevPos = m_pos;
     m_animFrame++;
@@ -691,8 +691,9 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                             m_resultShowTimer = 60;
                             m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
 
-                            // 筋トレ成功エフェクト再生（無効化中）
-                            // EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+                            // 筋トレ成功エフェクト再生
+                            EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+                            camera.TriggerShake(6.0f, 6);
                         }
                         
                         else
@@ -701,6 +702,7 @@ void Player3D::UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR
                             m_lastResultSuccess = false;
                             m_resultShowTimer = 90;
                             m_scStoppedTimer = 22; // 約0.36秒間針を止めて失敗位置を表示
+                            camera.TriggerShake(8.0f, 8);
                         }
                     }
                     
@@ -1112,8 +1114,8 @@ void Player3D::AddRep(int amount)
     m_lastResultSuccess = true;
     m_resultShowTimer = 60;
 
-    // 筋トレ成功エフェクト再生（無効化中）
-    // EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+    // 筋トレ成功エフェクト再生
+    EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
 }
 
 void Player3D::DrawBarbell(float catScale)

@@ -16,12 +16,12 @@ namespace ModelConfig
 
     // 通常ネズミ
     constexpr const char* MOUSE_NORMAL_MODEL_PATH = "Resource/Models/MouseModel/ネズミ.mv1";
-    constexpr float       MOUSE_NORMAL_MODEL_SCALE = 7.0f;
+    constexpr float       MOUSE_NORMAL_MODEL_SCALE = 11.0f; // モデルサイズ拡大（7.0f → 11.0f）
     constexpr float       MOUSE_NORMAL_MODEL_ROT_Y = 3.14159265f; // 180度反転（ラジアン）
 
     // 高速逃走ネズミ
     constexpr const char* MOUSE_FAST_MODEL_PATH = "Resource/Models/MouseModel/ネズミ.mv1";
-    constexpr float       MOUSE_FAST_MODEL_SCALE = 7.0f;
+    constexpr float       MOUSE_FAST_MODEL_SCALE = 11.0f; // モデルサイズ拡大（7.0f → 11.0f）
     constexpr float       MOUSE_FAST_MODEL_ROT_Y = 3.14159265f; // 180度反転（ラジアン）
 
     // マップ種別

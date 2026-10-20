@@ -18,7 +18,21 @@ private:
     std::shared_ptr<Player3D>                  m_player;
     Stage3D                                    m_stage;
     int                                        m_caughtCount = 0;
+    int                                        m_caughtNormalCount = 0;
+    int                                        m_caughtFastCount = 0;
     bool                                       m_isTimeFrozen = false;
+    bool                                       m_showDebugHitboxes = false;
+    int                                        m_hitStopFrames = 0; // ヒットストップ残りフレーム
+
+    // 捕獲演出用ポップアップ
+    struct CatchPopup
+    {
+        VECTOR worldPos;
+        int    timer = 45;
+        int    maxTimer = 45;
+        std::string text;
+    };
+    std::vector<CatchPopup>                    m_catchPopups;
 
 public:
     ObjectManager3D() = default;
@@ -73,22 +87,59 @@ public:
     {
         m_isTimeFrozen = !m_isTimeFrozen;
     }
-    
+
+    // ヒットストップ
+    void TriggerHitStop(int frames)
+    {
+        if (frames > m_hitStopFrames)
+        {
+            m_hitStopFrames = frames;
+        }
+    }
+    bool IsHitStopping() const { return m_hitStopFrames > 0; }
+
+    bool IsDebugHitboxesEnabled() const
+    {
+        return m_showDebugHitboxes;
+    }
+
+    void ToggleDebugHitboxes()
+    {
+        m_showDebugHitboxes = !m_showDebugHitboxes;
+    }
+
+    void SetDebugHitboxes(bool enabled)
+    {
+        m_showDebugHitboxes = enabled;
+    }
+
+    void DrawDebugHitboxes() const;
+
     void SpawnNormalMouse();
     void SpawnFastMouse();
 
-    void Update(const Camera3D& camera);
+    void Update(Camera3D& camera);
     void Draw3D();
     void Draw2D();
 
-    void CheckCollisions();
-    void CheckObstacleAndStageCollisions();
+    void CheckCollisions(Camera3D& camera);
+    void CheckObstacleAndStageCollisions(Camera3D& camera);
 
     int GetRemainingMouseCount() const;
     
     int GetCaughtCount() const
     {
         return m_caughtCount;
+    }
+
+    int GetCaughtNormalCount() const
+    {
+        return m_caughtNormalCount;
+    }
+
+    int GetCaughtFastCount() const
+    {
+        return m_caughtFastCount;
     }
     
     float GetCurrentMouseSpeed() const;
