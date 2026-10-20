@@ -37,6 +37,11 @@ void Camera3D::Init(const VECTOR& initialTargetPos, float initialAngleH)
 
     m_currentPos = VGet(desiredCamX, desiredCamY, desiredCamZ);
 
+    m_shakeIntensity = 0.0f;
+    m_shakeFrames = 0;
+    m_shakeMaxFrames = 0;
+    m_shakeOffset = VGet(0.0f, 0.0f, 0.0f);
+
     ResetMouseToCenter();
 }
 
@@ -295,12 +300,44 @@ void Camera3D::Update(
         m_currentPos.y = MathHelper::Lerp(m_currentPos.y, desiredCamY, 0.35f);
         m_currentPos.z = MathHelper::Lerp(m_currentPos.z, desiredCamZ, 0.35f);
     }
+
+    // カメラシェイク更新（時間経過で減衰しながら振動）
+    if (m_shakeFrames > 0 && m_shakeMaxFrames > 0)
+    {
+        float ratio = static_cast<float>(m_shakeFrames) / static_cast<float>(m_shakeMaxFrames);
+        float curIntensity = m_shakeIntensity * ratio;
+
+        float rx = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f) * curIntensity;
+        float ry = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f) * (curIntensity * 0.8f);
+        float rz = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f) * curIntensity;
+
+        m_shakeOffset = VGet(rx, ry, rz);
+        m_shakeFrames--;
+    }
+    else
+    {
+        m_shakeOffset = VGet(0.0f, 0.0f, 0.0f);
+        m_shakeFrames = 0;
+    }
 }
 
 void Camera3D::Apply() const
 {
     SetCameraNearFar(5.0f, 90000.0f);
-    SetCameraPositionAndTarget_UpVecY(m_currentPos, m_targetPos);
+    VECTOR camPos = VAdd(m_currentPos, m_shakeOffset);
+    VECTOR targetPos = VAdd(m_targetPos, VScale(m_shakeOffset, 0.4f));
+    SetCameraPositionAndTarget_UpVecY(camPos, targetPos);
+}
+
+void Camera3D::TriggerShake(float intensity, int frames)
+{
+    if (frames <= 0) return;
+    if (intensity >= m_shakeIntensity || m_shakeFrames <= 0)
+    {
+        m_shakeIntensity = intensity;
+        m_shakeFrames = frames;
+        m_shakeMaxFrames = frames;
+    }
 }
 
 VECTOR Camera3D::GetForwardXZ() const

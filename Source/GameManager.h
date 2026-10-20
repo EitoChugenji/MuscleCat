@@ -35,13 +35,17 @@ private:
     // デバッグチート関連
     bool  m_cheatEnabled = false;
     bool  m_prevKeyF1 = false;
+    bool  m_prevKeyF2 = false;
+    bool  m_prevKeyF3 = false;
     bool  m_prevKey1  = false;
     bool  m_prevKey2  = false;
     bool  m_prevKey3  = false;
     bool  m_prevKey4  = false;
     bool  m_prevKey5  = false;
     bool  m_prevKey6  = false;
+    bool  m_prevKey7  = false;
     int   m_prevUpdateTime = 0;
+    int   m_effectNoticeTimer = 0; // エフェクト切替通知タイマー
 
     // タイトル画面用演出・メニュー状態
     ModelConfig::MapType m_selectedMap = ModelConfig::MapType::SlopeHills;
@@ -72,11 +76,16 @@ private:
     bool  m_prevKeyMinus = false;
     bool  m_prevKeyPlus = false;
 
+    // リザルト（クリア画面）演出用
+    int   m_clearAnimTimer = 0;
+    int   m_clearFinalRep = 0;
+
     void SetupRoomObstacles();
     void DrawTitleScreen();
     void DrawHowToPlayModal();
     void UpdatePause(bool triggerEsc);
     void DrawPauseModal();
+    void DrawClearScreen();
 
 public:
     GameManager() = default;

@@ -4,6 +4,7 @@
 #include "Mouse3D.h"
 #include "Obstacle3D.h"
 #include "Camera3D.h"
+#include "FontManager.h"
 #include "Common.h"
 #include "DxLib.h"
 #include <algorithm>
@@ -14,7 +15,11 @@ void ObjectManager3D::Clear()
     m_obstacles.clear();
     m_player.reset();
     m_caughtCount = 0;
+    m_caughtNormalCount = 0;
+    m_caughtFastCount = 0;
     m_isTimeFrozen = false;
+    m_hitStopFrames = 0;
+    m_catchPopups.clear();
 }
 
 void ObjectManager3D::InitStage(ModelConfig::MapType mapType)
@@ -133,8 +138,29 @@ void ObjectManager3D::SpawnFastMouse()
     AddObject(mouse);
 }
 
-void ObjectManager3D::Update(const Camera3D& camera)
+void ObjectManager3D::Update(Camera3D& camera)
 {
+    // 捕獲ポップアップタイマーの更新
+    for (auto it = m_catchPopups.begin(); it != m_catchPopups.end(); )
+    {
+        it->timer--;
+        if (it->timer <= 0)
+        {
+            it = m_catchPopups.erase(it);
+        }
+        else
+        {
+            ++it;
+        }
+    }
+
+    // ヒットストップ中ならオブジェクトの物理・移動更新を一時停止（打撃インパクト強調）
+    if (m_hitStopFrames > 0)
+    {
+        m_hitStopFrames--;
+        return;
+    }
+
     // プレイヤー更新（TPSカメラ基準・飛びつき追尾用ネズミ座標収集）
     if (m_player && m_player->IsAlive())
     {
@@ -167,10 +193,10 @@ void ObjectManager3D::Update(const Camera3D& camera)
     }
 
     // 障害物・ステージ壁との衝突押し出し
-    CheckObstacleAndStageCollisions();
+    CheckObstacleAndStageCollisions(camera);
 
     // ネズミと猫の捕獲当たり判定
-    CheckCollisions();
+    CheckCollisions(camera);
 
     // 死亡（捕獲された）オブジェクトの削除
     m_objects.erase
@@ -209,6 +235,110 @@ void ObjectManager3D::Draw3D()
     {
         m_player->Draw3D();
     }
+
+    // 5. デバッグ当たり判定可視化ワイヤーフレーム
+    DrawDebugHitboxes();
+}
+
+void ObjectManager3D::DrawDebugHitboxes() const
+{
+    if (!m_showDebugHitboxes)
+    {
+        return;
+    }
+
+    SetWriteZBuffer3D(FALSE);
+
+    // 1. 障害物・家具 (Obstacle3D) の直方体当たり判定 (AABB: シアン)
+    for (const auto& obs : m_obstacles)
+    {
+        if (!obs) continue;
+        VECTOR pos = obs->GetPos();
+        float w = obs->GetWidth();
+        float h = obs->GetHeight();
+        float d = obs->GetDepth();
+
+        float minX = pos.x - w * 0.5f;
+        float maxX = pos.x + w * 0.5f;
+        float minZ = pos.z - d * 0.5f;
+        float maxZ = pos.z + d * 0.5f;
+        float minY = pos.y;
+        float maxY = pos.y + h;
+
+        unsigned int boxCol = GetColor(50, 220, 255); // シアン (水色)
+
+        // 底面4辺
+        DrawLine3D(VGet(minX, minY, minZ), VGet(maxX, minY, minZ), boxCol);
+        DrawLine3D(VGet(maxX, minY, minZ), VGet(maxX, minY, maxZ), boxCol);
+        DrawLine3D(VGet(maxX, minY, maxZ), VGet(minX, minY, maxZ), boxCol);
+        DrawLine3D(VGet(minX, minY, maxZ), VGet(minX, minY, minZ), boxCol);
+
+        // 天面4辺
+        DrawLine3D(VGet(minX, maxY, minZ), VGet(maxX, maxY, minZ), boxCol);
+        DrawLine3D(VGet(maxX, maxY, minZ), VGet(maxX, maxY, maxZ), boxCol);
+        DrawLine3D(VGet(maxX, maxY, maxZ), VGet(minX, maxY, maxZ), boxCol);
+        DrawLine3D(VGet(minX, maxY, maxZ), VGet(minX, maxY, minZ), boxCol);
+
+        // 柱4辺
+        DrawLine3D(VGet(minX, minY, minZ), VGet(minX, maxY, minZ), boxCol);
+        DrawLine3D(VGet(maxX, minY, minZ), VGet(maxX, maxY, minZ), boxCol);
+        DrawLine3D(VGet(maxX, minY, maxZ), VGet(maxX, maxY, maxZ), boxCol);
+        DrawLine3D(VGet(minX, minY, maxZ), VGet(minX, maxY, maxZ), boxCol);
+    }
+
+    // 2. ネズミ (Mouse3D) の球体当たり判定（通常: 黄色、高速: オレンジ）
+    for (const auto& obj : m_objects)
+    {
+        if (!obj || !obj->IsAlive()) continue;
+        VECTOR mPos = obj->GetPos();
+        float mRadius = obj->GetRadius();
+        bool isFast = (obj->GetType() == ObjectType::FastMouse);
+
+        unsigned int mouseCol = isFast ? GetColor(255, 90, 40) : GetColor(255, 230, 40);
+        DrawSphere3D(VGet(mPos.x, mPos.y + mRadius, mPos.z), mRadius, 8, mouseCol, mouseCol, FALSE);
+    }
+
+    // 3. プレイヤー (Player3D) の球体当たり判定（通常: 緑、タックル/飛びつき中: 強化オレンジ）
+    if (m_player && m_player->IsAlive())
+    {
+        VECTOR pPos = m_player->GetPos();
+        float pRadius = m_player->GetRadius();
+
+        unsigned int catCol = (m_player->IsPouncing() || m_player->IsTackling())
+            ? GetColor(255, 170, 30)
+            : GetColor(80, 255, 80);
+
+        DrawSphere3D(VGet(pPos.x, pPos.y + pRadius, pPos.z), pRadius, 10, catCol, catCol, FALSE);
+
+        // 前方向きベクトル
+        float rotY = m_player->GetRotY();
+        VECTOR forward = VGet(std::sin(rotY) * 35.0f, 0.0f, std::cos(rotY) * 35.0f);
+        DrawLine3D(VGet(pPos.x, pPos.y + pRadius, pPos.z),
+                   VGet(pPos.x + forward.x, pPos.y + pRadius, pPos.z + forward.z),
+                   catCol);
+    }
+
+    // 4. ステージ壁ポリゴンのワイヤーフレーム（猫の周囲550以内: ネオンピンク）
+    if (m_player)
+    {
+        VECTOR catPos = m_player->GetPos();
+        const auto& walls = m_stage.GetWallPolygons();
+        unsigned int wallCol = GetColor(255, 60, 200);
+
+        for (const auto& wp : walls)
+        {
+            float dx = wp.v0.x - catPos.x;
+            float dz = wp.v0.z - catPos.z;
+            if (dx * dx + dz * dz < 550.0f * 550.0f)
+            {
+                DrawLine3D(wp.v0, wp.v1, wallCol);
+                DrawLine3D(wp.v1, wp.v2, wallCol);
+                DrawLine3D(wp.v2, wp.v0, wallCol);
+            }
+        }
+    }
+
+    SetWriteZBuffer3D(TRUE);
 }
 
 void ObjectManager3D::Draw2D()
@@ -233,9 +363,47 @@ void ObjectManager3D::Draw2D()
     {
         m_player->Draw2D();
     }
+
+    // 捕獲ポップアップ描画（画面上への跳ね上がり＆フェードアウト演出）
+    const auto& fm = FontManager::GetInstance();
+    int font24 = fm.GetFont24();
+    for (const auto& popup : m_catchPopups)
+    {
+        VECTOR screenPos = ConvWorldPosToScreenPos(popup.worldPos);
+        if (screenPos.z >= 0.0f && screenPos.z <= 1.0f)
+        {
+            float ratio = static_cast<float>(popup.timer) / static_cast<float>(popup.maxTimer);
+            float bounceY = std::sin((1.0f - ratio) * DX_PI_F * 0.5f) * 35.0f;
+            int drawX = static_cast<int>(screenPos.x);
+            int drawY = static_cast<int>(screenPos.y - bounceY);
+
+            int alpha = static_cast<int>(255 * (ratio < 0.25f ? (ratio / 0.25f) : 1.0f));
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+
+            int strW = GetDrawStringWidthToHandle(popup.text.c_str(), static_cast<int>(popup.text.length()), font24);
+            int textX = drawX - strW / 2;
+            int textY = drawY - 12;
+
+            // コミック風太黒縁取り
+            for (int ox = -2; ox <= 2; ++ox)
+            {
+                for (int oy = -2; oy <= 2; ++oy)
+                {
+                    if (ox != 0 || oy != 0)
+                    {
+                        DrawStringToHandle(textX + ox, textY + oy, popup.text.c_str(), GetColor(0, 0, 0), font24);
+                    }
+                }
+            }
+            // メインカラー（ビビッドイエロー〜ゴールド）
+            DrawStringToHandle(textX, textY, popup.text.c_str(), GetColor(255, 230, 40), font24);
+
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        }
+    }
 }
 
-void ObjectManager3D::CheckCollisions()
+void ObjectManager3D::CheckCollisions(Camera3D& camera)
 {
     if (!m_player || !m_player->IsAlive())
     {
@@ -258,9 +426,11 @@ void ObjectManager3D::CheckCollisions()
             VECTOR mPos = obj->GetPos();
             float mRadius = obj->GetRadius();
 
-            float distSq = (pPos.x - mPos.x) * (pPos.x - mPos.x) +
-                           (pPos.y - mPos.y) * (pPos.y - mPos.y) +
-                           (pPos.z - mPos.z) * (pPos.z - mPos.z);
+            // 坂道や段差での上下（Y軸）の判定アシスト（Yの差を緩和して飛びつき空振りを防ぐ）
+            float dx = pPos.x - mPos.x;
+            float dy = (pPos.y - mPos.y) * 0.5f;
+            float dz = pPos.z - mPos.z;
+            float distSq = dx * dx + dy * dy + dz * dz;
             float totalR = pRadius + mRadius;
 
             if (distSq <= totalR * totalR)
@@ -269,26 +439,51 @@ void ObjectManager3D::CheckCollisions()
                 {
                     // タックル時：ネズミは捕まえられないが、スタン状態にする！
                     auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
-                    if (mouse)
+                    if (mouse && !mouse->IsStunned())
                     {
                         int stunDuration = m_player->GetMouseStunDuration();
                         mouse->ApplyStun(stunDuration);
+
+                        // 強烈な打撃感：強シェイク ＆ ヒットストップ
+                        camera.TriggerShake(18.0f, 9);
+                        TriggerHitStop(6);
                     }
                 }
                 
                 else
                 {
                     // 通常接触時：捕獲成功（スタン中のネズミも通常接触で捕獲可能！）
+                    bool isFast = (obj->GetType() == ObjectType::FastMouse);
                     obj->SetAlive(false);
                     m_caughtCount++;
+                    if (isFast)
+                    {
+                        m_caughtFastCount++;
+                    }
+                    else
+                    {
+                        m_caughtNormalCount++;
+                    }
                     ApplyMouseSpeedBonus();
+
+                    // 捕獲の爽快感：カメラシェイク ＆ ヒットストップ
+                    camera.TriggerShake(13.0f, 7);
+                    TriggerHitStop(5);
+
+                    // 捕獲演出ポップアップ
+                    CatchPopup cp;
+                    cp.worldPos = VGet(mPos.x, mPos.y + 24.0f, mPos.z);
+                    cp.timer = 45;
+                    cp.maxTimer = 45;
+                    cp.text = isFast ? "FAST CATCH!!" : "CATCH!!";
+                    m_catchPopups.push_back(cp);
                 }
             }
         }
     }
 }
 
-void ObjectManager3D::CheckObstacleAndStageCollisions()
+void ObjectManager3D::CheckObstacleAndStageCollisions(Camera3D& camera)
 {
     // 1. プレイヤーと障害物・壁の衝突解決
     if (m_player && m_player->IsAlive())
@@ -313,10 +508,14 @@ void ObjectManager3D::CheckObstacleAndStageCollisions()
         }
 
         // タックル中に壁や家具に当たったら猫がスタンする！
-        if (collided && m_player->IsTackling())
+        if (collided && m_player->IsTackling() && !m_player->IsStunned())
         {
             // 猫が1.5秒（90フレーム）気絶スタン
             m_player->ApplyStun(90);
+
+            // 壁激突インパクト：特大シェイク ＆ 長めヒットストップ
+            camera.TriggerShake(24.0f, 12);
+            TriggerHitStop(8);
         }
 
         // 床・坂道への接地判定およびマップ外（足場のない空間・崖）への落下・はみ出し防止

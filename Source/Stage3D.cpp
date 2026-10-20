@@ -266,7 +266,7 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                 float m = (a > b) ? a : b;
                 return (m > c) ? m : c;
             };
-
+            
             std::vector<int> meshWallCount(meshNum, 0);
 
             auto ExtractPolygons = [&](const MV1_REF_POLYGONLIST& ref) {
@@ -302,6 +302,7 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                             continue;
                         }
                     }
+
                     else
                     {
                         if (polyHeight < 8.0f)
@@ -421,7 +422,7 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
                 AddWallQuad(VGet(1800.0f, 0.0f, 480.0f), VGet(1800.0f, 0.0f, 540.0f), bY, tY);
 
                 // 2. 西側カーブ通路の突出スタブ・行き止まり端壁
-                AddWallQuad(VGet(-1200.0f, 0.0f, -1350.0f), VGet(-1200.0f, 0.0f, -1050.0f), bY, tY);
+                //AddWallQuad(VGet(-1200.0f, 0.0f, -1350.0f), VGet(-1200.0f, 0.0f, -1050.0f), bY, tY);
                 AddWallQuad(VGet(-2310.0f, 0.0f, -1250.0f), VGet(-2310.0f, 0.0f, -850.0f), bY, tY);
 
                 // 3. 南東S字カーブ通路の行き止まり端壁

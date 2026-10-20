@@ -117,7 +117,7 @@ public:
     virtual ~Player3D();
 
     void Update() override;
-    void UpdateWithCamera(const Camera3D& camera, const std::vector<VECTOR>& targetPositions = {});
+    void UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& targetPositions = {});
     void Draw3D() override;
     void Draw2D() override;
 
@@ -295,20 +295,20 @@ public:
 
         if (eff <= 4)
         {
-            return 18.0f;
+            return 26.0f; // 拡大 (18.0f -> 26.0f)
         }
 
         if (eff == 5)
         {
-            return 21.0f;
+            return 30.0f; // 拡大 (21.0f -> 30.0f)
         }
 
         if (eff == 6)
         {
-            return 24.0f;
+            return 35.0f; // 拡大 (24.0f -> 35.0f)
         }
 
-        return 28.0f;
+        return 42.0f;     // 拡大 (28.0f -> 42.0f)
     }
 
     // タックル（Eキー）パラメータ動的算出（4 Rep以上で使用可能、Repで強化、最大Lv15で頭打ち）
@@ -330,7 +330,7 @@ public:
 
     float GetTackleRadius() const
     {
-        return 22.0f + static_cast<float>(GetEffectiveRep()) * 2.0f;
+        return 32.0f + static_cast<float>(GetEffectiveRep()) * 2.5f; // 拡大 (22.0f -> 32.0f)
     }
 
     int GetMouseStunDuration() const
@@ -353,10 +353,10 @@ public:
         return m_radius;
     }
 
-    // 壁や障害物との物理的な当たり判定用身体半径（タックルの巨大攻撃範囲とは分離）
+    // 壁や障害物との物理的な当たり判定用身体半径（タックルの巨大攻撃範囲とは分離、通路引っかかり防止）
     float GetBodyRadius() const
     {
-        return m_radius + static_cast<float>(GetEffectiveRep()) * 0.3f;
+        return 18.0f + static_cast<float>(GetEffectiveRep()) * 0.3f;
     }
 
 

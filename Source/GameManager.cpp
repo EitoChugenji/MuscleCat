@@ -582,7 +582,7 @@ void GameManager::Update()
             m_startTransitionTimer = 22; // 閃光トランジション開始
             if (player)
             {
-                EffectManager::GetInstance().PlayPumpSuccessEffect(player->GetPos(), 10);
+                EffectManager::GetInstance().PlayPumpSuccessEffect(player->GetPos(), player->GetRepCount());
             }
             return;
         }
@@ -654,6 +654,11 @@ void GameManager::Update()
             m_sensitivityNoticeTimer--;
         }
 
+        if (m_effectNoticeTimer > 0)
+        {
+            m_effectNoticeTimer--;
+        }
+
         // デバッグチート入力処理（F1でON/OFF切り替え）
         bool keyF1 = (CheckHitKey(KEY_INPUT_F1) != 0);
 
@@ -663,6 +668,27 @@ void GameManager::Update()
         }
 
         m_prevKeyF1 = keyF1;
+
+        // F2キーで当たり判定の可視化をトグル（いつでも切り替え可能）
+        bool keyF2 = (CheckHitKey(KEY_INPUT_F2) != 0);
+
+        if (keyF2 && !m_prevKeyF2)
+        {
+            m_objManager.ToggleDebugHitboxes();
+        }
+
+        m_prevKeyF2 = keyF2;
+
+        // F3キーでエフェクト表示のON/OFFをトグル（いつでも切り替え可能）
+        bool keyF3 = (CheckHitKey(KEY_INPUT_F3) != 0);
+
+        if (keyF3 && !m_prevKeyF3)
+        {
+            EffectManager::GetInstance().ToggleEffectEnabled();
+            m_effectNoticeTimer = 90; // 約1.5秒通知表示
+        }
+
+        m_prevKeyF3 = keyF3;
 
         if (m_cheatEnabled && player)
         {
@@ -722,9 +748,20 @@ void GameManager::Update()
             if (key6 && !m_prevKey6)
             {
                 EffectManager::GetInstance().ToggleEffectEnabled();
+                m_effectNoticeTimer = 90;
             }
 
             m_prevKey6 = key6;
+
+            // [7] 当たり判定表示ON/OFF
+            bool key7 = (CheckHitKey(KEY_INPUT_7) != 0);
+
+            if (key7 && !m_prevKey7)
+            {
+                m_objManager.ToggleDebugHitboxes();
+            }
+
+            m_prevKey7 = key7;
         }
 
         m_objManager.Update(m_camera);
@@ -735,14 +772,21 @@ void GameManager::Update()
             m_state = GameState::GameClear;
             m_clearCount = GetNowCount();
             m_clearTimeSeconds = (m_clearCount - m_startCount) / 1000.0f;
+            auto player = m_objManager.GetPlayer();
+            m_clearFinalRep = player ? player->GetRepCount() : 0;
+            m_clearAnimTimer = 0;
+
+            // クリア時のお祝いカメラシェイク
+            m_camera.TriggerShake(15.0f, 16);
         }
     }
     
     else if (m_state == GameState::GameClear)
     {
         SetMouseDispFlag(TRUE); // クリア画面ではカーソル表示
-        auto player = m_objManager.GetPlayer();
+        m_clearAnimTimer++;
 
+        auto player = m_objManager.GetPlayer();
         if (player)
         {
             const auto& stage = m_objManager.GetStage();
@@ -751,13 +795,37 @@ void GameManager::Update()
 
         m_camera.Apply();
 
-        // リトライまたはタイトル
-        if (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_R))
+        // マウス入力取得
+        int mx = 0, my = 0;
+        GetMousePoint(&mx, &my);
+        bool isMouseClick = (GetMouseInput() & MOUSE_INPUT_LEFT) != 0;
+        bool isMouseTrigger = isMouseClick && !m_prevMouseLeft;
+        m_prevMouseLeft = isMouseClick;
+
+        // ボタンのレイアウト判定（DrawClearScreenと共通座標）
+        int boxW = 680;
+        int boxH = 430;
+        int boxX = (Config::SCREEN_WIDTH - boxW) / 2;
+        int boxY = (Config::SCREEN_HEIGHT - boxH) / 2;
+
+        int btnW = 260;
+        int btnH = 50;
+        int retryBtnX = boxX + 55;
+        int titleBtnX = boxX + boxW - 55 - btnW;
+        int btnY = boxY + boxH - 74;
+
+        bool hoverRetry = (mx >= retryBtnX && mx <= retryBtnX + btnW && my >= btnY && my <= btnY + btnH);
+        bool hoverTitle = (mx >= titleBtnX && mx <= titleBtnX + btnW && my >= btnY && my <= btnY + btnH);
+
+        bool triggerRetryKey = (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_R) || CheckHitKey(KEY_INPUT_RETURN));
+        bool triggerTitleKey = (CheckHitKey(KEY_INPUT_T) || CheckHitKey(KEY_INPUT_ESCAPE));
+
+        // リトライまたはタイトルへ戻る
+        if (triggerRetryKey || (hoverRetry && isMouseTrigger))
         {
             StartGame();
         }
-        
-        else if (CheckHitKey(KEY_INPUT_T))
+        else if (triggerTitleKey || (hoverTitle && isMouseTrigger))
         {
             SetupTitle();
         }
@@ -957,7 +1025,7 @@ void GameManager::Draw()
 
         // 下段：基本移動・カメラ
         char camInfo[128];
-        snprintf(camInfo, sizeof(camInfo), "移動: WASD  |  視点: マウス(感度:%.1fx) / 矢印  |  感度変更: [- / +]  |  視点リセット: [F]", m_camera.GetMouseSensitivity());
+        snprintf(camInfo, sizeof(camInfo), "移動: WASD  |  視点: マウス(感度:%.1fx) / 矢印  |  感度: [- / +]  |  視点リセット: [F]  |  エフェクト: [F3]", m_camera.GetMouseSensitivity());
         DrawStringToHandle(gX + 14, gY + 42, camInfo, GetColor(210, 225, 245), font13);
 
         // デバッグチートパネル表示
@@ -967,9 +1035,9 @@ void GameManager::Draw()
         {
             // 半透明背景
             SetDrawBlendMode(DX_BLENDMODE_ALPHA, 200);
-            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 246, GetColor(15, 15, 30), TRUE);
+            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 272, GetColor(15, 15, 30), TRUE);
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 246, GetColor(255, 80, 80), FALSE);
+            DrawBox(Config::SCREEN_WIDTH - 380, 40, Config::SCREEN_WIDTH - 5, 272, GetColor(255, 80, 80), FALSE);
 
             DrawStringToHandle(Config::SCREEN_WIDTH - 370, 48, "★ DEBUG CHEAT MODE ON ★", GetColor(255, 80, 80), font16);
 
@@ -977,6 +1045,7 @@ void GameManager::Draw()
             bool ncd = cheatPlayer ? cheatPlayer->IsNoCooldown() : false;
             int  rep = cheatPlayer ? cheatPlayer->GetRepCount() : 0;
             bool eff = EffectManager::GetInstance().IsEffectEnabled();
+            bool hb  = m_objManager.IsDebugHitboxesEnabled();
 
             DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 76,  GetColor(180, 230, 255), font16,
                 "[1] 通常ネズミ追加  [2] 高速ネズミ追加");
@@ -991,11 +1060,14 @@ void GameManager::Draw()
                 "[5] クールタイム無効: %s", ncd ? "ON (スタンも無効)" : "OFF");
 
             DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 172, eff ? GetColor(255, 240, 60) : GetColor(180, 230, 255), font16,
-                "[6] エフェクト表示: %s", eff ? "ON" : "OFF");
+                "[6] / [F3] エフェクト表示: %s", eff ? "ON" : "OFF");
 
-            DrawStringToHandle(Config::SCREEN_WIDTH - 370, 196, "[F1] チートOFF", GetColor(255, 120, 120), font16);
+            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 196, hb ? GetColor(255, 240, 60) : GetColor(180, 230, 255), font16,
+                "[7] 当たり判定表示: %s", hb ? "ON (F2でも切替)" : "OFF");
+
+            DrawStringToHandle(Config::SCREEN_WIDTH - 370, 220, "[F1] チートOFF", GetColor(255, 120, 120), font16);
             
-            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 220, GetColor(140, 200, 140), font13,
+            DrawFormatStringToHandle(Config::SCREEN_WIDTH - 370, 246, GetColor(140, 200, 140), font13,
                 "ネズミ残り: %d 体", m_objManager.GetRemainingMouseCount());
         }
         
@@ -1029,6 +1101,32 @@ void GameManager::Draw()
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         }
 
+        // プレイ中のエフェクト切替通知ポップアップ
+        if (m_effectNoticeTimer > 0 && !m_isPaused)
+        {
+            float alphaRatio = (m_effectNoticeTimer < 20) ? (m_effectNoticeTimer / 20.0f) : 1.0f;
+            int alpha = static_cast<int>(230 * alphaRatio);
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+
+            int notW = 300;
+            int notH = 46;
+            int notX = (Config::SCREEN_WIDTH - notW) / 2;
+            int notY = (m_sensitivityNoticeTimer > 0) ? 76 : 24;
+
+            bool eff = EffectManager::GetInstance().IsEffectEnabled();
+
+            DrawBox(notX + 4, notY + 4, notX + notW + 4, notY + notH + 4, GetColor(0, 0, 0), TRUE);
+            DrawBox(notX, notY, notX + notW, notY + notH, eff ? GetColor(18, 36, 26) : GetColor(36, 20, 22), TRUE);
+            DrawBox(notX, notY, notX + notW, notY + notH, eff ? GetColor(80, 255, 130) : GetColor(255, 90, 90), FALSE);
+
+            char notBuf[64];
+            snprintf(notBuf, sizeof(notBuf), "✨ エフェクト: %s [F3]", eff ? "ON" : "OFF");
+            int nW = GetDrawStringWidthToHandle(notBuf, static_cast<int>(strlen(notBuf)), font18);
+            DrawStringToHandle((Config::SCREEN_WIDTH - nW) / 2, notY + 12, notBuf, eff ? GetColor(100, 255, 150) : GetColor(255, 120, 120), font18);
+
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        }
+
         // ポーズ画面描画
         if (m_isPaused)
         {
@@ -1038,49 +1136,7 @@ void GameManager::Draw()
 
     else if (m_state == GameState::GameClear)
     {
-        // リザルト画面（簡易）
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 190);
-        DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(10, 15, 25), TRUE);
-        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-
-        int resultBoxW = 600;
-        int resultBoxH = 380;
-        int boxX = (Config::SCREEN_WIDTH - resultBoxW) / 2;
-        int boxY = (Config::SCREEN_HEIGHT - resultBoxH) / 2;
-
-        DrawBox(boxX, boxY, boxX + resultBoxW, boxY + resultBoxH, GetColor(30, 35, 50), TRUE);
-        DrawBox(boxX, boxY, boxX + resultBoxW, boxY + resultBoxH, yellow, FALSE);
-
-        int clearW = GetDrawStringWidthToHandle("★ STAGE CLEAR!! ★", static_cast<int>(std::string("★ STAGE CLEAR!! ★").length()), font36);
-        DrawStringToHandle((Config::SCREEN_WIDTH - clearW) / 2, boxY + 30, "★ STAGE CLEAR!! ★", yellow, font36);
-
-        DrawFormatStringToHandle(boxX + 130, boxY + 110, white, font24, "クリアタイム : %.2f 秒", m_clearTimeSeconds);
-
-        // 評価ランク算出
-        const char* rankText = "C";
-        unsigned int rankColor = GetColor(180, 180, 180);
-        if (m_clearTimeSeconds <= 20.0f)
-        {
-            rankText = "S (GOD MUSCLE CAT)";
-            rankColor = GetColor(255, 215, 0);
-        }
-        
-        else if (m_clearTimeSeconds <= 35.0f)
-        {
-            rankText = "A (GREAT MUSCLE)";
-            rankColor = GetColor(255, 130, 50);
-        }
-        
-        else if (m_clearTimeSeconds <= 50.0f)
-        {
-            rankText = "B (NICE PUMP)";
-            rankColor = GetColor(100, 220, 120);
-        }
-
-        DrawFormatStringToHandle(boxX + 130, boxY + 160, rankColor, font24, "ランク       : %s", rankText);
-
-        DrawStringToHandle(boxX + 130, boxY + 240, "[SPACE] または [R] キー: リトライ", GetColor(150, 255, 150), font18);
-        DrawStringToHandle(boxX + 130, boxY + 280, "[T] キー: タイトル画面へ戻る", cyan, font18);
+        DrawClearScreen();
     }
 
     if (CheckHitKey(KEY_INPUT_F12))
@@ -1579,14 +1635,14 @@ void GameManager::UpdatePause(bool triggerEsc)
         return;
     }
 
-    // 上下キーで選択切り替え (0: リトライ, 1: タイトルに戻る, 2: マウス感度)
+    // 上下キーで選択切り替え (0: リトライ, 1: タイトルに戻る, 2: マウス感度, 3: エフェクト)
     if (triggerUp)
     {
-        m_pauseMenuItem = (m_pauseMenuItem + 2) % 3;
+        m_pauseMenuItem = (m_pauseMenuItem + 3) % 4;
     }
     if (triggerDown)
     {
-        m_pauseMenuItem = (m_pauseMenuItem + 1) % 3;
+        m_pauseMenuItem = (m_pauseMenuItem + 1) % 4;
     }
 
     // ボタン・スライダー当たり判定座標
@@ -1598,29 +1654,32 @@ void GameManager::UpdatePause(bool triggerEsc)
     int btnW = 360;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
 
-    int retryBtnY = modalY + 68;
-    int retryBtnH = 50;
+    int retryBtnY = modalY + 62;
+    int retryBtnH = 44;
 
-    int titleBtnY = modalY + 126;
-    int titleBtnH = 50;
+    int titleBtnY = modalY + 112;
+    int titleBtnH = 44;
 
-    int sensRowY  = modalY + 184;
-    int sensRowH  = 74;
+    int sensRowY  = modalY + 162;
+    int sensRowH  = 68;
 
     int sensBtnW   = 46;
     int sensBtnH   = 28;
-    int sensBtnY   = sensRowY + 36;
+    int sensBtnY   = sensRowY + 32;
     int minusBtnX  = btnX + 10;
     int sliderBarX = btnX + 64;
     int sliderBarW = 232;
-    int sliderBarY = sensRowY + 44;
+    int sliderBarY = sensRowY + 40;
     int sliderBarH = 12;
     int plusBtnX   = btnX + 304;
 
+    int effBtnY    = modalY + 236;
+    int effBtnH    = 40;
+
     int resumeBtnW = 260;
-    int resumeBtnH = 36;
+    int resumeBtnH = 34;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 280;
+    int resumeBtnY = modalY + 284;
 
     bool hoverRetry  = (mx >= btnX && mx <= btnX + btnW && my >= retryBtnY && my <= retryBtnY + retryBtnH);
     bool hoverTitle  = (mx >= btnX && mx <= btnX + btnW && my >= titleBtnY && my <= titleBtnY + titleBtnH);
@@ -1628,11 +1687,13 @@ void GameManager::UpdatePause(bool triggerEsc)
     bool hoverMinus  = (mx >= minusBtnX && mx <= minusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
     bool hoverPlus   = (mx >= plusBtnX && mx <= plusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
     bool hoverSlider = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= sliderBarY - 8 && my <= sliderBarY + sliderBarH + 8);
+    bool hoverEff    = (mx >= btnX && mx <= btnX + btnW && my >= effBtnY && my <= effBtnY + effBtnH);
     bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW && my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
     if (hoverRetry) m_pauseMenuItem = 0;
     if (hoverTitle) m_pauseMenuItem = 1;
     if (hoverSens)  m_pauseMenuItem = 2;
+    if (hoverEff)   m_pauseMenuItem = 3;
 
     // 1. リトライ判定（ボタンクリック / 選択中Enter/Space / Rキー）
     if ((hoverRetry && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_pauseMenuItem == 0) || triggerR)
@@ -1685,7 +1746,17 @@ void GameManager::UpdatePause(bool triggerEsc)
         m_camera.SetMouseSensitivity(newSens);
     }
 
-    // 4. ゲームに戻る判定（再開ボタンクリック）
+    // 4. エフェクト表示切替処理（ボタンクリック / 選択中Enter・Space / F3キー）
+    bool keyF3 = (CheckHitKey(KEY_INPUT_F3) != 0);
+    bool triggerF3 = keyF3 && !m_prevKeyF3;
+    m_prevKeyF3 = keyF3;
+
+    if ((hoverEff && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_pauseMenuItem == 3) || triggerF3)
+    {
+        EffectManager::GetInstance().ToggleEffectEnabled();
+    }
+
+    // 5. ゲームに戻る判定（再開ボタンクリック）
     if (hoverResume && isMouseTrigger)
     {
         m_startCount += (GetNowCount() - m_pauseStartTime);
@@ -1737,12 +1808,14 @@ void GameManager::DrawPauseModal()
     // ボタン配置
     int btnW = 360;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-    int retryBtnY = modalY + 68;
-    int retryBtnH = 50;
-    int titleBtnY = modalY + 126;
-    int titleBtnH = 50;
-    int sensRowY  = modalY + 184;
-    int sensRowH  = 74;
+    int retryBtnY = modalY + 62;
+    int retryBtnH = 44;
+    int titleBtnY = modalY + 112;
+    int titleBtnH = 44;
+    int sensRowY  = modalY + 162;
+    int sensRowH  = 68;
+    int effBtnY   = modalY + 236;
+    int effBtnH   = 40;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
@@ -1871,11 +1944,30 @@ void GameManager::DrawPauseModal()
     DrawBox(plusBtnX, sensBtnY, plusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverPlus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), FALSE);
     DrawStringToHandle(plusBtnX + 11, sensBtnY + 5, "+ ▶", hoverPlus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font16);
 
+    // --- コントロール4: エフェクト表示切替 ---
+    bool isEffSelected = (m_pauseMenuItem == 3);
+    bool effEnabled = EffectManager::GetInstance().IsEffectEnabled();
+    bool hoverEff = (mx >= btnX && mx <= btnX + btnW && my >= effBtnY && my <= effBtnY + effBtnH);
+
+    DrawBox(btnX + 3, effBtnY + 3, btnX + btnW + 3, effBtnY + effBtnH + 3, GetColor(0, 0, 0), TRUE);
+    DrawBox(btnX - 1, effBtnY - 1, btnX + btnW + 1, effBtnY + effBtnH + 1, isEffSelected ? GetColor(255, 180, 50) : GetColor(0, 0, 0), TRUE);
+    DrawBox(btnX, effBtnY, btnX + btnW, effBtnY + effBtnH,
+            hoverEff ? (effEnabled ? GetColor(28, 55, 38) : GetColor(55, 26, 32))
+                     : (effEnabled ? GetColor(18, 40, 28) : GetColor(40, 18, 22)), TRUE);
+    DrawBox(btnX, effBtnY, btnX + btnW, effBtnY + effBtnH,
+            isEffSelected ? GetColor(255, 180, 50) : (effEnabled ? GetColor(70, 200, 120) : GetColor(200, 70, 80)), FALSE);
+
+    char effText[64];
+    snprintf(effText, sizeof(effText), "✨ エフェクト表示: [ %s ]  (F3)", effEnabled ? "ON" : "OFF");
+    int eW = GetDrawStringWidthToHandle(effText, static_cast<int>(strlen(effText)), font16);
+    DrawStringToHandle((Config::SCREEN_WIDTH - eW) / 2, effBtnY + 10, effText,
+                       effEnabled ? GetColor(100, 255, 150) : GetColor(255, 120, 120), font16);
+
     // --- 下部: ゲームに戻る (ESC) ガイドボタン ---
     int resumeBtnW = 260;
-    int resumeBtnH = 36;
+    int resumeBtnH = 34;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 280;
+    int resumeBtnY = modalY + 284;
 
     bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW &&
                        my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
@@ -1886,14 +1978,203 @@ void GameManager::DrawPauseModal()
 
     const char* resumeTxt = "▶ ゲームに戻る (ESC)";
     int rW = GetDrawStringWidthToHandle(resumeTxt, static_cast<int>(strlen(resumeTxt)), font16);
-    DrawStringToHandle((Config::SCREEN_WIDTH - rW) / 2, resumeBtnY + 9, resumeTxt, hoverResume ? GetColor(255, 255, 255) : GetColor(180, 205, 235), font16);
+    DrawStringToHandle((Config::SCREEN_WIDTH - rW) / 2, resumeBtnY + 8, resumeTxt, hoverResume ? GetColor(255, 255, 255) : GetColor(180, 205, 235), font16);
 
     // 操作説明ガイド
-    const char* guideTxt1 = "選択: [↑/↓]  感度変更: [←/→] または クリック";
+    const char* guideTxt1 = "選択: [↑/↓]  感度: [←/→]  エフェクト切替: [F3 / クリック]";
     int gW1 = GetDrawStringWidthToHandle(guideTxt1, static_cast<int>(strlen(guideTxt1)), font13);
-    DrawStringToHandle((Config::SCREEN_WIDTH - gW1) / 2, modalY + 338, guideTxt1, GetColor(160, 185, 220), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW1) / 2, modalY + 330, guideTxt1, GetColor(160, 185, 220), font13);
 
     const char* guideTxt2 = "決定: [ENTER] / [SPACE]  |  閉じる: [ESC]";
     int gW2 = GetDrawStringWidthToHandle(guideTxt2, static_cast<int>(strlen(guideTxt2)), font13);
-    DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 360, guideTxt2, GetColor(130, 150, 180), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 352, guideTxt2, GetColor(130, 150, 180), font13);
+}
+
+// ============================================================================
+// ステージクリア（リザルト画面）の描画（ポップ＆ゴージャス演出）
+// ============================================================================
+void GameManager::DrawClearScreen()
+{
+    auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
+    int font16 = fm.GetFont16();
+    int font18 = fm.GetFont18();
+    int font24 = fm.GetFont24();
+    int font36 = fm.GetFont36();
+    int font60 = fm.GetFont60();
+
+    // 1. 全画面暗転（背景の3Dステージとマッチョ猫を透かして演出）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 205);
+    DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 12, 22), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+    // 2. メインリザルトパネル配置
+    int boxW = 680;
+    int boxH = 430;
+    int boxX = (Config::SCREEN_WIDTH - boxW) / 2;
+    int boxY = (Config::SCREEN_HEIGHT - boxH) / 2;
+
+    // ドロップシャドウ
+    DrawBox(boxX + 8, boxY + 8, boxX + boxW + 8, boxY + boxH + 8, GetColor(0, 0, 0), TRUE);
+
+    // 極太コミック縁取り＋ダークプレート
+    DrawBox(boxX - 3, boxY - 3, boxX + boxW + 3, boxY + boxH + 3, GetColor(0, 0, 0), TRUE);
+    DrawBox(boxX, boxY, boxX + boxW, boxY + boxH, GetColor(20, 25, 42), TRUE);
+    DrawBox(boxX, boxY, boxX + boxW, boxY + boxH, GetColor(255, 140, 40), FALSE);
+    DrawBox(boxX + 1, boxY + 1, boxX + boxW - 1, boxY + boxH - 1, GetColor(255, 200, 70), FALSE);
+
+    // 3. ヘッダータイトル：★ STAGE CLEAR!! ★（ゴールド＆拍動アニメーション）
+    float pulse = std::sin(m_clearAnimTimer * 0.06f) * 3.0f;
+    const char* clearTitle = "★ STAGE CLEAR!! ★";
+    int titleW = GetDrawStringWidthToHandle(clearTitle, static_cast<int>(strlen(clearTitle)), font36);
+    int titleX = (Config::SCREEN_WIDTH - titleW) / 2;
+    int titleY = boxY + 24 + static_cast<int>(pulse);
+
+    // タイトル影
+    DrawStringToHandle(titleX + 3, titleY + 3, clearTitle, GetColor(0, 0, 0), font36);
+    DrawStringToHandle(titleX, titleY, clearTitle, GetColor(255, 225, 50), font36);
+
+    // 4. ランク判定と称号の決定（ステージ別の基準タイム：ステージ2は広大マップのためS:60秒、以降15秒間隔）
+    bool isStage2 = (m_selectedMap != ModelConfig::MapType::House);
+    float rankS_Time = isStage2 ? 60.0f : 30.0f;
+    float rankA_Time = isStage2 ? 75.0f : 45.0f; // +15秒
+    float rankB_Time = isStage2 ? 90.0f : 60.0f; // +15秒
+
+    const char* rankChar = "C";
+    const char* rankTitle = "BEGINNER CAT";
+    const char* rankComment = "もっと筋肉を追い込もう！";
+    unsigned int rankBg = GetColor(35, 45, 60);
+    unsigned int rankColor = GetColor(180, 215, 255);
+
+    if (m_clearTimeSeconds <= rankS_Time)
+    {
+        rankChar = "S";
+        rankTitle = "GOD MUSCLE CAT";
+        rankComment = "神の如きバルク！完全無欠の仕上がり！";
+        rankBg = GetColor(60, 45, 15);
+        rankColor = GetColor(255, 220, 40);
+    }
+    else if (m_clearTimeSeconds <= rankA_Time)
+    {
+        rankChar = "A";
+        rankTitle = "GREAT MUSCLE";
+        rankComment = "素晴らしいパンプ感！キレてるキレてる！";
+        rankBg = GetColor(55, 32, 18);
+        rankColor = GetColor(255, 130, 40);
+    }
+    else if (m_clearTimeSeconds <= rankB_Time)
+    {
+        rankChar = "B";
+        rankTitle = "NICE PUMP";
+        rankComment = "ナイスバルク！筋肉の成長を感じる！";
+        rankBg = GetColor(20, 50, 30);
+        rankColor = GetColor(90, 230, 130);
+    }
+
+    // 5. 左側：特大ランクバッジプレート
+    int rBoxX = boxX + 45;
+    int rBoxY = boxY + 95;
+    int rBoxW = 210;
+    int rBoxH = 205;
+
+    DrawBox(rBoxX + 4, rBoxY + 4, rBoxX + rBoxW + 4, rBoxY + rBoxH + 4, GetColor(0, 0, 0), TRUE);
+    DrawBox(rBoxX, rBoxY, rBoxX + rBoxW, rBoxY + rBoxH, rankBg, TRUE);
+    DrawBox(rBoxX, rBoxY, rBoxX + rBoxW, rBoxY + rBoxH, rankColor, FALSE);
+    DrawBox(rBoxX + 1, rBoxY + 1, rBoxX + rBoxW - 1, rBoxY + rBoxH - 1, rankColor, FALSE);
+
+    DrawStringToHandle(rBoxX + 20, rBoxY + 12, "CLEAR RANK", GetColor(200, 220, 245), font13);
+
+    // 特大ランクアルファベット
+    int rw = GetDrawStringWidthToHandle(rankChar, static_cast<int>(strlen(rankChar)), font60);
+    DrawStringToHandle(rBoxX + (rBoxW - rw) / 2 + 2, rBoxY + 42, rankChar, GetColor(0, 0, 0), font60);
+    DrawStringToHandle(rBoxX + (rBoxW - rw) / 2, rBoxY + 40, rankChar, rankColor, font60);
+
+    // 称号名
+    int tw = GetDrawStringWidthToHandle(rankTitle, static_cast<int>(strlen(rankTitle)), font16);
+    DrawStringToHandle(rBoxX + (rBoxW - tw) / 2, rBoxY + 152, rankTitle, rankColor, font16);
+
+    // 6. 右側：スタッツ詳細プレート
+    int sBoxX = boxX + 275;
+    int sBoxY = boxY + 95;
+    int sBoxW = boxW - 320;
+    int sBoxH = 205;
+
+    DrawBox(sBoxX + 4, sBoxY + 4, sBoxX + sBoxW + 4, sBoxY + sBoxH + 4, GetColor(0, 0, 0), TRUE);
+    DrawBox(sBoxX, sBoxY, sBoxX + sBoxW, sBoxY + sBoxH, GetColor(26, 33, 52), TRUE);
+    DrawBox(sBoxX, sBoxY, sBoxX + sBoxW, sBoxY + sBoxH, GetColor(60, 75, 110), FALSE);
+
+    int statLineY = sBoxY + 18;
+    int statLineGap = 34;
+
+    // タイム
+    DrawStringToHandle(sBoxX + 22, statLineY, "⏱ クリアタイム", GetColor(180, 210, 240), font18);
+    char timeStr[32];
+    snprintf(timeStr, sizeof(timeStr), "%.2f 秒", m_clearTimeSeconds);
+    DrawStringToHandle(sBoxX + 200, statLineY, timeStr, GetColor(255, 235, 100), font18);
+
+    // マッスルLv
+    statLineY += statLineGap;
+    DrawStringToHandle(sBoxX + 22, statLineY, "💪 最終筋肉レベル", GetColor(180, 210, 240), font18);
+    char repStr[32];
+    snprintf(repStr, sizeof(repStr), "Lv.%d", m_clearFinalRep);
+    DrawStringToHandle(sBoxX + 200, statLineY, repStr, (m_clearFinalRep >= 10) ? GetColor(255, 120, 60) : GetColor(255, 235, 100), font18);
+
+    // 通常ネズミ
+    statLineY += statLineGap;
+    DrawStringToHandle(sBoxX + 22, statLineY, "🐭 通常ネズミ捕獲", GetColor(180, 210, 240), font16);
+    char normStr[32];
+    snprintf(normStr, sizeof(normStr), "%d 匹", m_objManager.GetCaughtNormalCount());
+    DrawStringToHandle(sBoxX + 200, statLineY, normStr, GetColor(240, 240, 255), font16);
+
+    // 高速ネズミ
+    statLineY += statLineGap;
+    DrawStringToHandle(sBoxX + 22, statLineY, "⚡ 高速ネズミ捕獲", GetColor(180, 210, 240), font16);
+    char fastStr[32];
+    snprintf(fastStr, sizeof(fastStr), "%d 匹", m_objManager.GetCaughtFastCount());
+    DrawStringToHandle(sBoxX + 200, statLineY, fastStr, GetColor(255, 180, 50), font16);
+
+    // 評価コメント帯
+    int commentY = sBoxY + sBoxH - 34;
+    DrawBox(sBoxX + 12, commentY, sBoxX + sBoxW - 12, commentY + 24, GetColor(16, 20, 32), TRUE);
+    int cw = GetDrawStringWidthToHandle(rankComment, static_cast<int>(strlen(rankComment)), font13);
+    DrawStringToHandle(sBoxX + (sBoxW - cw) / 2, commentY + 4, rankComment, rankColor, font13);
+
+    // 7. 下部：アクションボタン（マウスクリック＆キーボード対応）
+    int mx = 0, my = 0;
+    GetMousePoint(&mx, &my);
+
+    int btnW = 260;
+    int btnH = 50;
+    int retryBtnX = boxX + 55;
+    int titleBtnX = boxX + boxW - 55 - btnW;
+    int btnY = boxY + boxH - 74;
+
+    bool hoverRetry = (mx >= retryBtnX && mx <= retryBtnX + btnW && my >= btnY && my <= btnY + btnH);
+    bool hoverTitle = (mx >= titleBtnX && mx <= titleBtnX + btnW && my >= btnY && my <= btnY + btnH);
+
+    // リトライボタン
+    DrawBox(retryBtnX + 3, btnY + 3, retryBtnX + btnW + 3, btnY + btnH + 3, GetColor(0, 0, 0), TRUE);
+    DrawBox(retryBtnX - 1, btnY - 1, retryBtnX + btnW + 1, btnY + btnH + 1, GetColor(0, 0, 0), TRUE);
+    DrawBox(retryBtnX, btnY, retryBtnX + btnW, btnY + btnH,
+            hoverRetry ? GetColor(70, 220, 110) : GetColor(38, 140, 70), TRUE);
+    DrawBox(retryBtnX + 2, btnY + 2, retryBtnX + btnW - 2, btnY + 8,
+            hoverRetry ? GetColor(180, 255, 200) : GetColor(60, 180, 100), TRUE);
+
+    const char* retryTxt = "🔄 もう一度遊ぶ [SPACE/R]";
+    int rw2 = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font18);
+    DrawStringToHandle(retryBtnX + (btnW - rw2) / 2, btnY + 14, retryTxt,
+                       hoverRetry ? GetColor(10, 30, 15) : GetColor(255, 255, 255), font18);
+
+    // タイトルへ戻るボタン
+    DrawBox(titleBtnX + 3, btnY + 3, titleBtnX + btnW + 3, btnY + btnH + 3, GetColor(0, 0, 0), TRUE);
+    DrawBox(titleBtnX - 1, btnY - 1, titleBtnX + btnW + 1, btnY + btnH + 1, GetColor(0, 0, 0), TRUE);
+    DrawBox(titleBtnX, btnY, titleBtnX + btnW, btnY + btnH,
+            hoverTitle ? GetColor(70, 180, 255) : GetColor(38, 90, 160), TRUE);
+    DrawBox(titleBtnX + 2, btnY + 2, titleBtnX + btnW - 2, btnY + 8,
+            hoverTitle ? GetColor(180, 230, 255) : GetColor(60, 125, 200), TRUE);
+
+    const char* titleTxt = "🏠 タイトルへ戻る [T]";
+    int tw2 = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font18);
+    DrawStringToHandle(titleBtnX + (btnW - tw2) / 2, btnY + 14, titleTxt,
+                       hoverTitle ? GetColor(10, 20, 35) : GetColor(255, 255, 255), font18);
 }
