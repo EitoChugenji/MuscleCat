@@ -1,0 +1,11 @@
+=== AUTOTEST SUITE START ===
+AutoTest: Switched to MAP 1: House
+AutoTest: Started game on MAP 1: House
+AutoTest PROTRUSION EAST: FinalPos=(2090.0, 20.0, 650.0), WallHit=NO, HasGround=YES, BlockedInside=FAIL
+AutoTest PROTRUSION WEST: FinalPos=(-1130.0, 20.0, -1200.0), WallHit=NO, HasGround=YES, BlockedInside=FAIL
+AutoTest PROTRUSION SOUTH: FinalPos=(400.0, 20.0, -1809.6), WallHit=YES, HasGround=YES, BlockedInside=PASS
+AutoTest ATTACKS: Lv0_Locked=PASS, Lv4_Unlocked=PASS (Overall=PASS)
+AutoTest FURNITURE & MOUSE WALL: NoObstacles=PASS (count=0), MouseWallCollision=FAIL, PushedInside=FAIL
+AutoTest MOUSE SENSITIVITY: Default=1.0(PASS), Adjust=PASS, ClampMax=PASS, ClampMin=PASS, PersistAfterRetry=PASS (Overall=PASS)
+AutoTest CSV MANAGER: CatStat=PASS(4.0,0.10,5.5), MouseStat=PASS(4.2,0.05,4.7), PosCount=PASS(Cat:1,Mouse:8), PlayerSpdCalc=PASS
+AutoTest F1 DEBUG OVERLAY: Enabled=PASS, Scale10m=580.5u(PASS), PlayerSpeed=4.00(PASS)
