@@ -222,10 +222,14 @@ void GameManager::SwitchSelectedMap(ModelConfig::MapType newMap)
         if (player)
         {
             player->SetMapType(m_selectedMap);
-            float gy = 0.0f;
-            if (m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), gy))
+            float groundY = 0.0f;
+            float gy = (m_selectedMap == ModelConfig::MapType::House) ? 5.0f : 200.0f;
+            if (m_selectedMap == ModelConfig::MapType::House) m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), gy);
+            player->SetPos(VGet(0.0f, gy, 0.0f));
+            player->SetGroundY(gy);
+            if (false)
             {
-                player->SetPos(VGet(0.0f, gy, 0.0f));
+                // unused
                 player->SetGroundY(gy);
             }
         }
@@ -254,10 +258,14 @@ void GameManager::SetupTitle()
     player->AddRep(6); // Lv.6のマッチョ体格
     player->SetMapType(m_selectedMap);
 
-    float groundY = 0.0f;
-    if (m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), groundY))
+    // Map1は床(Y≈5)、Map2は中央の円柱台座上(Y=200)に配置
+    float groundY = (m_selectedMap == ModelConfig::MapType::House) ? 5.0f : 200.0f;
+    if (m_selectedMap == ModelConfig::MapType::House) m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), groundY);
+    player->SetPos(VGet(0.0f, groundY, 0.0f));
+    player->SetGroundY(groundY);
+    if (false)
     {
-        player->SetPos(VGet(0.0f, groundY, 0.0f));
+        // unused
         player->SetGroundY(groundY);
     }
     m_objManager.SetPlayer(player);
@@ -398,11 +406,12 @@ void GameManager::Update()
         float catY = (player) ? player->GetPos().y : 0.0f;
         float camDist = 240.0f;
         float camHeight = catY + 38.0f + std::sin(m_titleAnimTimer * 0.02f) * 6.0f;
-        VECTOR center = VGet(0.0f, catY + 20.0f, 0.0f);
+        VECTOR catPos = (player) ? player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
+        VECTOR center = VGet(catPos.x, catY + 20.0f, catPos.z);
         VECTOR camPos = VGet(
-            std::sin(m_titleCameraAngle) * camDist,
+            catPos.x + std::sin(m_titleCameraAngle) * camDist,
             camHeight,
-            std::cos(m_titleCameraAngle) * camDist
+            catPos.z + std::cos(m_titleCameraAngle) * camDist
         );
         SetCameraPositionAndTarget_UpVecY(camPos, center);
 
@@ -2159,6 +2168,50 @@ void GameManager::DrawDebug3DOverlay()
         }
     }
 
+    // =========================================================================
+    // 6. 見えない壁（AddWallQuad補助壁 & 外周ClampToBounds）および壁コリジョンの3Dフレーム表示
+    // =========================================================================
+    {
+        unsigned int invWallBeamCol = GetColor(255, 30, 210); // 見えない壁(AddWallQuad): 鮮やかなマゼンタ
+        unsigned int invWallDiagCol = GetColor(255, 230, 60); // 見えない壁の対角フレーム: イエロー
+        unsigned int meshWallCol    = GetColor(80, 235, 150); // モデル壁コリジョン: ライトグリーン
+
+        for (const auto& wp : stage.GetWallPolygons())
+        {
+            if (wp.isInvisibleWall)
+            {
+                // 見えない壁（AddWallQuad）は視認しやすいよう立体ビームで3Dフレーム表示
+                drawBeam3D(wp.v0, wp.v1, 2.0f, invWallBeamCol);
+                drawBeam3D(wp.v1, wp.v2, 2.0f, invWallBeamCol);
+                drawBeam3D(wp.v2, wp.v0, 1.4f, invWallDiagCol);
+            }
+            else
+            {
+                // 通常壁コリジョンポリゴンも3Dワイヤーフレーム表示
+                DrawLine3D(wp.v0, wp.v1, meshWallCol);
+                DrawLine3D(wp.v1, wp.v2, meshWallCol);
+                DrawLine3D(wp.v2, wp.v0, meshWallCol);
+            }
+        }
+
+        // ステージ外周のセーフティネット透明境界（ClampToBounds）の3Dフレーム表示
+        VECTOR minB = stage.GetMinBounds();
+        VECTOR maxB = stage.GetMaxBounds();
+        float bY0 = -10.0f;
+        float bY1 = 80.0f;
+        unsigned int boundsCol = GetColor(200, 80, 255);
+        VECTOR c00 = VGet(minB.x, bY0, minB.z), c10 = VGet(maxB.x, bY0, minB.z);
+        VECTOR c11 = VGet(maxB.x, bY0, maxB.z), c01 = VGet(minB.x, bY0, maxB.z);
+        VECTOR u00 = VGet(minB.x, bY1, minB.z), u10 = VGet(maxB.x, bY1, minB.z);
+        VECTOR u11 = VGet(maxB.x, bY1, maxB.z), u01 = VGet(minB.x, bY1, maxB.z);
+        DrawLine3D(c00, c10, boundsCol); DrawLine3D(c10, c11, boundsCol);
+        DrawLine3D(c11, c01, boundsCol); DrawLine3D(c01, c00, boundsCol);
+        DrawLine3D(u00, u10, boundsCol); DrawLine3D(u10, u11, boundsCol);
+        DrawLine3D(u11, u01, boundsCol); DrawLine3D(u01, u00, boundsCol);
+        DrawLine3D(c00, u00, boundsCol); DrawLine3D(c10, u10, boundsCol);
+        DrawLine3D(c11, u11, boundsCol); DrawLine3D(c01, u01, boundsCol);
+    }
+
     SetUseLighting(TRUE);
 }
 
@@ -2556,7 +2609,12 @@ void GameManager::DrawDebug2DOverlay()
         int x0, y0, x1, y1;
         worldToMinimap(wp.v0.x, wp.v0.z, x0, y0);
         worldToMinimap(wp.v1.x, wp.v1.z, x1, y1);
-        DrawLine(x0, y0, x1, y1, wallMapCol);
+        unsigned int col = wp.isInvisibleWall ? GetColor(255, 50, 220) : wallMapCol;
+        DrawLine(x0, y0, x1, y1, col);
+        int x2, y2;
+        worldToMinimap(wp.v2.x, wp.v2.z, x2, y2);
+        DrawLine(x1, y1, x2, y2, col);
+        DrawLine(x2, y2, x0, y0, col);
     }
 
     // Position.csv (Pos1〜Pos8) のミニマップピン
@@ -2644,4 +2702,4 @@ void GameManager::DrawDebug2DOverlay()
     cy += 18;
     DrawStringToHandle(cheatX + 12, cy, "[F1] デバッグオーバーレイ ON/OFF", GetColor(180, 195, 215), font13);
 }
-
+
