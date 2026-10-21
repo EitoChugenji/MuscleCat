@@ -4,6 +4,7 @@
 #include "FontManager.h"
 #include "ModelManager.h"
 #include "EffectManager.h"
+#include "CustomEffectManager.h"
 #include "CsvManager.h"
 #include "Config.h"
 #include <cstdlib>
@@ -53,6 +54,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     FontManager::GetInstance().Init();
     ModelManager::GetInstance().Init();
     EffectManager::GetInstance().Init();
+    CustomEffectManager::GetInstance().Init();
 
     // ゲームマネージャー初期化
     GameManager game;
@@ -525,6 +527,7 @@ int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, LPSTR lpCmdLine
     }
 
     // リソース解放
+    CustomEffectManager::GetInstance().Release();
     EffectManager::GetInstance().Release();
     FontManager::GetInstance().Release();
     ModelManager::GetInstance().Release();

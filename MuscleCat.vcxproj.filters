@@ -23,6 +23,9 @@
     <ClInclude Include="Source\CsvManager.h">
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\CustomEffectManager.h">
+      <Filter>ヘッダーファイル</Filter>
+    </ClInclude>
     <ClInclude Include="Source\EffectManager.h">
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
@@ -62,6 +65,9 @@
       <Filter>ソースファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\CsvManager.cpp">
+      <Filter>ソースファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\CustomEffectManager.cpp">
       <Filter>ソースファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\EffectManager.cpp">
