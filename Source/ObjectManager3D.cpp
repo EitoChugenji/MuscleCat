@@ -101,7 +101,7 @@ void ObjectManager3D::SpawnFastMouse()
     ApplyMouseSpeedBonus();
 }
 
-void ObjectManager3D::Update(const Camera3D& camera)
+void ObjectManager3D::Update(Camera3D& camera)
 {
     // プレイヤー更新（TPSカメラ基準・飛びつき追尾用ネズミ座標収集）
     if (m_player && m_player->IsAlive())
@@ -135,10 +135,10 @@ void ObjectManager3D::Update(const Camera3D& camera)
     }
 
     // 障害物・ステージ壁との衝突押し出し
-    CheckObstacleAndStageCollisions();
+    CheckObstacleAndStageCollisions(camera);
 
     // ネズミと猫の捕獲当たり判定
-    CheckCollisions();
+    CheckCollisions(camera);
 
     // 死亡（捕獲された）オブジェクトの削除
     m_objects.erase
@@ -203,7 +203,7 @@ void ObjectManager3D::Draw2D()
     }
 }
 
-void ObjectManager3D::CheckCollisions()
+void ObjectManager3D::CheckCollisions(Camera3D& camera)
 {
     if (!m_player || !m_player->IsAlive())
     {
@@ -256,7 +256,7 @@ void ObjectManager3D::CheckCollisions()
     }
 }
 
-void ObjectManager3D::CheckObstacleAndStageCollisions()
+void ObjectManager3D::CheckObstacleAndStageCollisions(Camera3D& camera)
 {
     // 1. プレイヤーと障害物・壁の衝突解決
     if (m_player && m_player->IsAlive())
