@@ -1059,27 +1059,33 @@ void GameManager::Draw()
         DrawFormatStringToHandle(boxX + 130, boxY + 110, white, font24, "クリアタイム : %.2f 秒", m_clearTimeSeconds);
 
         // 評価ランク算出
+        bool isStage2 = (m_selectedMap == ModelConfig::MapType::NewMap);
+        float sLimit = isStage2 ? 60.0f : 30.0f;
+        float aLimit = isStage2 ? 75.0f : 45.0f;
+        float bLimit = isStage2 ? 90.0f : 60.0f;
+
         const char* rankText = "C";
         unsigned int rankColor = GetColor(180, 180, 180);
-        if (m_clearTimeSeconds <= 20.0f)
+        if (m_clearTimeSeconds <= sLimit)
         {
             rankText = "S (GOD MUSCLE CAT)";
             rankColor = GetColor(255, 215, 0);
         }
         
-        else if (m_clearTimeSeconds <= 35.0f)
+        else if (m_clearTimeSeconds <= aLimit)
         {
             rankText = "A (GREAT MUSCLE)";
             rankColor = GetColor(255, 130, 50);
         }
         
-        else if (m_clearTimeSeconds <= 50.0f)
+        else if (m_clearTimeSeconds <= bLimit)
         {
             rankText = "B (NICE PUMP)";
             rankColor = GetColor(100, 220, 120);
         }
 
-        DrawFormatStringToHandle(boxX + 130, boxY + 160, rankColor, font24, "ランク       : %s", rankText);
+        DrawFormatStringToHandle(boxX + 130, boxY + 155, rankColor, font24, "ランク       : %s", rankText);
+        DrawFormatStringToHandle(boxX + 130, boxY + 195, gray, font16, "基準: S ≦ %.0f秒 / A ≦ %.0f秒 / B ≦ %.0f秒", sLimit, aLimit, bLimit);
 
         DrawStringToHandle(boxX + 130, boxY + 240, "[SPACE] または [R] キー: リトライ", GetColor(150, 255, 150), font18);
         DrawStringToHandle(boxX + 130, boxY + 280, "[T] キー: タイトル画面へ戻る", cyan, font18);

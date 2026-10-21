@@ -6,6 +6,7 @@
 #include "Camera3D.h"
 #include "CsvManager.h"
 #include "FontManager.h"
+#include "EffectManager.h"
 #include "Common.h"
 #include "DxLib.h"
 #include <algorithm>
@@ -310,6 +311,9 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     obj->SetAlive(false);
                     m_caughtCount++;
                     ApplyMouseSpeedBonus();
+
+                    // ネズミ捕獲Effekseerエフェクト再生（ヒット閃光＋リング衝撃波＋星スパーク）
+                    EffectManager::GetInstance().PlayCatchEffect(mPos, isFast);
 
                     // カメラシェイク演出発動
                     camera.TriggerShake(8.0f, 10);

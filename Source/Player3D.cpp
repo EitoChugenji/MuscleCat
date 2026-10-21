@@ -692,8 +692,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                             m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
 
                             // 筋トレ成功エフェクト再生
-                            EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
-                            camera.TriggerShake(6.0f, 6);
+                            // EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+                            camera.TriggerShake(4.0f, 4);
                         }
                         
                         else
