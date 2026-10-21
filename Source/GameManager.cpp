@@ -4,6 +4,7 @@
 #include "Obstacle3D.h"
 #include "FontManager.h"
 #include "EffectManager.h"
+#include "CustomEffectManager.h"
 #include "CsvManager.h"
 #include "ModelConfig.h"
 #include "Config.h"
@@ -249,6 +250,7 @@ void GameManager::SetupTitle()
     m_state = GameState::Title;
     m_objManager.Clear();
     EffectManager::GetInstance().StopMuscleAura();
+    CustomEffectManager::GetInstance().Clear();
 
     // 選択中マップのステージ読み込み
     m_objManager.LoadStage(m_selectedMap);
@@ -289,6 +291,7 @@ void GameManager::StartGame()
 
     m_objManager.Clear();
     EffectManager::GetInstance().StopMuscleAura();
+    CustomEffectManager::GetInstance().Clear();
     m_isPaused = false;
     m_pauseStartTime = 0;
     m_pauseMenuItem = 0;
@@ -415,15 +418,12 @@ void GameManager::Update()
         );
         SetCameraPositionAndTarget_UpVecY(camPos, center);
 
-        // 猫のアニメーション：定期的にスクワット運動＆黄金オーラ
+        // 猫のアニメーション：定期的にスクワット運動（タイトル画面ではエフェクトは出さない）
         if (player)
         {
             // 2.5秒ごとにスクワットと待機を切り替え
             bool isSquatting = ((m_titleAnimTimer / 140) % 2 == 0);
             player->UpdateTitleAnimation(isSquatting);
-
-            // マッスルオーラを華やかに更新
-            EffectManager::GetInstance().UpdateMuscleAura(player->GetPos(), true, player->GetRepCount());
         }
 
         // キー入力
@@ -571,10 +571,6 @@ void GameManager::Update()
         if ((hoverStart && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_selectedMenuItem == 0))
         {
             m_startTransitionTimer = 22; // 閃光トランジション開始
-            if (player)
-            {
-                EffectManager::GetInstance().PlayPumpSuccessEffect(player->GetPos(), 10);
-            }
             return;
         }
 
@@ -713,6 +709,7 @@ void GameManager::Update()
             if (key6 && !m_prevKey6)
             {
                 EffectManager::GetInstance().ToggleEffectEnabled();
+                CustomEffectManager::GetInstance().SetEffectEnabled(EffectManager::GetInstance().IsEffectEnabled());
             }
 
             m_prevKey6 = key6;
@@ -785,10 +782,11 @@ void GameManager::Update()
         }
     }
 
-    // 3Dエフェクトの更新（ポーズ中は更新停止）
-    if (!m_isPaused)
+    // 3Dエフェクトの更新（タイトル画面・ポーズ中は更新しない）
+    if (m_state != GameState::Title && !m_isPaused)
     {
         EffectManager::GetInstance().Update();
+        CustomEffectManager::GetInstance().Update();
     }
 }
 
@@ -806,9 +804,13 @@ void GameManager::Draw()
         DrawDebug3DOverlay();
     }
 
-    // Effekseer 3Dエフェクト描画
-    EffectManager::GetInstance().SyncCamera();
-    EffectManager::GetInstance().Draw3D();
+    // Effekseer 3Dエフェクトおよびカスタム燃焼エフェクト描画（タイトル画面では非表示）
+    if (m_state != GameState::Title)
+    {
+        EffectManager::GetInstance().SyncCamera();
+        EffectManager::GetInstance().Draw3D();
+        CustomEffectManager::GetInstance().Draw3D();
+    }
 
     // 2. 2D HUD / UI描画 (Zバッファ無効)
     SetUseZBuffer3D(FALSE);
