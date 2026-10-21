@@ -19,14 +19,19 @@ void EffectManager::Init()
     // 歪みエフェクトの初期化
     Effekseer_InitDistortion();
 
-    // 1. タックル突進エフェクト（進行方向に射出されるアタックエフェクト: スケールを調整して猫のPush動作を見えやすく）
+    // 1. タックル突進エフェクト（進行方向に射出されるアタックエフェクト）
     m_tackleResHandle = LoadEffekseerEffect("Resource/Effects/Attack/01_NextSoft01/RightAttack.efk", 6.5f);
 
-    // 2. 筋トレ成功エフェクト（モデル周囲の光バリア: 猫を覆い隠さない適切なスケールに調整）
-    m_pumpSuccessResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Barrior01.efkefc", 6.0f);
+    // 2. ネズミ捕獲エフェクト
+    // ① 捕獲ヒット閃光（LightAttackEffect: 捕獲瞬間のクッキリしたヒットフラッシュ）
+    m_catchHitResHandle = LoadEffekseerEffect("Resource/Effects/Attack/01_NextSoft01/LightAttackEffect.efk", 4.0f);
 
-    // 3. マッスルオーラエフェクト（足元から立ち昇るオーラ: 猫の全身が黒煙に覆われないよう足元に調整）
-    m_muscleAuraResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Aura01.efkefc", 1.2f);
+    // ② ユーザー自作捕獲エフェクト用スロット（Resource/Effects/Custom/Catch.efkefc または Catch.efk があれば最優先再生）
+    m_customCatchResHandle = LoadEffekseerEffect("Resource/Effects/Custom/Catch.efkefc", 4.0f);
+    if (m_customCatchResHandle == -1)
+    {
+        m_customCatchResHandle = LoadEffekseerEffect("Resource/Effects/Custom/Catch.efk", 4.0f);
+    }
 }
 
 void EffectManager::Release()
@@ -41,10 +46,42 @@ void EffectManager::Release()
         m_tackleResHandle = -1;
     }
 
+    if (m_catchHitResHandle != -1)
+    {
+        DeleteEffekseerEffect(m_catchHitResHandle);
+        m_catchHitResHandle = -1;
+    }
+
+
+
+    if (m_customCatchResHandle != -1)
+    {
+        DeleteEffekseerEffect(m_customCatchResHandle);
+        m_customCatchResHandle = -1;
+    }
+
     if (m_pumpSuccessResHandle != -1)
     {
         DeleteEffekseerEffect(m_pumpSuccessResHandle);
         m_pumpSuccessResHandle = -1;
+    }
+
+    if (m_pumpRingResHandle != -1)
+    {
+        DeleteEffekseerEffect(m_pumpRingResHandle);
+        m_pumpRingResHandle = -1;
+    }
+
+    if (m_pumpSparkResHandle != -1)
+    {
+        DeleteEffekseerEffect(m_pumpSparkResHandle);
+        m_pumpSparkResHandle = -1;
+    }
+
+    if (m_customLevelUpResHandle != -1)
+    {
+        DeleteEffekseerEffect(m_customLevelUpResHandle);
+        m_customLevelUpResHandle = -1;
     }
 
     if (m_muscleAuraResHandle != -1)
@@ -75,7 +112,6 @@ void EffectManager::SetEffectEnabled(bool enabled)
 
     if (!m_effectEnabled)
     {
-        // エフェクト無効時は現在再生中のオーラを停止
         StopMuscleAura();
     }
 }
@@ -123,43 +159,55 @@ void EffectManager::PlayTackleEffect(const VECTOR& pos, const VECTOR& dir)
     }
 }
 
-void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
+void EffectManager::PlayCatchEffect(const VECTOR& pos, bool isFast)
 {
-    if (!m_effectEnabled || m_pumpSuccessResHandle == -1)
+    if (!m_effectEnabled)
     {
         return;
     }
 
-    int playHandle = PlayEffekseer3DEffect(m_pumpSuccessResHandle);
-    if (playHandle != -1)
+    // 高速ネズミ捕獲時は少しエフェクトを大きめにしてメリハリをつける
+    float fastMultiplier = isFast ? 1.35f : 1.0f;
+
+    // 自作捕獲エフェクトがある場合はそれを最優先再生
+    if (m_customCatchResHandle != -1)
     {
-        float scale = 4.5f + static_cast<float>(repCount) * 0.25f;
-        SetPosPlayingEffekseer3DEffect(playHandle, pos.x, pos.y + 10.0f, pos.z);
-        SetScalePlayingEffekseer3DEffect(playHandle, scale, scale, scale);
+        int customPlay = PlayEffekseer3DEffect(m_customCatchResHandle);
+        if (customPlay != -1)
+        {
+            float scale = 3.5f * fastMultiplier;
+            SetPosPlayingEffekseer3DEffect(customPlay, pos.x, pos.y + 6.0f, pos.z);
+            SetScalePlayingEffekseer3DEffect(customPlay, scale, scale, scale);
+        }
     }
+
+    // ① 捕獲ヒット閃光（ネズミの体中心でバシュッと光る）
+    if (m_catchHitResHandle != -1)
+    {
+        int hitPlay = PlayEffekseer3DEffect(m_catchHitResHandle);
+        if (hitPlay != -1)
+        {
+            float scale = 3.2f * fastMultiplier;
+            SetPosPlayingEffekseer3DEffect(hitPlay, pos.x, pos.y + 8.0f, pos.z);
+            SetScalePlayingEffekseer3DEffect(hitPlay, scale, scale, scale);
+        }
+    }
+}
+
+void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
+{
+    // 筋トレ時のエフェクトは無効化（ユーザーリクエストにより非表示）
+    (void)pos;
+    (void)repCount;
 }
 
 void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCount)
 {
-    if (!m_effectEnabled || !isActive || m_muscleAuraResHandle == -1)
-    {
-        StopMuscleAura();
-        return;
-    }
-
-    // オーラが未再生、または停止している場合は新規再生
-    if (m_activeAuraHandle == -1 || IsEffekseer3DEffectPlaying(m_activeAuraHandle) == -1)
-    {
-        m_activeAuraHandle = PlayEffekseer3DEffect(m_muscleAuraResHandle);
-    }
-
-    if (m_activeAuraHandle != -1)
-    {
-        // 足元から立ち昇るオーラ。Rep数に応じてスケールを自然に拡大
-        float auraScale = 1.0f + static_cast<float>(repCount) * 0.1f;
-        SetPosPlayingEffekseer3DEffect(m_activeAuraHandle, pos.x, pos.y + 2.0f, pos.z);
-        SetScalePlayingEffekseer3DEffect(m_activeAuraHandle, auraScale, auraScale, auraScale);
-    }
+    // 筋トレ時オーラも無効化
+    (void)pos;
+    (void)isActive;
+    (void)repCount;
+    StopMuscleAura();
 }
 
 void EffectManager::StopMuscleAura()
