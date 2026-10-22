@@ -39,16 +39,6 @@ public:
         float rotZ = 0.0f
     );
 
-    // ローカルトランスフォーム付きモデル描画（前傾・横揺れ・Squash&Stretch・スタン倒れ対応）
-    bool DrawModelWithTransform(
-        const std::string& path,
-        const VECTOR& pos,
-        float rotY,
-        const VECTOR& scaleVec,
-        float localPitchX = 0.0f,
-        float localRollZ = 0.0f
-    );
-
     // プレイヤー（猫）のフォールバック描画
     void DrawFallbackCat(
         const VECTOR& pos,
@@ -60,24 +50,10 @@ public:
     );
 
     // ネズミ（通常）のフォールバック描画
-    void DrawFallbackNormalMouse(
-        const VECTOR& pos,
-        float rotY,
-        float animTime,
-        float localPitchX = 0.0f,
-        float localRollZ = 0.0f,
-        bool isStunned = false
-    );
+    void DrawFallbackNormalMouse(const VECTOR& pos, float rotY, float animTime);
 
     // ネズミ（高速）のフォールバック描画
-    void DrawFallbackFastMouse(
-        const VECTOR& pos,
-        float rotY,
-        float animTime,
-        float localPitchX = 0.0f,
-        float localRollZ = 0.0f,
-        bool isStunned = false
-    );
+    void DrawFallbackFastMouse(const VECTOR& pos, float rotY, float animTime);
 
     // 障害物のフォールバック描画
     void DrawFallbackObstacle(
