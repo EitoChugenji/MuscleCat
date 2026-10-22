@@ -32,6 +32,10 @@ void EffectManager::Init()
     {
         m_customCatchResHandle = LoadEffekseerEffect("Resource/Effects/Custom/Catch.efk", 4.0f);
     }
+
+    // 筋トレ成功エフェクト＆マッスルオーラエフェクトのロードを追加
+    m_pumpSuccessResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Barrior01.efkefc", 6.0f);
+    m_muscleAuraResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Aura01.efkefc", 1.2f);
 }
 
 void EffectManager::Release()
@@ -196,18 +200,36 @@ void EffectManager::PlayCatchEffect(const VECTOR& pos, bool isFast)
 
 void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
 {
-    // 筋トレ時のエフェクトは無効化（ユーザーリクエストにより非表示）
-    (void)pos;
-    (void)repCount;
+    if (!m_effectEnabled || m_pumpSuccessResHandle == -1)
+    {
+        return;
+    }
+    int playHandle = PlayEffekseer3DEffect(m_pumpSuccessResHandle);
+    if (playHandle != -1)
+    {
+        float scale = 4.5f + static_cast<float>(repCount) * 0.25f;
+        SetPosPlayingEffekseer3DEffect(playHandle, pos.x, pos.y + 10.0f, pos.z);
+        SetScalePlayingEffekseer3DEffect(playHandle, scale, scale, scale);
+    }
 }
 
 void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCount)
 {
-    // 筋トレ時オーラも無効化
-    (void)pos;
-    (void)isActive;
-    (void)repCount;
-    StopMuscleAura();
+    if (!m_effectEnabled || !isActive || m_muscleAuraResHandle == -1)
+    {
+        StopMuscleAura();
+        return;
+    }
+    if (m_activeAuraHandle == -1 || IsEffekseer3DEffectPlaying(m_activeAuraHandle) == -1)
+    {
+        m_activeAuraHandle = PlayEffekseer3DEffect(m_muscleAuraResHandle);
+    }
+    if (m_activeAuraHandle != -1)
+    {
+        float auraScale = 1.0f + static_cast<float>(repCount) * 0.1f;
+        SetPosPlayingEffekseer3DEffect(m_activeAuraHandle, pos.x, pos.y + 2.0f, pos.z);
+        SetScalePlayingEffekseer3DEffect(m_activeAuraHandle, auraScale, auraScale, auraScale);
+    }
 }
 
 void EffectManager::StopMuscleAura()

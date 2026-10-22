@@ -4,6 +4,7 @@
 #include "ModelManager.h"
 #include "FontManager.h"
 #include "EffectManager.h"
+#include "CustomEffectManager.h"
 #include "CsvManager.h"
 #include "Config.h"
 #include "DxLib.h"
@@ -304,6 +305,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         m_isTackling = false;
         m_isPouncing = false;
         m_pos.y = m_groundY;
+        CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, false, m_repCount, m_scCursor, false);
         UpdateAnimation(false);
         return;
     }
@@ -325,11 +327,17 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         m_pos.z += m_tackleDir.z * tSpeed;
         m_pos.y = m_groundY;
 
+        CustomEffectManager::GetInstance().UpdateTackleSpaceTimeRift(m_pos, m_tackleDir, m_tackleTimer, m_repCount);
+        CustomEffectManager::GetInstance().UpdateRunDust(m_pos, m_tackleDir, tSpeed / SPEED_INITIAL, true, m_repCount);
+
         if (m_tackleTimer <= 0)
         {
             m_isTackling = false;
             m_tackleCooldown = GetTackleCooldownMax();
+            CustomEffectManager::GetInstance().FinishTackleSpaceTimeRift(m_pos, m_tackleDir, m_repCount);
         }
+
+        CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, false, m_repCount, m_scCursor, m_state != MuscleState::Soreness);
 
         // タックル中のアニメーション（Push）を更新
         UpdateAnimation(false);
@@ -393,12 +401,18 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         m_pos.x += m_pounceDir.x * pSpeed;
         m_pos.z += m_pounceDir.z * pSpeed;
 
+        VECTOR groundPos = VGet(m_pos.x, m_groundY, m_pos.z);
+        CustomEffectManager::GetInstance().UpdatePounceGroundGouge(groundPos, m_pounceDir, progress, m_repCount);
+
         if (m_pounceTimer <= 0)
         {
             m_isPouncing = false;
             m_pos.y = m_groundY;
             m_pounceCooldown = GetPounceCooldownMax();
         }
+
+        CustomEffectManager::GetInstance().FinishPounceGroundGouge(groundPos, m_pounceDir, m_repCount);
+        camera.TriggerShake(4.5f, 7);
     }
     
     else
@@ -498,6 +512,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     // Effekseer タックル衝撃波リングエフェクト再生
                     EffectManager::GetInstance().PlayTackleEffect(m_pos, m_tackleDir);
 
+                    CustomEffectManager::GetInstance().StartTackleSpaceTimeRift(m_pos, m_tackleDir, m_repCount);
+
                     // 即座にタックルアニメーション（Push）を開始
                     UpdateAnimation(false);
                     return;
@@ -567,6 +583,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         m_pounceDir = currentFacing;
                     }
 
+                    CustomEffectManager::GetInstance().StartPounceGroundGouge(VGet(m_pos.x, m_groundY, m_pos.z), m_pounceDir, m_repCount);
+
                     // 即座に飛びつきアニメーション（Attack）を開始
                     UpdateAnimation(false);
                     return;
@@ -612,6 +630,9 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     // 移動（Statu.csvのCat速度パラメータに基づく）
                     m_pos.x += moveDir.x * m_speed;
                     m_pos.z += moveDir.z * m_speed;
+
+                    CustomEffectManager::GetInstance().UpdateRunDust(m_pos, moveDir, m_speed / SPEED_INITIAL, false, m_repCount);
+
                 }
 
                 // 筋トレ開始チェック
@@ -693,6 +714,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
 
                             // 筋トレ成功エフェクト再生
                             // EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+                            CustomEffectManager::GetInstance().PlayWorkoutSuccessBurst(m_pos, m_repCount);
                             camera.TriggerShake(4.0f, 4);
                         }
                         
@@ -718,6 +740,10 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
             }
         }
     }
+
+    bool allowBodySmoke = (m_state != MuscleState::Soreness && m_stunTimer <= 0);
+    bool workoutFlameActive = (m_isSkillChecking && allowBodySmoke);
+    CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, workoutFlameActive, m_repCount, m_scCursor, allowBodySmoke);
 
     // Effekseer マッスルオーラの更新（QTE筋トレ中またはパンプアップ状態）
     bool auraActive = ((m_isSkillChecking || (m_state == MuscleState::Muscular && m_repCount > 0)) &&
@@ -1115,7 +1141,7 @@ void Player3D::AddRep(int amount)
     m_resultShowTimer = 60;
 
     // 筋トレ成功エフェクト再生
-    EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+    CustomEffectManager::GetInstance().PlayWorkoutSuccessBurst(m_pos, m_repCount);
 }
 
 void Player3D::DrawBarbell(float catScale)
