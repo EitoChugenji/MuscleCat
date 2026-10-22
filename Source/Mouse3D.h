@@ -5,6 +5,17 @@
 
 class Player3D;
 
+// ネズミのプロシージャルアニメーション姿勢・スケール構造体
+struct MouseAnimTransform
+{
+    VECTOR drawPos;      // 地面ホッピングやスタン倒れを反映した描画位置
+    VECTOR scaleVec;     // Squash & Stretch（伸縮）を反映したスケール
+    float  rotY;         // 進行方向ヨー
+    float  localPitchX;  // 前傾・後傾
+    float  localRollZ;   // 左右の横揺れステップ、スタン横倒し
+    bool   isStunned;
+};
+
 // 派生クラス：MouseBase3D（3Dネズミの基底クラス）
 class MouseBase3D : public GameObject3D
 {
@@ -16,6 +27,7 @@ protected:
     float m_maxSpeed = 4.7f;
     float m_speedBonus = 0.0f; // 仲間の被捕食数 * m_speedGrowthPerUnit
     float m_animTime = 0.0f;
+    float m_walkAnimPhase = 0.0f; // 歩行ホッピングアニメーション位相
     int   m_stunTimer = 0;     // スタン残りフレーム数
     VECTOR m_prevPos = VGet(0.0f, 0.0f, 0.0f); // 移動前の位置（壁抜け・床外抜け防止用）
 
@@ -95,6 +107,10 @@ public:
     // スタンエフェクト（頭上のピヨピヨ星・パルス）描画
     void DrawStunEffect();
 
+    // ネズミの生き生きとしたプロシージャルアニメーション姿勢・スケール算出
+    MouseAnimTransform GetAnimTransform(float baseScale, float modelRotY) const;
+    void UpdateAnimPhase();
+
     // 2D頭上スタン表示＆パニック漫符（汗・ビックリ）表示
     void Draw2D() override;
 
@@ -146,7 +162,7 @@ class NormalMouse3D : public MouseBase3D
 private:
     std::shared_ptr<Player3D> m_targetPlayer;
     int m_turnTimer = 0;
-    bool m_isFleeingNow = false;
+
 
 public:
     NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player = nullptr);

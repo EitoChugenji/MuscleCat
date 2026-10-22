@@ -18,7 +18,8 @@ private:
         EmberSpark,  // 舞い散る火の粉・スパーク
         CoreGlow,    // 身体中心・足元の熱気グロー
         BodySmoke,   // Lv.10以降に過熱した体から立ち昇る白い湯気（蒸気）
-        GougeDust    // 飛びつき攻撃で地面をえぐった際に噴き上がる土煙・破片スプラッシュ
+        GougeDust,   // 飛びつき攻撃で地面をえぐった際に噴き上がる土煙・破片スプラッシュ
+        RunDust      // 走行中・電撃疾走中に足元から巻き上がる土煙
     };
 
     // 3D炎・煙パーティクル構造体
@@ -172,6 +173,7 @@ private:
     float  m_chargeProgress = 0.0f; // QTEゲージ進行度 (0.0f ~ 1.0f)
     float  m_time = 0.0f;
     int    m_burstTimer = 0;        // 筋トレ成功時の爆炎ブースト残りフレーム
+    int    m_runDustCounter = 0;    // 走行土煙の発生間隔カウンタ
 
     // エフェクト有効フラグ（デバッグ切替連動用）
     bool   m_effectEnabled = true;
@@ -256,6 +258,12 @@ public:
     void StartTackleSpaceTimeRift(const VECTOR& playerPos, const VECTOR& dirXZ, int repCount);
     void UpdateTackleSpaceTimeRift(const VECTOR& playerPos, const VECTOR& dirXZ, int timer, int repCount);
     void FinishTackleSpaceTimeRift(const VECTOR& playerPos, const VECTOR& dirXZ, int repCount);
+
+    // 走行中（通常移動・電撃疾走）に足元から土煙を巻き上げる（移動中のフレームで毎フレーム呼び出す）
+    void UpdateRunDust(const VECTOR& footPos, const VECTOR& moveDirXZ, float speedRatio, bool isDashing, int repCount);
+
+    // ネズミ逃走時のミニ足元土煙（コミカルなパニック逃走演出）
+    void SpawnMouseFleeDust(const VECTOR& footPos, const VECTOR& moveDirXZ);
 
     // 現在燃焼中（またはバースト余韻中）かどうか
     bool IsPlayerBurning() const { return m_effectEnabled && (m_isBurning || m_burstTimer > 0); }
