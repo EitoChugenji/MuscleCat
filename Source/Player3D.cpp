@@ -4,6 +4,7 @@
 #include "ModelManager.h"
 #include "FontManager.h"
 #include "EffectManager.h"
+#include "CustomEffectManager.h"
 #include "CsvManager.h"
 #include "Config.h"
 #include "DxLib.h"
@@ -161,20 +162,11 @@ void Player3D::UpdateAnimation(bool isMoving)
 
     if (m_isTackling)
     {
-<<<<<<< HEAD
-<<<<<<< HEAD
         targetAnim = m_animIndexPush;      // Armature|05_Push
         playSpeed = 1.0f;
-=======
         // 電撃疾走（スタン攻撃）中は超高速のRunモーションで疾走感を演出
         targetAnim = m_animIndexRun;       // Armature|01_Run
         playSpeed = 2.4f + static_cast<float>(GetEffectiveRep()) * 0.08f;
->>>>>>> parent of 34d371d (エフェクトの更新)
-=======
-        // 電撃疾走（スタン攻撃）中は超高速のRunモーションで疾走感を演出
-        targetAnim = m_animIndexRun;       // Armature|01_Run
-        playSpeed = 2.4f + static_cast<float>(GetEffectiveRep()) * 0.08f;
->>>>>>> parent of 34d371d (エフェクトの更新)
     }
     else if (m_isPouncing)
     {
@@ -316,6 +308,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         m_isTackling = false;
         m_isPouncing = false;
         m_pos.y = m_groundY;
+        CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, false, m_repCount, m_scCursor, false);
         UpdateAnimation(false);
         return;
     }
@@ -331,33 +324,27 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
             m_trails.push_back({ m_pos, m_rotY, m_repCount, 85 });
         }
 
-<<<<<<< HEAD
-<<<<<<< HEAD
         // 地面を滑るような超高速直進
-=======
-=======
->>>>>>> parent of 34d371d (エフェクトの更新)
         // 電撃の尾を引く高密度残像トレイル（毎フレーム記録）
         m_trails.push_back({ m_pos, m_rotY, m_repCount, 115 });
 
         // 電気を帯びて地面を超高速疾走
->>>>>>> parent of 34d371d (エフェクトの更新)
         float tSpeed = GetTackleSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f);
         m_pos.x += m_tackleDir.x * tSpeed;
         m_pos.z += m_tackleDir.z * tSpeed;
         m_pos.y = m_groundY;
 
-<<<<<<< HEAD
-=======
-        // 電撃疾走中のスピードライン・雷撃トレイルエフェクトを更新
         CustomEffectManager::GetInstance().UpdateTackleSpaceTimeRift(m_pos, m_tackleDir, m_tackleTimer, m_repCount);
+        //CustomEffectManager::GetInstance().UpdateRunDust(m_pos, m_tackleDir, tSpeed / SPEED_INITIAL, true, m_repCount);
 
->>>>>>> parent of 34d371d (エフェクトの更新)
         if (m_tackleTimer <= 0)
         {
             m_isTackling = false;
             m_tackleCooldown = GetTackleCooldownMax();
+            CustomEffectManager::GetInstance().FinishTackleSpaceTimeRift(m_pos, m_tackleDir, m_repCount);
         }
+
+        CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, false, m_repCount, m_scCursor, m_state != MuscleState::Soreness);
 
         // タックル中のアニメーション（Push）を更新
         UpdateAnimation(false);
@@ -421,12 +408,18 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         m_pos.x += m_pounceDir.x * pSpeed;
         m_pos.z += m_pounceDir.z * pSpeed;
 
+        VECTOR groundPos = VGet(m_pos.x, m_groundY, m_pos.z);
+        CustomEffectManager::GetInstance().UpdatePounceGroundGouge(groundPos, m_pounceDir, progress, m_repCount);
+
         if (m_pounceTimer <= 0)
         {
             m_isPouncing = false;
             m_pos.y = m_groundY;
             m_pounceCooldown = GetPounceCooldownMax();
         }
+
+        CustomEffectManager::GetInstance().FinishPounceGroundGouge(groundPos, m_pounceDir, m_repCount);
+        camera.TriggerShake(4.5f, 7);
     }
     
     else
@@ -526,6 +519,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     // Effekseer タックル衝撃波リングエフェクト再生
                     EffectManager::GetInstance().PlayTackleEffect(m_pos, m_tackleDir);
 
+                    CustomEffectManager::GetInstance().StartTackleSpaceTimeRift(m_pos, m_tackleDir, m_repCount);
+
                     // 即座にタックルアニメーション（Push）を開始
                     UpdateAnimation(false);
                     return;
@@ -595,6 +590,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         m_pounceDir = currentFacing;
                     }
 
+                    CustomEffectManager::GetInstance().StartPounceGroundGouge(VGet(m_pos.x, m_groundY, m_pos.z), m_pounceDir, m_repCount);
+
                     // 即座に飛びつきアニメーション（Attack）を開始
                     UpdateAnimation(false);
                     return;
@@ -640,6 +637,9 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     // 移動（Statu.csvのCat速度パラメータに基づく）
                     m_pos.x += moveDir.x * m_speed;
                     m_pos.z += moveDir.z * m_speed;
+
+                   // CustomEffectManager::GetInstance().UpdateRunDust(m_pos, moveDir, m_speed / SPEED_INITIAL, false, m_repCount);
+
                 }
 
                 // 筋トレ開始チェック
@@ -721,6 +721,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
 
                             // 筋トレ成功エフェクト再生
                             // EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+                            CustomEffectManager::GetInstance().PlayWorkoutSuccessBurst(m_pos, m_repCount);
                             camera.TriggerShake(4.0f, 4);
                         }
                         
@@ -746,6 +747,10 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
             }
         }
     }
+
+    bool allowBodySmoke = (m_state != MuscleState::Soreness && m_stunTimer <= 0);
+    bool workoutFlameActive = (m_isSkillChecking && allowBodySmoke);
+    CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, workoutFlameActive, m_repCount, m_scCursor, allowBodySmoke);
 
     // Effekseer マッスルオーラの更新（QTE筋トレ中またはパンプアップ状態）
     bool auraActive = ((m_isSkillChecking || (m_state == MuscleState::Muscular && m_repCount > 0)) &&
@@ -1143,7 +1148,7 @@ void Player3D::AddRep(int amount)
     m_resultShowTimer = 60;
 
     // 筋トレ成功エフェクト再生
-    EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+    CustomEffectManager::GetInstance().PlayWorkoutSuccessBurst(m_pos, m_repCount);
 }
 
 void Player3D::DrawBarbell(float catScale)
