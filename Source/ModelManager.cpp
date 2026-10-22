@@ -93,6 +93,39 @@ bool ModelManager::DrawModelIfLoaded(
     return true;
 }
 
+bool ModelManager::DrawModelWithTransform(
+    const std::string& path,
+    const VECTOR& pos,
+    float rotY,
+    const VECTOR& scaleVec,
+    float localPitchX,
+    float localRollZ
+)
+{
+    int handle = LoadModelHandle(path);
+    if (handle == -1)
+    {
+        return false;
+    }
+
+    MATRIX mat = MGetScale(scaleVec);
+    if (std::abs(localPitchX) > 0.0001f)
+    {
+        mat = MMult(mat, MGetRotX(localPitchX));
+    }
+    if (std::abs(localRollZ) > 0.0001f)
+    {
+        mat = MMult(mat, MGetRotZ(localRollZ));
+    }
+    mat = MMult(mat, MGetRotY(rotY));
+    mat = MMult(mat, MGetTranslate(pos));
+
+    MV1SetMatrix(handle, mat);
+    MV1DrawModel(handle);
+
+    return true;
+}
+
 // プロシージャル3Dフォールバック描画
 void ModelManager::DrawFallbackCat(
     const VECTOR& pos,
@@ -203,7 +236,14 @@ void ModelManager::DrawFallbackCat(
 }
 
 
-void ModelManager::DrawFallbackNormalMouse(const VECTOR& pos, float rotY, float animTime) {
+void ModelManager::DrawFallbackNormalMouse(
+    const VECTOR& pos,
+    float rotY,
+    float animTime,
+    float localPitchX,
+    float localRollZ,
+    bool isStunned
+) {
     unsigned int bodyColor = GetColor(160, 160, 170); // 灰色
     unsigned int earColor  = GetColor(255, 180, 190); // ピンク
     unsigned int eyeColor  = GetColor(20, 20, 20);
@@ -239,7 +279,14 @@ void ModelManager::DrawFallbackNormalMouse(const VECTOR& pos, float rotY, float 
     DrawCapsule3D(tailBase, tailTip, 1.6f, 6, earColor, earColor, TRUE);
 }
 
-void ModelManager::DrawFallbackFastMouse(const VECTOR& pos, float rotY, float animTime) {
+void ModelManager::DrawFallbackFastMouse(
+    const VECTOR& pos,
+    float rotY,
+    float animTime,
+    float localPitchX,
+    float localRollZ,
+    bool isStunned
+) {
     unsigned int bodyColor = GetColor(240, 190, 50);  // 金色/黄色
     unsigned int earColor  = GetColor(255, 140, 120); // 濃いピンク
     unsigned int eyeColor  = GetColor(220, 20, 20);   // 赤目

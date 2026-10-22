@@ -151,7 +151,7 @@ void Player3D::UpdateAnimation(bool isMoving)
     }
 
     // 再生すべきアニメーションの判定
-    // 優先度1: タックル（Eキー: Pushアニメーション）
+    // 優先度1: スタン攻撃・電撃疾走（右クリック/Eキー: Pushアニメーションを高速再生してパンチ風に）
     // 優先度2: 飛びつき（SHIFT/X/Cキー: Attackアニメーション）
     // 優先度3: 筋肉痛（QTE失敗時など: MuscleSorena / MuscleSorenessアニメーション）
     // 優先度4: スクワット（筋トレQTE中: squatアニメーション）
@@ -162,9 +162,9 @@ void Player3D::UpdateAnimation(bool isMoving)
 
     if (m_isTackling)
     {
-        // 電撃疾走（スタン攻撃）中は超高速のRunモーションで疾走感を演出
-        targetAnim = m_animIndexRun;       // Armature|01_Run
-        playSpeed = 2.4f + static_cast<float>(GetEffectiveRep()) * 0.08f;
+        // 電撃疾走（スタン攻撃）中は押し出し（Push）モーションを速めに再生してパンチのように見せる
+        targetAnim = m_animIndexPush;      // Armature|05_Push（高速再生でパンチ風に）
+        playSpeed = 2.0f + static_cast<float>(GetEffectiveRep()) * 0.05f; // 通常の約2〜2.75倍速でキレのある突き出しに
     }
     else if (m_isPouncing)
     {
@@ -345,8 +345,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
             }
         }
 
-        // 電撃の尾を引く高密度残像トレイル（毎フレーム記録）
-        m_trails.push_back({ m_pos, m_rotY, m_repCount, 115 });
+        // 電撃の尾を引く残像トレイル（2フレームに1回、控えめに記録）
+        if (m_tackleTimer % 2 == 0) m_trails.push_back({ m_pos, m_rotY, m_repCount, 90 });
 
         // 電気を帯びて地面を超高速疾走
         float tSpeed = GetTackleSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f);
@@ -356,6 +356,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
 
         // 電撃疾走中のスピードライン・雷撃トレイルエフェクトを更新
         CustomEffectManager::GetInstance().UpdateTackleSpaceTimeRift(m_pos, m_tackleDir, m_tackleTimer, m_repCount);
+        // 電撃疾走中は足元から勢いよく土煙を巻き上げる
+        CustomEffectManager::GetInstance().UpdateRunDust(m_pos, m_tackleDir, tSpeed / SPEED_INITIAL, true, m_repCount);
 
         if (m_tackleTimer <= 0)
         {
@@ -660,6 +662,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     // 移動（Statu.csvのCat速度パラメータに基づく）
                     m_pos.x += moveDir.x * m_speed;
                     m_pos.z += moveDir.z * m_speed;
+                    // 走行中は足元から土煙を巻き上げる
+                    CustomEffectManager::GetInstance().UpdateRunDust(m_pos, moveDir, m_speed / SPEED_INITIAL, false, m_repCount);
                 }
 
                 // 筋トレ開始チェック
