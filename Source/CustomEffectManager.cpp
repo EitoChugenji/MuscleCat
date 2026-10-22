@@ -774,7 +774,7 @@ void CustomEffectManager::SpawnSpaceTimeSlashAndRift(
     VECTOR up       = VGet(0.0f, 1.0f, 0.0f);
 
     // 1. 音速突破の「電撃ソニックブーム衝撃波リング」（進行方向に垂直な円環が猫の周囲で弾け広がる）
-    int ringCount = isCrossSlash ? (1 + extraLv / 6) : ((std::rand() % 4 == 0) ? 1 : 0);
+    int ringCount = isCrossSlash ? (2 + extraLv / 4) : ((std::rand() % 2 == 0) ? 1 : 0);
     for (int i = 0; i < ringCount; ++i)
     {
         SpaceTimeSlashArc sonicRing;
@@ -801,7 +801,7 @@ void CustomEffectManager::SpawnSpaceTimeSlashAndRift(
 
     // 2. 猛烈な疾走感を生む「3D電撃スピードライン（疾走風圧ストリーク）」
     // 猫の周囲360度（円筒状）および足元から後方（-forward）へ長大な黄色い閃光ラインが猛スピードで流れる
-    int speedLineCount = isCrossSlash ? (5 + extraLv / 2) : (2 + extraLv / 4);
+    int speedLineCount = isCrossSlash ? (12 + extraLv) : (5 + extraLv / 2);
     for (int r = 0; r < speedLineCount; ++r)
     {
         SpaceTimeRift speedLine;
@@ -850,7 +850,7 @@ void CustomEffectManager::SpawnSpaceTimeSlashAndRift(
 
     // 3. 全身に纏い＆疾走軌跡として後方へ激しく尾を引く「黄色い3D稲妻・雷撃（ThunderBoltArc）」
     // レベルが高いほど本数・長さ・太さが増し、雷光の尾を引きながら超高速移動する
-    int boltCount = isCrossSlash ? (4 + extraLv / 2) : (1 + extraLv / 4);
+    int boltCount = isCrossSlash ? (10 + extraLv) : (5 + extraLv / 2);
     for (int b = 0; b < boltCount; ++b)
     {
         ThunderBoltArc bolt;
@@ -932,7 +932,7 @@ void CustomEffectManager::SpawnSpaceTimeSlashAndRift(
     }
 
     // 4. 疾走する猫の足元・身体から後方へ弾け飛ぶ「高圧電撃スパーク粒（SpaceTimeShard）」
-    int sparkCount = isCrossSlash ? (6 + extraLv) : (2 + extraLv / 4);
+    int sparkCount = isCrossSlash ? (14 + extraLv * 2) : (5 + extraLv / 2);
     for (int s = 0; s < sparkCount; ++s)
     {
         SpaceTimeShard spark;
@@ -1007,8 +1007,9 @@ void CustomEffectManager::UpdateTackleSpaceTimeRift(const VECTOR& playerPos, con
         m_hasLastRiftPos = true;
     }
 
-    // 電撃疾走中は2フレームに1回スピードラインと雷撃トレイルを発生させる（視認性を保つため控えめに）
-    if (timer % 2 == 0) SpawnSpaceTimeSlashAndRift(curCenter, dirXZ, repCount, scaleBoost * 0.92f, false);
+    // 電撃疾走中は毎フレーム途切れなくスピードラインと雷撃トレイルを発生させ、圧倒的な疾走感を演出
+    (void)timer;
+    SpawnSpaceTimeSlashAndRift(curCenter, dirXZ, repCount, scaleBoost * 0.92f, false);
     m_lastRiftPos = curCenter;
 }
 
@@ -1029,111 +1030,6 @@ void CustomEffectManager::FinishTackleSpaceTimeRift(const VECTOR& playerPos, con
     VECTOR finishCenter = VGet(playerPos.x, chestY, playerPos.z);
     SpawnSpaceTimeSlashAndRift(finishCenter, dirXZ, repCount, scaleBoost * 1.12f, true);
     m_hasLastRiftPos = false;
-}
-
-void CustomEffectManager::UpdateRunDust(const VECTOR& footPos, const VECTOR& moveDirXZ, float speedRatio, bool isDashing, int repCount)
-{
-    if (!m_effectEnabled)
-    {
-        return;
-    }
-
-    // 発生間隔：通常走行は3フレームに1回、電撃疾走中は毎フレーム
-    m_runDustCounter++;
-    int interval = isDashing ? 1 : 3;
-    if (m_runDustCounter < interval)
-    {
-        return;
-    }
-    m_runDustCounter = 0;
-
-    VECTOR forward = moveDirXZ;
-    forward.y = 0.0f;
-    float fLen = VSize(forward);
-    if (fLen < 0.001f)
-    {
-        return;
-    }
-    forward = VScale(forward, 1.0f / fLen);
-    VECTOR backward = VScale(forward, -1.0f);
-    VECTOR right    = VGet(forward.z, 0.0f, -forward.x);
-
-    // マッチョ度（レベル）が上がるほど体重が増して土煙も大きくなる
-    int effRep = (std::min)((std::max)(repCount, 0), 15);
-    float lvScale = 1.0f + static_cast<float>(effRep) * 0.035f;
-    float spdScale = MathHelper::Clamp(speedRatio, 0.5f, 2.0f);
-
-    int count = isDashing ? 2 : 1;
-    for (int i = 0; i < count; ++i)
-    {
-        FlameParticle p;
-        p.type = FlameParticleType::RunDust;
-        p.spawnRepLevel = repCount;
-        p.phase = RandRange(0.0f, MathHelper::PI * 2.0f);
-
-        // 左右の足元（やや後方）から巻き上がる
-        float sideSign = (Rand01() < 0.5f) ? 1.0f : -1.0f;
-        float sideOff  = sideSign * RandRange(4.0f, 12.0f) * lvScale;
-        float backOff  = RandRange(4.0f, 14.0f);
-        p.pos = VAdd(footPos, VAdd(VScale(backward, backOff), VAdd(VScale(right, sideOff), VGet(0.0f, RandRange(1.0f, 4.0f), 0.0f))));
-
-        float backSpd = (isDashing ? RandRange(1.6f, 3.2f) : RandRange(0.6f, 1.4f)) * spdScale;
-        float sideSpd = sideSign * RandRange(0.2f, 0.9f);
-        float upSpd   = isDashing ? RandRange(0.9f, 1.8f) : RandRange(0.5f, 1.1f);
-        p.vel = VAdd(VScale(backward, backSpd), VAdd(VScale(right, sideSpd), VGet(0.0f, upSpd, 0.0f)));
-
-        p.width   = RandRange(10.0f, 16.0f) * lvScale * (isDashing ? 1.35f : 1.0f);
-        p.height  = p.width * RandRange(0.75f, 1.0f);
-        p.age     = 0.0f;
-        p.maxLife = isDashing ? RandRange(20.0f, 30.0f) : RandRange(18.0f, 28.0f);
-        p.colorVariant = std::rand() % 2;
-        p.followPlayerXZ = false;
-
-        m_particles.push_back(p);
-    }
-}
-
-void CustomEffectManager::SpawnMouseFleeDust(const VECTOR& footPos, const VECTOR& moveDirXZ)
-{
-    if (!m_effectEnabled)
-    {
-        return;
-    }
-
-    VECTOR forward = moveDirXZ;
-    forward.y = 0.0f;
-    float fLen = VSize(forward);
-    if (fLen < 0.001f)
-    {
-        return;
-    }
-    forward = VScale(forward, 1.0f / fLen);
-    VECTOR backward = VScale(forward, -1.0f);
-    VECTOR right    = VGet(forward.z, 0.0f, -forward.x);
-
-    FlameParticle p;
-    p.type = FlameParticleType::RunDust;
-    p.spawnRepLevel = 0;
-    p.phase = RandRange(0.0f, MathHelper::PI * 2.0f);
-
-    float sideSign = (Rand01() < 0.5f) ? 1.0f : -1.0f;
-    float sideOff  = sideSign * RandRange(2.0f, 5.0f);
-    float backOff  = RandRange(3.0f, 7.0f);
-    p.pos = VAdd(footPos, VAdd(VScale(backward, backOff), VAdd(VScale(right, sideOff), VGet(0.0f, RandRange(0.5f, 2.0f), 0.0f))));
-
-    float backSpd = RandRange(0.8f, 1.8f);
-    float sideSpd = sideSign * RandRange(0.1f, 0.5f);
-    float upSpd   = RandRange(0.4f, 0.9f);
-    p.vel = VAdd(VScale(backward, backSpd), VAdd(VScale(right, sideSpd), VGet(0.0f, upSpd, 0.0f)));
-
-    p.width   = RandRange(4.5f, 7.5f); // ネズミ用ミニサイズ
-    p.height  = p.width * 0.85f;
-    p.age     = 0.0f;
-    p.maxLife = RandRange(14.0f, 22.0f);
-    p.colorVariant = std::rand() % 2;
-    p.followPlayerXZ = false;
-
-    m_particles.push_back(p);
 }
 
 void CustomEffectManager::SpawnWorkoutFlameParticles(int count, bool isBurst)
@@ -1428,16 +1324,6 @@ void CustomEffectManager::Update()
             it->vel.x *= 0.97f;
             it->vel.z *= 0.97f;
             it->vel.y *= 0.992f;
-        }
-        else if (it->type == FlameParticleType::RunDust)
-        {
-            // 走行土煙：後方へ流れながら減速し、ふわっと広がって漂う
-            it->pos.x += it->vel.x;
-            it->pos.y += it->vel.y;
-            it->pos.z += it->vel.z;
-            it->vel.x *= 0.90f;
-            it->vel.z *= 0.90f;
-            it->vel.y *= 0.88f;
         }
         else if (it->type == FlameParticleType::GougeDust)
         {
@@ -2429,25 +2315,6 @@ void CustomEffectManager::Draw3D()
         }
 
         float lifeRatio = p.age / p.maxLife;
-
-        if (p.type == FlameParticleType::RunDust)
-        {
-            float dustEnv = (lifeRatio < 0.12f) ? (lifeRatio / 0.12f) : (1.0f - (lifeRatio - 0.12f) / 0.88f);
-            unsigned char dustAlpha = static_cast<unsigned char>(MathHelper::Clamp(dustEnv * 150.0f, 0.0f, 255.0f));
-            if (dustAlpha <= 2)
-            {
-                continue;
-            }
-
-            // 白い床でも見える淡いサンドベージュ〜グレージュの土煙
-            COLOR_U8 dustBottom = (p.colorVariant == 0) ? GetColorU8(150, 128, 100, dustAlpha) : GetColorU8(135, 120, 105, dustAlpha);
-            COLOR_U8 dustTop    = GetColorU8(185, 168, 145, static_cast<unsigned char>(dustAlpha * 55 / 100));
-
-            float expand = 0.70f + lifeRatio * 1.40f;
-            VECTOR upDir = VGet(0.0f, 1.0f, 0.0f);
-            DrawFlameQuad3D(p.pos, upDir, camPos, p.width * expand, p.width * expand * 1.20f, p.height * expand, dustBottom, dustTop, m_smokeTexHandle);
-            continue;
-        }
 
         if (p.type == FlameParticleType::GougeDust)
         {
