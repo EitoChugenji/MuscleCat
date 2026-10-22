@@ -162,8 +162,14 @@ void Player3D::UpdateAnimation(bool isMoving)
     if (m_isTackling)
     {
 <<<<<<< HEAD
+<<<<<<< HEAD
         targetAnim = m_animIndexPush;      // Armature|05_Push
         playSpeed = 1.0f;
+=======
+        // 電撃疾走（スタン攻撃）中は超高速のRunモーションで疾走感を演出
+        targetAnim = m_animIndexRun;       // Armature|01_Run
+        playSpeed = 2.4f + static_cast<float>(GetEffectiveRep()) * 0.08f;
+>>>>>>> parent of 34d371d (エフェクトの更新)
 =======
         // 電撃疾走（スタン攻撃）中は超高速のRunモーションで疾走感を演出
         targetAnim = m_animIndexRun;       // Armature|01_Run
@@ -326,8 +332,11 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         }
 
 <<<<<<< HEAD
+<<<<<<< HEAD
         // 地面を滑るような超高速直進
 =======
+=======
+>>>>>>> parent of 34d371d (エフェクトの更新)
         // 電撃の尾を引く高密度残像トレイル（毎フレーム記録）
         m_trails.push_back({ m_pos, m_rotY, m_repCount, 115 });
 
