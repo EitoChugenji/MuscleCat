@@ -4,7 +4,6 @@
 #include "ModelManager.h"
 #include "FontManager.h"
 #include "EffectManager.h"
-#include "CustomEffectManager.h"
 #include "CsvManager.h"
 #include "Config.h"
 #include "DxLib.h"
@@ -151,7 +150,7 @@ void Player3D::UpdateAnimation(bool isMoving)
     }
 
     // 再生すべきアニメーションの判定
-    // 優先度1: スタン攻撃・電撃疾走（右クリック/Eキー: Pushアニメーションを高速再生してパンチ風に）
+    // 優先度1: タックル（Eキー: Pushアニメーション）
     // 優先度2: 飛びつき（SHIFT/X/Cキー: Attackアニメーション）
     // 優先度3: 筋肉痛（QTE失敗時など: MuscleSorena / MuscleSorenessアニメーション）
     // 優先度4: スクワット（筋トレQTE中: squatアニメーション）
@@ -162,9 +161,8 @@ void Player3D::UpdateAnimation(bool isMoving)
 
     if (m_isTackling)
     {
-        // 電撃疾走（スタン攻撃）中は押し出し（Push）モーションを速めに再生してパンチのように見せる
-        targetAnim = m_animIndexPush;      // Armature|05_Push（高速再生でパンチ風に）
-        playSpeed = 2.0f + static_cast<float>(GetEffectiveRep()) * 0.05f; // 通常の約2〜2.75倍速でキレのある突き出しに
+        targetAnim = m_animIndexPush;      // Armature|05_Push
+        playSpeed = 1.0f;
     }
     else if (m_isPouncing)
     {
@@ -306,71 +304,35 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         m_isTackling = false;
         m_isPouncing = false;
         m_pos.y = m_groundY;
-        CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, false, m_repCount, m_scCursor, false);
         UpdateAnimation(false);
         return;
     }
 
-    // 電撃疾走・スタン攻撃（Tackle）アクション実行中処理
+    // タックル（Tackle）アクション実行中処理
     if (m_isTackling)
     {
         m_tackleTimer--;
 
-        // 電撃疾走中にWASDまたはカメラ方向で滑らかに高速ステアリング（方向転換）可能にする
-        VECTOR forwardXZ = camera.GetForwardXZ();
-        VECTOR rightXZ   = camera.GetRightXZ();
-        VECTOR steerDir  = VGet(0.0f, 0.0f, 0.0f);
-        if (CheckHitKey(KEY_INPUT_W)) steerDir = VAdd(steerDir, forwardXZ);
-        if (CheckHitKey(KEY_INPUT_S)) steerDir = VSub(steerDir, forwardXZ);
-        if (CheckHitKey(KEY_INPUT_D)) steerDir = VAdd(steerDir, rightXZ);
-        if (CheckHitKey(KEY_INPUT_A)) steerDir = VSub(steerDir, rightXZ);
-
-        float steerLenSq = steerDir.x * steerDir.x + steerDir.z * steerDir.z;
-        if (steerLenSq > 0.0001f)
+        // 残像記録（半透明で控えめにし、本体のPushモーションを際立たせる）
+        if (m_tackleTimer % 2 == 0)
         {
-            float invL = 1.0f / std::sqrt(steerLenSq);
-            steerDir = VGet(steerDir.x * invL, 0.0f, steerDir.z * invL);
-            // 疾走感を損なわない滑らかな旋回補間
-            constexpr float STEER_RATE = 0.15f;
-            VECTOR blended = VGet(
-                m_tackleDir.x * (1.0f - STEER_RATE) + steerDir.x * STEER_RATE,
-                0.0f,
-                m_tackleDir.z * (1.0f - STEER_RATE) + steerDir.z * STEER_RATE
-            );
-            float bLen = VSize(blended);
-            if (bLen > 0.0001f)
-            {
-                m_tackleDir = VScale(blended, 1.0f / bLen);
-                m_rotY = std::atan2(m_tackleDir.x, m_tackleDir.z);
-            }
+            m_trails.push_back({ m_pos, m_rotY, m_repCount, 85 });
         }
 
-        // 電撃の尾を引く残像トレイル（2フレームに1回、控えめに記録）
-        if (m_tackleTimer % 2 == 0) m_trails.push_back({ m_pos, m_rotY, m_repCount, 90 });
-
-        // 電気を帯びて地面を超高速疾走
+        // 地面を滑るような超高速直進
         float tSpeed = GetTackleSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f);
         m_pos.x += m_tackleDir.x * tSpeed;
         m_pos.z += m_tackleDir.z * tSpeed;
         m_pos.y = m_groundY;
 
-        // 電撃疾走中のスピードライン・雷撃トレイルエフェクトを更新
-        CustomEffectManager::GetInstance().UpdateTackleSpaceTimeRift(m_pos, m_tackleDir, m_tackleTimer, m_repCount);
-        // 電撃疾走中は足元から勢いよく土煙を巻き上げる
-        CustomEffectManager::GetInstance().UpdateRunDust(m_pos, m_tackleDir, tSpeed / SPEED_INITIAL, true, m_repCount);
-
         if (m_tackleTimer <= 0)
         {
             m_isTackling = false;
             m_tackleCooldown = GetTackleCooldownMax();
-            CustomEffectManager::GetInstance().FinishTackleSpaceTimeRift(m_pos, m_tackleDir, m_repCount);
         }
 
-        // 電撃疾走中もLv.10以上の体から立ち昇る蒸気・煙は継続させる
-        CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, false, m_repCount, m_scCursor, m_state != MuscleState::Soreness);
-
-        // 電撃疾走中のアニメーション（超高速Run）を更新
-        UpdateAnimation(true);
+        // タックル中のアニメーション（Push）を更新
+        UpdateAnimation(false);
         return;
     }
 
@@ -431,19 +393,11 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         m_pos.x += m_pounceDir.x * pSpeed;
         m_pos.z += m_pounceDir.z * pSpeed;
 
-        // 飛びつき中に地面をえぐり裂く爪痕・岩片エフェクトを更新
-        VECTOR groundPos = VGet(m_pos.x, m_groundY, m_pos.z);
-        CustomEffectManager::GetInstance().UpdatePounceGroundGouge(groundPos, m_pounceDir, progress, m_repCount);
-
         if (m_pounceTimer <= 0)
         {
             m_isPouncing = false;
             m_pos.y = m_groundY;
             m_pounceCooldown = GetPounceCooldownMax();
-
-            // 着地フィニッシュ時の地面叩き割り・えぐりエフェクト＆軽いカメラシェイク
-            CustomEffectManager::GetInstance().FinishPounceGroundGouge(groundPos, m_pounceDir, m_repCount);
-            camera.TriggerShake(4.5f, 7);
         }
     }
     
@@ -541,9 +495,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         m_rotY = std::atan2(forwardXZ.x, forwardXZ.z);
                     }
 
-                    // Effekseer タックル衝撃波リング＆カスタム時空切り裂きエフェクト再生
+                    // Effekseer タックル衝撃波リングエフェクト再生
                     EffectManager::GetInstance().PlayTackleEffect(m_pos, m_tackleDir);
-                    CustomEffectManager::GetInstance().StartTackleSpaceTimeRift(m_pos, m_tackleDir, m_repCount);
 
                     // 即座にタックルアニメーション（Push）を開始
                     UpdateAnimation(false);
@@ -614,9 +567,6 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         m_pounceDir = currentFacing;
                     }
 
-                    // 飛びつき踏み切り時の地面えぐりエフェクト開始
-                    CustomEffectManager::GetInstance().StartPounceGroundGouge(VGet(m_pos.x, m_groundY, m_pos.z), m_pounceDir, m_repCount);
-
                     // 即座に飛びつきアニメーション（Attack）を開始
                     UpdateAnimation(false);
                     return;
@@ -662,8 +612,6 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     // 移動（Statu.csvのCat速度パラメータに基づく）
                     m_pos.x += moveDir.x * m_speed;
                     m_pos.z += moveDir.z * m_speed;
-                    // 走行中は足元から土煙を巻き上げる
-                    CustomEffectManager::GetInstance().UpdateRunDust(m_pos, moveDir, m_speed / SPEED_INITIAL, false, m_repCount);
                 }
 
                 // 筋トレ開始チェック
@@ -743,9 +691,9 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                             m_resultShowTimer = 60;
                             m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
 
-                            // 筋トレ成功エフェクト（爆炎バースト）再生
-                            CustomEffectManager::GetInstance().PlayWorkoutSuccessBurst(m_pos, m_repCount);
-                            camera.TriggerShake(6.0f, 6);
+                            // 筋トレ成功エフェクト再生
+                            // EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
+                            camera.TriggerShake(4.0f, 4);
                         }
                         
                         else
@@ -771,13 +719,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         }
     }
 
-    // 筋トレ中（スクワットQTE中）の燃え上がる炎エフェクト＆Lv.10以上の体から出る煙の更新
-    bool allowBodySmoke = (m_state != MuscleState::Soreness && m_stunTimer <= 0);
-    bool workoutFlameActive = (m_isSkillChecking && allowBodySmoke);
-    CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, workoutFlameActive, m_repCount, m_scCursor, allowBodySmoke);
-
-    // Effekseer マッスルオーラの更新（パンプアップ移動状態：筋トレ燃焼中は炎エフェクトを主役にする）
-    bool auraActive = ((m_state == MuscleState::Muscular && m_repCount > 0 && !m_isSkillChecking) &&
+    // Effekseer マッスルオーラの更新（QTE筋トレ中またはパンプアップ状態）
+    bool auraActive = ((m_isSkillChecking || (m_state == MuscleState::Muscular && m_repCount > 0)) &&
                        m_state != MuscleState::Soreness && m_stunTimer <= 0);
 
     EffectManager::GetInstance().UpdateMuscleAura(m_pos, auraActive, m_repCount);
@@ -832,7 +775,7 @@ void Player3D::Draw3D()
     // 足元接地高さ補正（モデル原点が足元にあるためオフセット0で地面接地）
     float offsetY = 0.0f;
 
-    // 1. 飛びつき・電撃疾走（タックル）残像の描画
+    // 1. 飛びつき・タックル残像の描画
     for (const auto& trail : m_trails)
     {
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, trail.alpha);
@@ -844,25 +787,10 @@ void Player3D::Draw3D()
             float trailOffsetY = 0.0f;
             VECTOR trailPos = VGet(trail.pos.x, trail.pos.y + trailOffsetY, trail.pos.z);
 
-            if (m_isTackling)
-            {
-                // 電撃疾走中の残像は鮮やかなエレクトリックイエローに発光させる
-                MV1SetDifColorScale(m_modelHandle, GetColorF(1.35f, 1.25f, 0.20f, 1.0f));
-                MV1SetAmbColorScale(m_modelHandle, GetColorF(1.25f, 1.15f, 0.15f, 1.0f));
-                MV1SetEmiColorScale(m_modelHandle, GetColorF(0.45f, 0.38f, 0.02f, 1.0f));
-            }
-
             MV1SetPosition(m_modelHandle, trailPos);
             MV1SetRotationXYZ(m_modelHandle, VGet(0.0f, trail.rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
             MV1SetScale(m_modelHandle, VGet(trailScale, trailScale, trailScale));
             MV1DrawModel(m_modelHandle);
-
-            if (m_isTackling)
-            {
-                MV1SetDifColorScale(m_modelHandle, GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
-                MV1SetAmbColorScale(m_modelHandle, GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
-                MV1SetEmiColorScale(m_modelHandle, GetColorF(0.0f, 0.0f, 0.0f, 1.0f));
-            }
         }
         
         else
@@ -875,7 +803,6 @@ void Player3D::Draw3D()
 
     // 2. プレイヤー本体の描画（3Dアニメーションモデルまたはフォールバック）
     bool isSoreness = (m_state == MuscleState::Soreness);
-    float flameTint = (!isSoreness) ? CustomEffectManager::GetInstance().GetPlayerFlameTintIntensity() : 0.0f;
 
     if (m_modelHandle != -1)
     {
@@ -888,34 +815,13 @@ void Player3D::Draw3D()
             MV1SetAmbColorScale(m_modelHandle, GetColorF(0.50f, 0.60f, 1.35f, 1.0f));
             MV1SetEmiColorScale(m_modelHandle, GetColorF(0.08f, 0.12f, 0.35f, 1.0f));
         }
-        else if (m_isTackling)
-        {
-            // 電撃疾走（スタン攻撃）時：全身が黄金・黄色の電気を帯びて激しく発光するティント
-            float pulse = 0.85f + 0.15f * std::sin(m_animTime * 45.0f);
-            MV1SetDifColorScale(m_modelHandle, GetColorF(1.0f + 0.38f * pulse, 1.0f + 0.30f * pulse, 0.55f, 1.0f));
-            MV1SetAmbColorScale(m_modelHandle, GetColorF(1.0f + 0.30f * pulse, 1.0f + 0.24f * pulse, 0.60f, 1.0f));
-            MV1SetEmiColorScale(m_modelHandle, GetColorF(0.38f * pulse, 0.30f * pulse, 0.02f, 1.0f));
-        }
-        else if (flameTint > 0.01f)
-        {
-            // 筋トレ燃焼中・成功バースト時：レベルが上がるほど濃い深紅の熱気に染まるティント
-            float lvRatio = effectiveRep / static_cast<float>(MAX_EFFECTIVE_REP);
-            float redBoost   = 0.30f + lvRatio * 0.22f;
-            float greenScale = (0.10f - lvRatio * 0.18f);
-            float blueSub    = 0.14f + lvRatio * 0.16f;
-            float emiRed     = 0.34f + lvRatio * 0.18f;
-            float emiGreen   = 0.14f * (1.0f - lvRatio * 0.75f);
-            MV1SetDifColorScale(m_modelHandle, GetColorF(1.0f + redBoost * flameTint, 1.0f + greenScale * flameTint, 1.0f - blueSub * flameTint, 1.0f));
-            MV1SetAmbColorScale(m_modelHandle, GetColorF(1.0f + (redBoost * 0.8f) * flameTint, 1.0f + (greenScale * 0.6f) * flameTint, 1.0f - (blueSub * 0.7f) * flameTint, 1.0f));
-            MV1SetEmiColorScale(m_modelHandle, GetColorF(emiRed * flameTint, emiGreen * flameTint, 0.02f * flameTint, 1.0f));
-        }
 
         MV1SetPosition(m_modelHandle, drawPos);
         MV1SetRotationXYZ(m_modelHandle, VGet(0.0f, m_rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
         MV1SetScale(m_modelHandle, VGet(scale, scale, scale));
         MV1DrawModel(m_modelHandle);
 
-        if (isSoreness || m_isTackling || flameTint > 0.01f)
+        if (isSoreness)
         {
             // 通常カラーに復帰
             MV1SetDifColorScale(m_modelHandle, GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
@@ -1208,8 +1114,8 @@ void Player3D::AddRep(int amount)
     m_lastResultSuccess = true;
     m_resultShowTimer = 60;
 
-    // 筋トレ成功エフェクト（爆炎バースト）再生
-    CustomEffectManager::GetInstance().PlayWorkoutSuccessBurst(m_pos, m_repCount);
+    // 筋トレ成功エフェクト再生
+    EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
 }
 
 void Player3D::DrawBarbell(float catScale)

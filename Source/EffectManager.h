@@ -10,8 +10,17 @@ class EffectManager
 private:
     // エフェクトリソースハンドル
     int m_tackleResHandle = -1;       // タックル突進エフェクト
-    int m_pumpSuccessResHandle = -1;  // 筋トレ成功エフェクト（モデル周囲の発光）
+    int m_pumpSuccessResHandle = -1;   // 筋トレ成功エフェクト（変身オーラ・全身発光）
+    int m_pumpRingResHandle = -1;      // 筋トレ成功・足元リング衝撃波
+    int m_pumpSparkResHandle = -1;     // 筋トレ成功・舞い上がる花火スパーク粒子
+    int m_customLevelUpResHandle = -1; // ユーザー自作レベルアップエフェクト（Custom/LevelUp.efkefc）
     int m_muscleAuraResHandle = -1;   // 筋トレ・マッスルオーラ
+
+    // 捕獲エフェクトリソースハンドル
+    int m_catchHitResHandle = -1;      // 捕獲ヒット閃光
+    int m_catchRingResHandle = -1;     // 捕獲リング衝撃波
+    int m_catchSparkResHandle = -1;    // 捕獲スパーク星
+    int m_customCatchResHandle = -1;   // 自作捕獲エフェクト（Custom/Catch.efkefc）
 
     // 再生中ハンドル（位置更新や停止用）
     int m_activeAuraHandle = -1;
@@ -47,6 +56,7 @@ public:
     void PlayTackleEffect(const VECTOR& pos, const VECTOR& dir);
 
     // 筋トレ成功（モデル周囲発光）エフェクト再生
+    void PlayCatchEffect(const VECTOR& pos, bool isFast = false);
     void PlayPumpSuccessEffect(const VECTOR& pos, int repCount);
 
     // 筋トレQTE中・マッチョ中のオーラエフェクト再生/追従
