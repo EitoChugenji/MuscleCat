@@ -151,6 +151,7 @@
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\CsvManager.h" />
+    <ClInclude Include="Source\CustomEffectManager.h" />
     <ClInclude Include="Source\EffectManager.h" />
     <ClInclude Include="Source\FontManager.h" />
     <ClInclude Include="Source\GameManager.h" />
@@ -166,6 +167,7 @@
   <ItemGroup>
     <ClCompile Include="Source\Camera3D.cpp" />
     <ClCompile Include="Source\CsvManager.cpp" />
+    <ClCompile Include="Source\CustomEffectManager.cpp" />
     <ClCompile Include="Source\EffectManager.cpp" />
     <ClCompile Include="Source\FontManager.cpp" />
     <ClCompile Include="Source\GameManager.cpp" />

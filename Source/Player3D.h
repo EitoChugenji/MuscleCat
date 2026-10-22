@@ -330,12 +330,12 @@ public:
     // タックル（Eキー）パラメータ動的算出（4 Rep以上で使用可能、Repで強化、最大Lv15で頭打ち）
     float GetTackleSpeed() const
     {
-        return 8.0f + static_cast<float>(GetEffectiveRep()) * 0.9f;
+        return 10.5f + static_cast<float>(GetEffectiveRep()) * 1.0f;
     }
 
     int GetTackleDuration() const
     {
-        return 14 + GetEffectiveRep() * 2;
+        return 18 + GetEffectiveRep() * 2;
     }
 
     int GetTackleCooldownMax() const
