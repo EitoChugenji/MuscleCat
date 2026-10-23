@@ -146,6 +146,54 @@ private:
         bool   hasBranch = true;
     };
 
+    // 捕獲時の祝祭3Dキラキラ星・ダイヤ紙吹雪パーティクル
+    struct CatchStarParticle
+    {
+        VECTOR pos = VGet(0.0f, 0.0f, 0.0f);
+        VECTOR vel = VGet(0.0f, 0.0f, 0.0f);
+        float  size = 5.0f;
+        float  rot = 0.0f;
+        float  rotSpeed = 0.2f;
+        float  age = 0.0f;
+        float  maxLife = 42.0f;
+        int    colorVariant = 0; // 0:Gold, 1:Cyan, 2:Pink, 3:White, 4:Lime
+        int    shapeType = 0;    // 0:CrossStar, 1:Diamond
+    };
+
+    // 捕獲地点の地面に広がる祝祭ゴールド衝撃波リング
+    struct CatchShockwaveRing
+    {
+        VECTOR center = VGet(0.0f, 0.0f, 0.0f);
+        float  radius = 4.0f;
+        float  maxRadius = 65.0f;
+        float  age = 0.0f;
+        float  maxLife = 22.0f;
+        bool   isFast = false;
+        int    combo = 1;
+    };
+
+    // 捕獲瞬間に周囲へ放たれる3D放射状サンバースト光線
+    struct CatchSunburstRay
+    {
+        VECTOR center = VGet(0.0f, 0.0f, 0.0f);
+        VECTOR dir = VGet(0.0f, 1.0f, 0.0f);
+        float  length = 15.0f;
+        float  maxLength = 70.0f;
+        float  age = 0.0f;
+        float  maxLife = 16.0f;
+        int    colorVariant = 0;
+    };
+
+    // 捕獲されたネズミのコミカル昇天ソウル（ミニ天使ネズミ・光輪＆スター）
+    struct CatchAscendingSoul
+    {
+        VECTOR pos = VGet(0.0f, 0.0f, 0.0f);
+        float  age = 0.0f;
+        float  maxLife = 50.0f;
+        float  swayPhase = 0.0f;
+        bool   isFast = false;
+    };
+
     std::vector<FlameParticle>      m_particles;
     std::vector<FireShockRing>      m_rings;
     std::vector<GroundGougeSegment> m_gougeSegments;
@@ -154,6 +202,10 @@ private:
     std::vector<SpaceTimeRift>      m_spaceRifts;
     std::vector<SpaceTimeShard>     m_spaceShards;
     std::vector<ThunderBoltArc>     m_thunderBolts;
+    std::vector<CatchStarParticle>  m_catchStars;
+    std::vector<CatchShockwaveRing> m_catchRings;
+    std::vector<CatchSunburstRay>   m_catchSunbursts;
+    std::vector<CatchAscendingSoul> m_catchSouls;
     VECTOR m_lastGougePos = VGet(0.0f, 0.0f, 0.0f);
     bool   m_hasLastGougePos = false;
     VECTOR m_lastRiftPos  = VGet(0.0f, 0.0f, 0.0f);
@@ -214,6 +266,10 @@ private:
     void SpawnSpaceTimeSlashAndRift(const VECTOR& centerPos, const VECTOR& dirXZ, int repCount, float scaleBoost, bool isCrossSlash);
     void DrawSpaceTimeEffects() const;
 
+    // ネズミ捕獲時の祝祭エフェクト更新・描画ヘルパー
+    void UpdateCatchCelebration();
+    void DrawCatchCelebration() const;
+
 public:
     static constexpr int SMOKE_START_REP_LEVEL = 10; // 体から煙が出始めるレベル閾値 (Lv.10〜)
 
@@ -264,6 +320,9 @@ public:
 
     // ネズミ逃走時のミニ足元土煙（コミカルなパニック逃走演出）
     void SpawnMouseFleeDust(const VECTOR& footPos, const VECTOR& moveDirXZ);
+
+    // ネズミ捕獲時の3D祝祭エフェクト（星＆ダイヤ噴水、ゴールド衝撃波、サンバースト光線、昇天ソウル）
+    void SpawnMouseCatchCelebration(const VECTOR& mousePos, bool isFast, int comboCount);
 
     // 現在燃焼中（またはバースト余韻中）かどうか
     bool IsPlayerBurning() const { return m_effectEnabled && (m_isBurning || m_burstTimer > 0); }

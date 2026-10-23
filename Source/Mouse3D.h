@@ -104,6 +104,17 @@ public:
         return static_cast<float>(m_stunTimer) / 60.0f;
     }
 
+    // 捕獲判定用の有効当たり判定半径（プレイヤーが快適に捕まえられるよう広めに設定）
+    virtual float GetCatchRadius() const
+    {
+        float r = m_radius * 1.55f;
+        if (IsStunned())
+        {
+            r += 5.0f; // スタン気絶中は倒れて無防備なためさらに捕獲ボーナス
+        }
+        return r;
+    }
+
     // スタンエフェクト（頭上のピヨピヨ星・パルス）描画
     void DrawStunEffect();
 

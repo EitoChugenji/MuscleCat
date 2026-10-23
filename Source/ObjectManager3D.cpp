@@ -7,6 +7,8 @@
 #include "CsvManager.h"
 #include "FontManager.h"
 #include "EffectManager.h"
+#include "CustomEffectManager.h"
+#include "Config.h"
 #include "Common.h"
 #include "DxLib.h"
 #include <algorithm>
@@ -21,6 +23,9 @@ void ObjectManager3D::Clear()
     m_caughtFastCount = 0;
     m_isTimeFrozen = false;
     m_hitStopFrames = 0;
+    m_comboCount = 0;
+    m_comboTimer = 0;
+    m_catchFlashTimer = 0;
     m_catchPopups.clear();
 }
 
@@ -109,6 +114,22 @@ void ObjectManager3D::SpawnFastMouse()
 
 void ObjectManager3D::Update(Camera3D& camera)
 {
+    // コンボ持続タイマー更新
+    if (m_comboTimer > 0)
+    {
+        m_comboTimer--;
+        if (m_comboTimer <= 0)
+        {
+            m_comboCount = 0;
+        }
+    }
+
+    // 画面インパクトフラッシュ更新
+    if (m_catchFlashTimer > 0)
+    {
+        m_catchFlashTimer--;
+    }
+
     // ポップアップタイマー更新
     for (auto it = m_catchPopups.begin(); it != m_catchPopups.end(); )
     {
@@ -229,8 +250,27 @@ void ObjectManager3D::Draw2D()
         m_player->Draw2D();
     }
 
-    // 捕獲ポップアップ（+1 CATCH! 演出）
+    // 捕獲瞬間の画面インパクトゴールドフラッシュ
+    if (m_catchFlashTimer > 0)
+    {
+        float flashRatio = static_cast<float>(m_catchFlashTimer) / 16.0f;
+        int flashAlpha = static_cast<int>(flashRatio * 90.0f);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, flashAlpha);
+        int scrW = Config::SCREEN_WIDTH;
+        int scrH = Config::SCREEN_HEIGHT;
+        unsigned int fCol = GetColor(255, 220, 60);
+        for (int i = 0; i < 12; ++i)
+        {
+            DrawBox(i, i, scrW - i, scrH - i, fCol, FALSE);
+        }
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    }
+
+    // 捕獲ポップアップ（バウンス拡大・コミック調カード・キラキラ星演出）
+    int font36 = FontManager::GetInstance().GetFont36();
     int font24 = FontManager::GetInstance().GetFont24();
+    int font16 = FontManager::GetInstance().GetFont16();
+
     for (const auto& popup : m_catchPopups)
     {
         // 3D座標から画面座標(2D)に変換
@@ -238,20 +278,111 @@ void ObjectManager3D::Draw2D()
         if (screenPos.z >= 0.0f && screenPos.z <= 1.0f)
         {
             float progress = 1.0f - static_cast<float>(popup.timer) / static_cast<float>(popup.maxTimer);
-            int yOffset = static_cast<int>(progress * 40.0f);
-            int x = static_cast<int>(screenPos.x);
-            int y = static_cast<int>(screenPos.y) - 30 - yOffset;
 
-            int textW = GetDrawStringWidthToHandle(popup.text.c_str(), static_cast<int>(popup.text.length()), font24);
-            int drawX = x - textW / 2;
+            int yOffset = static_cast<int>(progress * 60.0f);
+            int cx = static_cast<int>(screenPos.x);
+            int cy = static_cast<int>(screenPos.y) - 45 - yOffset;
 
-            // ポップな縁取り描画
-            DrawStringToHandle(drawX - 2, y, popup.text.c_str(), GetColor(0, 0, 0), font24);
-            DrawStringToHandle(drawX + 2, y, popup.text.c_str(), GetColor(0, 0, 0), font24);
-            DrawStringToHandle(drawX, y - 2, popup.text.c_str(), GetColor(0, 0, 0), font24);
-            DrawStringToHandle(drawX, y + 2, popup.text.c_str(), GetColor(0, 0, 0), font24);
-            DrawStringToHandle(drawX, y, popup.text.c_str(), GetColor(255, 230, 40), font24);
+            int alpha = 255;
+            if (popup.timer < 16)
+            {
+                alpha = popup.timer * 255 / 16;
+            }
+
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+
+            int titleFont = (popup.combo >= 2 || popup.isFast) ? font36 : font24;
+            int tW = GetDrawStringWidthToHandle(popup.titleText.c_str(), static_cast<int>(popup.titleText.length()), titleFont);
+            int sW = GetDrawStringWidthToHandle(popup.subText.c_str(), static_cast<int>(popup.subText.length()), font16);
+            int cardW = (std::max)(tW, sW) + 36;
+            int cardH = (popup.combo >= 2 || popup.isFast) ? 68 : 56;
+
+            int left   = cx - cardW / 2;
+            int right  = cx + cardW / 2;
+            int top    = cy - cardH / 2;
+            int bottom = cy + cardH / 2;
+
+            // コミック調ポップカード（黒縁・バッジ枠・シャドウ）
+            DrawBox(left - 4, top - 4, right + 4, bottom + 4, GetColor(0, 0, 0), TRUE);
+            DrawBox(left - 2, top - 2, right + 2, bottom + 2, popup.badgeColor, TRUE);
+            DrawBox(left, top, right, bottom, GetColor(20, 24, 38), TRUE);
+
+            // タイトル文字（黒極太縁取り＋ビビッドカラー）
+            int titleX = cx - tW / 2;
+            int titleY = top + ((popup.combo >= 2 || popup.isFast) ? 6 : 4);
+            for (int ox = -2; ox <= 2; ++ox)
+            {
+                for (int oy = -2; oy <= 2; ++oy)
+                {
+                    if (ox != 0 || oy != 0)
+                    {
+                        DrawStringToHandle(titleX + ox, titleY + oy, popup.titleText.c_str(), GetColor(0, 0, 0), titleFont);
+                    }
+                }
+            }
+            DrawStringToHandle(titleX, titleY, popup.titleText.c_str(), popup.titleColor, titleFont);
+
+            // サブテキスト
+            int subX = cx - sW / 2;
+            int subY = titleY + ((popup.combo >= 2 || popup.isFast) ? 38 : 28);
+            DrawStringToHandle(subX - 1, subY, popup.subText.c_str(), GetColor(0, 0, 0), font16);
+            DrawStringToHandle(subX + 1, subY, popup.subText.c_str(), GetColor(0, 0, 0), font16);
+            DrawStringToHandle(subX, subY - 1, popup.subText.c_str(), GetColor(0, 0, 0), font16);
+            DrawStringToHandle(subX, subY + 1, popup.subText.c_str(), GetColor(0, 0, 0), font16);
+            DrawStringToHandle(subX, subY, popup.subText.c_str(), GetColor(255, 255, 230), font16);
+
+            // カード周囲のダンシング2D星
+            float sparkTime = static_cast<float>(popup.timer) * 0.25f;
+            int s1x = left - 12 + static_cast<int>(std::sin(sparkTime) * 4.0f);
+            int s1y = top + 8 + static_cast<int>(std::cos(sparkTime) * 4.0f);
+            DrawCircle(s1x, s1y, 4, popup.titleColor, TRUE);
+            DrawCircle(s1x, s1y, 2, GetColor(255, 255, 255), TRUE);
+
+            int s2x = right + 12 + static_cast<int>(std::cos(sparkTime) * 4.0f);
+            int s2y = bottom - 10 + static_cast<int>(std::sin(sparkTime) * 4.0f);
+            DrawCircle(s2x, s2y, 4, popup.titleColor, TRUE);
+            DrawCircle(s2x, s2y, 2, GetColor(255, 255, 255), TRUE);
+
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         }
+    }
+
+    // 画面上部：コンボラッシュHUD（2コンボ以上で表示）
+    if (m_comboCount >= 2 && m_comboTimer > 0)
+    {
+        int scrW = Config::SCREEN_WIDTH;
+        int cX = scrW / 2;
+        int cY = 70;
+        float comboRatio = static_cast<float>(m_comboTimer) / 210.0f;
+
+        char comboBuf[64];
+        snprintf(comboBuf, sizeof(comboBuf), "🔥 %d COMBO RUSH! 🔥", m_comboCount);
+        int strW = GetDrawStringWidthToHandle(comboBuf, static_cast<int>(std::strlen(comboBuf)), font24);
+
+        int bW = strW + 36;
+        int bH = 46;
+        int bx1 = cX - bW / 2;
+        int by1 = cY - bH / 2;
+        int bx2 = cX + bW / 2;
+        int by2 = cY + bH / 2;
+
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 225);
+        DrawBox(bx1 - 3, by1 - 3, bx2 + 3, by2 + 3, GetColor(0, 0, 0), TRUE);
+        DrawBox(bx1 - 1, by1 - 1, bx2 + 1, by2 + 1, GetColor(255, 140, 20), TRUE);
+        DrawBox(bx1, by1, bx2, by2, GetColor(22, 25, 38), TRUE);
+
+        // コンボ持続ゲージバー
+        int barX = bx1 + 10;
+        int barY = by2 - 8;
+        int barW = bW - 20;
+        int barH = 4;
+        DrawBox(barX, barY, barX + barW, barY + barH, GetColor(50, 50, 60), TRUE);
+        unsigned int gaugeCol = (comboRatio < 0.3f) ? GetColor(255, 60, 60) : GetColor(255, 200, 30);
+        DrawBox(barX, barY, barX + static_cast<int>(barW * comboRatio), barY + barH, gaugeCol, TRUE);
+
+        // テキスト
+        DrawStringToHandle(cX - strW / 2, by1 + 6, comboBuf, GetColor(255, 235, 50), font24);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 }
 
@@ -275,8 +406,9 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
 
         if (obj->IsMouse())
         {
+            auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
             VECTOR mPos = obj->GetPos();
-            float mRadius = obj->GetRadius();
+            float mRadius = mouse ? mouse->GetCatchRadius() : obj->GetRadius();
 
             float distSq = (pPos.x - mPos.x) * (pPos.x - mPos.x) +
                            ((pPos.y - mPos.y) * 0.5f) * ((pPos.y - mPos.y) * 0.5f) +
@@ -288,7 +420,6 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                 if (isTackling)
                 {
                     // タックル時：ネズミは捕まえられないが、スタン状態にする！
-                    auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
                     if (mouse)
                     {
                         int stunDuration = m_player->GetMouseStunDuration();
@@ -312,21 +443,92 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     m_caughtCount++;
                     ApplyMouseSpeedBonus();
 
-                    // ネズミ捕獲Effekseerエフェクト再生（ヒット閃光＋リング衝撃波＋星スパーク）
+                    // コンボ判定（約3.5秒以内に次のネズミを捕まえればコンボ加算！）
+                    if (m_comboTimer > 0)
+                    {
+                        m_comboCount++;
+                    }
+                    else
+                    {
+                        m_comboCount = 1;
+                    }
+                    m_comboTimer = 210; // 約3.5秒のコンボ猶予
+                    m_catchFlashTimer = 16; // 画面端インパクトゴールドフラッシュ
+
+                    // ネズミ捕獲3D祝祭エフェクト（星・ダイヤ噴水、ゴールド衝撃波、サンバースト光線、コミカル昇天ソウル）
+                    CustomEffectManager::GetInstance().SpawnMouseCatchCelebration(mPos, isFast, m_comboCount);
+
+                    // ネズミ捕獲Effekseerエフェクト再生
                     EffectManager::GetInstance().PlayCatchEffect(mPos, isFast);
 
-                    // カメラシェイク演出発動
-                    camera.TriggerShake(8.0f, 10);
+                    // カメラシェイク演出発動（コンボ数・高速ネズミに応じて手応え強化）
+                    float shakeAmp = 10.0f + static_cast<float>((std::min)(m_comboCount, 5)) * 2.2f + (isFast ? 3.5f : 0.0f);
+                    int shakeFrames = 10 + (std::min)(m_comboCount, 4) * 2;
+                    camera.TriggerShake(shakeAmp, shakeFrames);
 
                     // ヒットストップ発動（捕獲瞬間の手応え・重量感）
-                    TriggerHitStop(6);
+                    int hitStop = 6 + (isFast ? 2 : 0) + (m_comboCount >= 3 ? 2 : 0);
+                    TriggerHitStop(hitStop);
 
-                    // 捕獲ポップアップ追加
+                    // プレイヤーの祝祭リアクション（オーラフレア＆パンプ時間全快リセット）
+                    if (m_player)
+                    {
+                        m_player->OnCatchMouse(isFast, m_comboCount);
+                    }
+
+                    // 豪華な弾けるポップアップUI追加
                     CatchPopup cp;
                     cp.worldPos = mPos;
-                    cp.timer = 45;
-                    cp.maxTimer = 45;
-                    cp.text = isFast ? "FAST GET! +1" : "GET! +1";
+                    cp.timer = 55;
+                    cp.maxTimer = 55;
+                    cp.combo = m_comboCount;
+                    cp.isFast = isFast;
+
+                    if (m_comboCount >= 5)
+                    {
+                        cp.titleText = "👑 " + std::to_string(m_comboCount) + " COMBO!! 👑";
+                        cp.subText = "GODLIKE CAT!! +1";
+                        cp.titleColor = GetColor(255, 220, 50);
+                        cp.badgeColor = GetColor(180, 40, 255); // ロイヤルパープル
+                    }
+                    else if (m_comboCount == 4)
+                    {
+                        cp.titleText = "💥 4 COMBO!! 💥";
+                        cp.subText = "MUSCLE FEVER!! +1";
+                        cp.titleColor = GetColor(255, 80, 180);
+                        cp.badgeColor = GetColor(255, 30, 80);
+                    }
+                    else if (m_comboCount == 3)
+                    {
+                        cp.titleText = "⚡ 3 COMBO!! ⚡";
+                        cp.subText = "EXCELLENT!! +1";
+                        cp.titleColor = GetColor(255, 240, 60);
+                        cp.badgeColor = GetColor(255, 120, 0);
+                    }
+                    else if (m_comboCount == 2)
+                    {
+                        cp.titleText = "🔥 2 COMBO!! 🔥";
+                        cp.subText = "NICE CATCH! +1";
+                        cp.titleColor = GetColor(255, 150, 40);
+                        cp.badgeColor = GetColor(220, 80, 10);
+                    }
+                    else
+                    {
+                        if (isFast)
+                        {
+                            cp.titleText = "⚡ FAST CATCH!! ⚡";
+                            cp.subText = "SPEED GET! +1";
+                            cp.titleColor = GetColor(70, 235, 255);
+                            cp.badgeColor = GetColor(20, 120, 240);
+                        }
+                        else
+                        {
+                            cp.titleText = "★ CATCH!! ★";
+                            cp.subText = "+1 POINT!";
+                            cp.titleColor = GetColor(255, 230, 40);
+                            cp.badgeColor = GetColor(255, 120, 20);
+                        }
+                    }
                     m_catchPopups.push_back(cp);
                 }
             }

@@ -154,6 +154,10 @@ void CustomEffectManager::Clear()
     m_spaceRifts.clear();
     m_spaceShards.clear();
     m_thunderBolts.clear();
+    m_catchStars.clear();
+    m_catchRings.clear();
+    m_catchSunbursts.clear();
+    m_catchSouls.clear();
     m_isBurning = false;
     m_isSmokeActive = false;
     m_burstTimer = 0;
@@ -1599,6 +1603,9 @@ void CustomEffectManager::Update()
         }
         ++it;
     }
+
+    // 11. ネズミ捕獲時の祝祭エフェクト（星噴水・衝撃波・光線・昇天ソウル）更新
+    UpdateCatchCelebration();
 }
 
 void CustomEffectManager::DrawFlameQuad3D(
@@ -2332,7 +2339,8 @@ void CustomEffectManager::Draw3D()
 
     if (!m_isBurning && !m_isSmokeActive && m_burstTimer <= 0 &&
         m_particles.empty() && m_rings.empty() && m_gougeSegments.empty() && m_debrisChunks.empty() &&
-        m_spaceSlashes.empty() && m_spaceRifts.empty() && m_spaceShards.empty() && m_thunderBolts.empty())
+        m_spaceSlashes.empty() && m_spaceRifts.empty() && m_spaceShards.empty() && m_thunderBolts.empty() &&
+        m_catchStars.empty() && m_catchRings.empty() && m_catchSunbursts.empty() && m_catchSouls.empty())
     {
         return;
     }
@@ -2361,6 +2369,7 @@ void CustomEffectManager::Draw3D()
     DrawGroundGougeSegments();
     DrawGroundDebrisChunks();
     DrawSpaceTimeEffects();
+    DrawCatchCelebration();
 
     // 1. 燃焼中の足元火炎渦（グラウンド・ファイア・ヴォルテックス）
     if (m_isBurning || m_burstTimer > 0)
@@ -2599,4 +2608,301 @@ void CustomEffectManager::Draw3D()
     SetUseBackCulling(TRUE);
     SetUseLighting(TRUE);
     SetWriteZBuffer3D(TRUE);
+}
+
+void CustomEffectManager::SpawnMouseCatchCelebration(const VECTOR& mousePos, bool isFast, int comboCount)
+{
+    if (!m_effectEnabled)
+    {
+        return;
+    }
+
+    int safeCombo = (std::max)(1, comboCount);
+    float comboBoost = 1.0f + static_cast<float>((std::min)(safeCombo, 5)) * 0.12f;
+
+    // 1. 祝祭ゴールド＆レインボー衝撃波リング
+    CatchShockwaveRing ring;
+    ring.center = VGet(mousePos.x, mousePos.y + 1.0f, mousePos.z);
+    ring.radius = 4.0f;
+    ring.maxRadius = (isFast ? 75.0f : 60.0f) * comboBoost;
+    ring.age = 0.0f;
+    ring.maxLife = 24.0f;
+    ring.isFast = isFast;
+    ring.combo = safeCombo;
+    m_catchRings.push_back(ring);
+
+    // コンボ3以上または高速ネズミなら第2衝撃波（少し遅れて大きく展開）
+    if (safeCombo >= 3 || isFast)
+    {
+        CatchShockwaveRing ring2 = ring;
+        ring2.maxRadius *= 1.3f;
+        ring2.maxLife = 28.0f;
+        ring2.age = -3.0f; // 3フレーム遅れて展開
+        m_catchRings.push_back(ring2);
+    }
+
+    // 2. 3D放射状サンバースト光線（捕獲瞬間の爆発的きらめき）
+    int rayCount = 10 + (std::min)(safeCombo, 5) * 2 + (isFast ? 4 : 0);
+    for (int i = 0; i < rayCount; ++i)
+    {
+        CatchSunburstRay ray;
+        ray.center = VGet(mousePos.x, mousePos.y + 6.0f, mousePos.z);
+        float theta = RandRange(0.0f, MathHelper::PI * 2.0f);
+        float phi = RandRange(-0.3f, 1.2f); // 水平〜上空方向
+        ray.dir = VNorm(VGet(std::cos(theta) * std::cos(phi), std::sin(phi), std::sin(theta) * std::cos(phi)));
+        ray.length = 8.0f;
+        ray.maxLength = RandRange(45.0f, 85.0f) * comboBoost;
+        ray.age = 0.0f;
+        ray.maxLife = RandRange(12.0f, 18.0f);
+        ray.colorVariant = (isFast ? 1 : (i % 3));
+        m_catchSunbursts.push_back(ray);
+    }
+
+    // 3. 3Dキラキラ星・ダイヤ紙吹雪パーティクル（祝祭ファウンテン）
+    int starCount = 28 + (std::min)(safeCombo, 5) * 8 + (isFast ? 12 : 0);
+    for (int s = 0; s < starCount; ++s)
+    {
+        CatchStarParticle p;
+        p.pos = VGet(mousePos.x + RandRange(-3.0f, 3.0f), mousePos.y + RandRange(3.0f, 10.0f), mousePos.z + RandRange(-3.0f, 3.0f));
+        float hAngle = RandRange(0.0f, MathHelper::PI * 2.0f);
+        float hSpeed = RandRange(1.8f, 6.5f) * comboBoost;
+        float vSpeed = RandRange(4.0f, 10.5f) * (isFast ? 1.2f : 1.0f);
+        p.vel = VGet(std::cos(hAngle) * hSpeed, vSpeed, std::sin(hAngle) * hSpeed);
+        p.size = RandRange(4.0f, 7.8f) * comboBoost;
+        p.rot = RandRange(0.0f, MathHelper::PI * 2.0f);
+        p.rotSpeed = RandRange(-0.35f, 0.35f);
+        p.age = 0.0f;
+        p.maxLife = RandRange(35.0f, 52.0f);
+        p.colorVariant = isFast ? ((s % 2 == 0) ? 1 : 0) : (s % 5);
+        p.shapeType = (s % 3 == 0) ? 1 : 0;
+        m_catchStars.push_back(p);
+    }
+
+    // 4. コミカル昇天ソウル（天使ネズミ＆光輪）
+    CatchAscendingSoul soul;
+    soul.pos = VGet(mousePos.x, mousePos.y + 4.0f, mousePos.z);
+    soul.age = 0.0f;
+    soul.maxLife = 52.0f;
+    soul.swayPhase = RandRange(0.0f, MathHelper::PI * 2.0f);
+    soul.isFast = isFast;
+    m_catchSouls.push_back(soul);
+}
+
+void CustomEffectManager::UpdateCatchCelebration()
+{
+    // 1. 衝撃波リング
+    for (auto it = m_catchRings.begin(); it != m_catchRings.end(); )
+    {
+        it->age += 1.0f;
+        if (it->age >= it->maxLife)
+        {
+            it = m_catchRings.erase(it);
+        }
+        else
+        {
+            if (it->age > 0.0f)
+            {
+                it->radius = MathHelper::Lerp(it->radius, it->maxRadius, 0.20f);
+            }
+            ++it;
+        }
+    }
+
+    // 2. サンバースト光線
+    for (auto it = m_catchSunbursts.begin(); it != m_catchSunbursts.end(); )
+    {
+        it->age += 1.0f;
+        if (it->age >= it->maxLife)
+        {
+            it = m_catchSunbursts.erase(it);
+        }
+        else
+        {
+            it->length = MathHelper::Lerp(it->length, it->maxLength, 0.25f);
+            ++it;
+        }
+    }
+
+    // 3. キラキラ星・ダイヤ
+    for (auto it = m_catchStars.begin(); it != m_catchStars.end(); )
+    {
+        it->age += 1.0f;
+        if (it->age >= it->maxLife)
+        {
+            it = m_catchStars.erase(it);
+        }
+        else
+        {
+            // 重力
+            it->vel.y -= 0.30f;
+            it->vel.x *= 0.965f;
+            it->vel.z *= 0.965f;
+            it->pos = VAdd(it->pos, it->vel);
+
+            // 地面バウンド
+            if (it->pos.y < 2.0f && it->vel.y < 0.0f)
+            {
+                it->pos.y = 2.0f;
+                it->vel.y = -it->vel.y * 0.45f;
+            }
+
+            it->rot += it->rotSpeed;
+            ++it;
+        }
+    }
+
+    // 4. 昇天ソウル
+    for (auto it = m_catchSouls.begin(); it != m_catchSouls.end(); )
+    {
+        it->age += 1.0f;
+        if (it->age >= it->maxLife)
+        {
+            it = m_catchSouls.erase(it);
+        }
+        else
+        {
+            it->pos.y += 1.4f;
+            it->swayPhase += 0.16f;
+            it->pos.x += std::sin(it->swayPhase) * 0.45f;
+            ++it;
+        }
+    }
+}
+
+void CustomEffectManager::DrawCatchCelebration() const
+{
+    if (m_catchRings.empty() && m_catchSunbursts.empty() && m_catchStars.empty() && m_catchSouls.empty())
+    {
+        return;
+    }
+
+    // 1. 衝撃波リング描画（地面に沿う二重リング）
+    for (const auto& ring : m_catchRings)
+    {
+        if (ring.age < 0.0f) continue;
+        float progress = ring.age / ring.maxLife;
+        int alpha = static_cast<int>((1.0f - progress) * 235.0f);
+        if (alpha <= 0) continue;
+
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+        unsigned int outerCol = ring.isFast ? GetColor(60, 230, 255) : (ring.combo >= 3 ? GetColor(255, 140, 20) : GetColor(255, 225, 40));
+        unsigned int innerCol = GetColor(255, 255, 255);
+
+        constexpr int SEGS = 28;
+        for (int i = 0; i < SEGS; ++i)
+        {
+            float a1 = static_cast<float>(i) * (2.0f * MathHelper::PI / SEGS);
+            float a2 = static_cast<float>(i + 1) * (2.0f * MathHelper::PI / SEGS);
+            VECTOR p1 = VGet(ring.center.x + std::cos(a1) * ring.radius, ring.center.y, ring.center.z + std::sin(a1) * ring.radius);
+            VECTOR p2 = VGet(ring.center.x + std::cos(a2) * ring.radius, ring.center.y, ring.center.z + std::sin(a2) * ring.radius);
+            DrawLine3D(p1, p2, outerCol);
+
+            // 内側コアリング
+            float rInner = ring.radius * 0.88f;
+            VECTOR ip1 = VGet(ring.center.x + std::cos(a1) * rInner, ring.center.y + 0.5f, ring.center.z + std::sin(a1) * rInner);
+            VECTOR ip2 = VGet(ring.center.x + std::cos(a2) * rInner, ring.center.y + 0.5f, ring.center.z + std::sin(a2) * rInner);
+            DrawLine3D(ip1, ip2, innerCol);
+        }
+    }
+
+    // 2. サンバースト放射光線描画
+    for (const auto& ray : m_catchSunbursts)
+    {
+        float progress = ray.age / ray.maxLife;
+        int alpha = static_cast<int>((1.0f - progress) * 240.0f);
+        if (alpha <= 0) continue;
+
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+        unsigned int col = (ray.colorVariant == 1) ? GetColor(80, 240, 255) : ((ray.colorVariant == 2) ? GetColor(255, 120, 200) : GetColor(255, 240, 60));
+
+        VECTOR endP = VAdd(ray.center, VScale(ray.dir, ray.length));
+        VECTOR startP = VAdd(ray.center, VScale(ray.dir, ray.length * 0.25f));
+        DrawCapsule3D(startP, endP, 2.2f * (1.0f - progress * 0.5f), 6, col, col, TRUE);
+    }
+
+    // 3. キラキラ星・ダイヤ紙吹雪描画
+    VECTOR camPos = GetCameraPosition();
+    for (const auto& star : m_catchStars)
+    {
+        float progress = star.age / star.maxLife;
+        int alpha = static_cast<int>((1.0f - progress * progress) * 255.0f);
+        if (alpha <= 0) continue;
+
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+        unsigned int col;
+        switch (star.colorVariant)
+        {
+        case 1: col = GetColor(60, 240, 255); break; // Cyan
+        case 2: col = GetColor(255, 90, 190); break; // Pink
+        case 3: col = GetColor(255, 255, 255); break; // White
+        case 4: col = GetColor(100, 255, 150); break; // Lime
+        default: col = GetColor(255, 225, 40); break; // Gold
+        }
+
+        float sz = star.size * (1.0f - progress * 0.4f);
+
+        VECTOR toCam = VNorm(VSub(camPos, star.pos));
+        VECTOR up = VGet(0.0f, 1.0f, 0.0f);
+        VECTOR right = VNorm(VCross(toCam, up));
+        up = VNorm(VCross(right, toCam));
+
+        float cr = std::cos(star.rot);
+        float sr = std::sin(star.rot);
+        VECTOR axisX = VAdd(VScale(right, cr), VScale(up, sr));
+        VECTOR axisY = VAdd(VScale(right, -sr), VScale(up, cr));
+
+        if (star.shapeType == 0)
+        {
+            // 4点クロススター（中心球＋4方向の光針）
+            DrawSphere3D(star.pos, sz * 0.45f, 6, col, col, TRUE);
+            DrawLine3D(VSub(star.pos, VScale(axisX, sz * 1.5f)), VAdd(star.pos, VScale(axisX, sz * 1.5f)), col);
+            DrawLine3D(VSub(star.pos, VScale(axisY, sz * 1.5f)), VAdd(star.pos, VScale(axisY, sz * 1.5f)), col);
+        }
+        else
+        {
+            // 3Dダイヤモンド（菱形ビルボード）
+            VECTOR dTop    = VAdd(star.pos, VScale(axisY, sz * 1.3f));
+            VECTOR dBottom = VSub(star.pos, VScale(axisY, sz * 1.3f));
+            VECTOR dLeft   = VSub(star.pos, VScale(axisX, sz * 0.8f));
+            VECTOR dRight  = VAdd(star.pos, VScale(axisX, sz * 0.8f));
+            DrawTriangle3D(dTop, dRight, dBottom, col, TRUE);
+            DrawTriangle3D(dTop, dBottom, dLeft, col, TRUE);
+            DrawLine3D(dTop, dRight, GetColor(255, 255, 255));
+            DrawLine3D(dRight, dBottom, GetColor(255, 255, 255));
+            DrawLine3D(dBottom, dLeft, GetColor(255, 255, 255));
+            DrawLine3D(dLeft, dTop, GetColor(255, 255, 255));
+        }
+    }
+
+    // 4. コミカル昇天ソウル（天使ネズミ光輪＆スター）描画
+    for (const auto& soul : m_catchSouls)
+    {
+        float progress = soul.age / soul.maxLife;
+        int alpha = static_cast<int>((1.0f - progress) * 220.0f);
+        if (alpha <= 0) continue;
+
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+        unsigned int haloCol = soul.isFast ? GetColor(80, 240, 255) : GetColor(255, 230, 80);
+        unsigned int soulCol = GetColor(255, 255, 255);
+
+        float haloY = soul.pos.y + 12.0f;
+        float hRadius = 7.5f;
+        constexpr int HSEGS = 16;
+        for (int i = 0; i < HSEGS; ++i)
+        {
+            float a1 = static_cast<float>(i) * (2.0f * MathHelper::PI / HSEGS);
+            float a2 = static_cast<float>(i + 1) * (2.0f * MathHelper::PI / HSEGS);
+            VECTOR p1 = VGet(soul.pos.x + std::cos(a1) * hRadius, haloY, soul.pos.z + std::sin(a1) * hRadius);
+            VECTOR p2 = VGet(soul.pos.x + std::cos(a2) * hRadius, haloY, soul.pos.z + std::sin(a2) * hRadius);
+            DrawLine3D(p1, p2, haloCol);
+        }
+
+        DrawSphere3D(soul.pos, 5.0f, 8, soulCol, soulCol, TRUE);
+
+        float wingFlap = std::sin(soul.swayPhase * 3.5f) * 4.0f;
+        VECTOR leftWingTip  = VGet(soul.pos.x - 7.5f, soul.pos.y + wingFlap, soul.pos.z);
+        VECTOR rightWingTip = VGet(soul.pos.x + 7.5f, soul.pos.y + wingFlap, soul.pos.z);
+        DrawLine3D(soul.pos, leftWingTip, GetColor(255, 255, 255));
+        DrawLine3D(soul.pos, rightWingTip, GetColor(255, 255, 255));
+    }
 }

@@ -356,7 +356,7 @@ void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDis
 NormalMouse3D::NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
     : MouseBase3D(
         pos,
-        12.0f,
+        16.0f,
         ObjectType::NormalMouse,
         CsvManager::GetInstance().GetMouseStatus().baseSpeed,
         CsvManager::GetInstance().GetMouseStatus().speedGrowthPerUnit,
@@ -437,7 +437,7 @@ void NormalMouse3D::Draw3D()
 FastMouse3D::FastMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
     : MouseBase3D(
         pos,
-        11.0f,
+        14.5f,
         ObjectType::FastMouse,
         CsvManager::GetInstance().GetFastMouseStatus().baseSpeed,
         CsvManager::GetInstance().GetFastMouseStatus().speedGrowthPerUnit,

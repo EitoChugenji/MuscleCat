@@ -27,12 +27,20 @@ private:
     // 捕獲演出用ポップアップ
     struct CatchPopup
     {
-        VECTOR worldPos;
-        int    timer = 45;
-        int    maxTimer = 45;
-        std::string text;
+        VECTOR worldPos = VGet(0.0f, 0.0f, 0.0f);
+        int    timer = 55;
+        int    maxTimer = 55;
+        std::string titleText;
+        std::string subText;
+        unsigned int titleColor = 0;
+        unsigned int badgeColor = 0;
+        int    combo = 1;
+        bool   isFast = false;
     };
     std::vector<CatchPopup>                    m_catchPopups;
+    int                                        m_comboCount = 0;       // 連続捕獲コンボ数
+    int                                        m_comboTimer = 0;       // コンボ持続残りフレーム
+    int                                        m_catchFlashTimer = 0;  // 画面インパクトゴールドフラッシュ
 
 public:
     ObjectManager3D() = default;
@@ -140,6 +148,16 @@ public:
     int GetCaughtFastCount() const
     {
         return m_caughtFastCount;
+    }
+
+    int GetComboCount() const
+    {
+        return m_comboCount;
+    }
+
+    int GetComboTimer() const
+    {
+        return m_comboTimer;
     }
     
     float GetCurrentMouseSpeed() const;

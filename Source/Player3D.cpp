@@ -640,23 +640,61 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                 {
                     m_isSkillChecking = true;
                     m_scCursor = 0.0f;
+                    m_scCursorDir = 1.0f; // 初期方向: 右進
                     m_wasDecayed = false;
                     m_scStoppedTimer = 0;
+                    m_scHoldingFrames = 0;
 
-                    // 難易度を緩和（初期ゾーン幅を0.38f、高Repでも最低0.20fを保証）
-                    float zoneWidth = 0.38f - static_cast<float>(m_repCount) * 0.02f;
-                    if (zoneWidth < 0.20f)
+                    // 難易度を緩和（初期ゾーン幅を0.36f、高Repでも最低0.18fを保証）
+                    float zoneWidth = 0.36f - static_cast<float>(m_repCount) * 0.018f;
+                    if (zoneWidth < 0.18f)
                     {
-                        zoneWidth = 0.20f;
+                        zoneWidth = 0.18f;
                     }
-                    
-                    m_scZoneStart = 0.40f + static_cast<float>(rand() % 20) / 100.0f;
-                    if (m_scZoneStart + zoneWidth > 0.95f)
+
+                    // バー全体（0.08f 〜 0.94f）の中でランダムに配置し、前回と近くなりすぎないように離隔
+                    float minStart = 0.08f;
+                    float maxStart = 0.94f - zoneWidth;
+                    if (maxStart < minStart)
                     {
-                        m_scZoneStart = 0.95f - zoneWidth;
+                        maxStart = minStart;
                     }
-                    
+
+                    float span = maxStart - minStart;
+                    float minRequiredDist = (span > 0.10f) ? (span * 0.38f) : 0.05f;
+
+                    float bestStart = minStart;
+                    float bestDist = -1.0f;
+
+                    for (int retry = 0; retry < 40; ++retry)
+                    {
+                        float r = static_cast<float>(rand() % 10001) / 10000.0f;
+                        float candStart = minStart + r * span;
+                        float candCenter = candStart + zoneWidth * 0.5f;
+
+                        if (m_prevScZoneCenter < 0.0f)
+                        {
+                            bestStart = candStart;
+                            break;
+                        }
+
+                        float dist = std::abs(candCenter - m_prevScZoneCenter);
+                        if (dist >= minRequiredDist)
+                        {
+                            bestStart = candStart;
+                            break;
+                        }
+
+                        if (dist > bestDist)
+                        {
+                            bestDist = dist;
+                            bestStart = candStart;
+                        }
+                    }
+
+                    m_scZoneStart = bestStart;
                     m_scZoneEnd = m_scZoneStart + zoneWidth;
+                    m_prevScZoneCenter = (m_scZoneStart + m_scZoneEnd) * 0.5f;
                 }
             }
             
@@ -691,15 +729,40 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     }
 
                     float cursorSpeed = 0.014f * speedMultiplier;
-                    m_scCursor += cursorSpeed;
+                    m_scCursor += cursorSpeed * m_scCursorDir;
+                    m_scHoldingFrames++;
 
-                    // タイミングよくキーを離した瞬間にバーをピタッと止めて判定！
-                    if (isTriggerJustReleased)
+                    // 反対側（1.0f）または開始側（0.0f）に達したら折り返して反復運動
+                    if (m_scCursor >= 1.0f)
                     {
-                        // キーを離した瞬間の座標で即座にピタッと止める
+                        m_scCursor = 1.0f;
+                        m_scCursorDir = -1.0f; // 左方向へ折り返し
+                    }
+                    else if (m_scCursor <= 0.0f)
+                    {
+                        m_scCursor = 0.0f;
+                        m_scCursorDir = 1.0f;  // 右方向へ折り返し
+                    }
+
+                    // 長時間（15秒 = 900フレーム）キーを離さなかった場合の筋疲労セーフティ
+                    if (m_scHoldingFrames >= 900)
+                    {
+                        m_lastResultSuccess = false;
+                        m_resultShowTimer = 90;
+                        m_scStoppedTimer = 22;
+                        camera.TriggerShake(8.0f, 8);
+                    }
+                    // タイミングよくキーを離した瞬間にバーをピタッと止めて判定！
+                    else if (isTriggerJustReleased)
+                    {
+                        // 0.0f 〜 1.0f の範囲内にクランプ
                         if (m_scCursor > 1.0f)
                         {
                             m_scCursor = 1.0f;
+                        }
+                        if (m_scCursor < 0.0f)
+                        {
+                            m_scCursor = 0.0f;
                         }
 
                         // タイミング判定
@@ -727,26 +790,22 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                             camera.TriggerShake(8.0f, 8);
                         }
                     }
-                    
-                    else if (m_scCursor >= 1.0f)
-                    {
-                        // 【タイムアウト見逃し失敗】
-                        m_scCursor = 1.0f;
-                        m_lastResultSuccess = false;
-                        m_resultShowTimer = 90;
-                        m_scStoppedTimer = 18;
-                    }
                 }
             }
         }
+    }
+
+    if (m_catchCelebrateTimer > 0)
+    {
+        m_catchCelebrateTimer--;
     }
 
     bool allowBodySmoke = (m_state != MuscleState::Soreness && m_stunTimer <= 0);
     bool workoutFlameActive = (m_isSkillChecking && allowBodySmoke);
     CustomEffectManager::GetInstance().UpdateWorkoutFlame(m_pos, workoutFlameActive, m_repCount, m_scCursor, allowBodySmoke);
 
-    // Effekseer マッスルオーラの更新（QTE筋トレ中またはパンプアップ状態）
-    bool auraActive = ((m_isSkillChecking || (m_state == MuscleState::Muscular && m_repCount > 0)) &&
+    // Effekseer マッスルオーラの更新（QTE筋トレ中、パンプアップ状態、またはネズミ捕獲祝祭時）
+    bool auraActive = ((m_isSkillChecking || (m_state == MuscleState::Muscular && m_repCount > 0) || m_catchCelebrateTimer > 0) &&
                        m_state != MuscleState::Soreness && m_stunTimer <= 0);
 
     EffectManager::GetInstance().UpdateMuscleAura(m_pos, auraActive, m_repCount);

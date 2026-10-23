@@ -52,8 +52,11 @@ private:
     bool  m_isSkillChecking = false;
     bool  m_isTitleSquat = false;
     float m_scCursor = 0.0f;         // 針の位置 (0.0f 〜 1.0f)
+    float m_scCursorDir = 1.0f;      // 針の反復移動方向 (1.0f: 右向き, -1.0f: 左向き)
     float m_scZoneStart = 0.55f;     // 成功ゾーン開始
     float m_scZoneEnd   = 0.85f;     // 成功ゾーン終了
+    float m_prevScZoneCenter = -1.0f;// 前回の成功ゾーン中心位置（前回と被らないように離す用）
+    int   m_scHoldingFrames = 0;     // スキルチェック長押しフレーム数（長時間放置セーフティ用）
     int   m_repCount = 0;            // レップ数
     bool  m_prevTriggerKey = false;
     int   m_resultShowTimer = 0;
@@ -79,6 +82,7 @@ private:
 
     // スタン（壁・家具衝突時）関連
     int    m_stunTimer = 0;          // 猫のスタン残りフレーム数
+    int    m_catchCelebrateTimer = 0;// ネズミ捕獲時の祝祭オーラ残りフレーム数
 
     // デバッグチート関連
     bool   m_cheatNoCooldown = false;
@@ -221,6 +225,16 @@ public:
         m_isTitleSquat = isSquatting;
         m_isSkillChecking = false;
         UpdateAnimation(false);
+    }
+
+    // ネズミ捕獲時の祝祭リアクション（パンプ維持リフレッシュ＆祝祭オーラ）
+    void OnCatchMouse(bool isFast, int comboCount)
+    {
+        m_catchCelebrateTimer = 35;
+        if (m_repCount > 0)
+        {
+            m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 捕獲でパンプ維持タイマー全快リセット！
+        }
     }
     
     int GetRepCount() const
