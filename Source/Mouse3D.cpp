@@ -6,6 +6,7 @@
 #include "CsvManager.h"
 #include "Config.h"
 #include "Common.h"
+#include "CustomEffectManager.h"
 #include <cmath>
 #include <cstdlib>
 #include <cstring>
@@ -19,6 +20,7 @@ MouseBase3D::MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float
     , m_maxSpeed(maxSpeed)
     , m_speedBonus(0.0f)
     , m_animTime(0.0f)
+    , m_walkAnimPhase(0.0f)
     , m_stunTimer(0)
     , m_prevPos(pos)
     , m_targetWaypoint(pos)
@@ -32,6 +34,122 @@ MouseBase3D::MouseBase3D(const VECTOR& pos, float radius, ObjectType type, float
     ChooseNewPatrolTarget();
 }
 
+void MouseBase3D::UpdateAnimPhase()
+{
+    m_animTime += 1.0f / 60.0f;
+
+    if (IsStunned())
+    {
+        return;
+    }
+
+    float speed = std::sqrt(m_vx * m_vx + m_vz * m_vz);
+    if (speed > 0.05f)
+    {
+        // 逃走中は必死に超高速ピョコピョコ、徘徊時はトコトコ歩き
+        float phaseSpeed = m_isFleeingNow ? (28.0f + speed * 2.2f) : (15.0f + speed * 1.6f);
+        m_walkAnimPhase += phaseSpeed * (1.0f / 60.0f);
+
+        // 逃走中は足元からパニック土煙を発生（数フレームに1回控えめに）
+        if (m_isFleeingNow && speed > 0.8f)
+        {
+            int frame = static_cast<int>(m_animTime * 60.0f);
+            if (frame % 5 == 0)
+            {
+                CustomEffectManager::GetInstance().SpawnMouseFleeDust(m_pos, VGet(m_vx, 0.0f, m_vz));
+            }
+        }
+    }
+    else
+    {
+        m_walkAnimPhase += 6.0f * (1.0f / 60.0f);
+    }
+}
+
+MouseAnimTransform MouseBase3D::GetAnimTransform(float baseScale, float modelRotY) const
+{
+    MouseAnimTransform t;
+    t.drawPos = m_pos;
+    t.scaleVec = VGet(baseScale, baseScale, baseScale);
+    t.rotY = m_rotY + modelRotY;
+    t.localPitchX = 0.0f;
+    t.localRollZ = 0.0f;
+    t.isStunned = IsStunned();
+
+    if (t.isStunned)
+    {
+        // 【スタン（気絶）アニメーション】
+        // バタンと横倒し（約83度ロール）＋手足ピクピク痙攣
+        float fallAngle = MathHelper::PI * 0.46f;
+        float twitch = std::sin(m_animTime * 34.0f) * 0.06f;
+        t.localRollZ = fallAngle + twitch;
+        t.localPitchX = -0.12f + std::cos(m_animTime * 26.0f) * 0.04f;
+
+        // スタン解除直前（残り約0.4秒未満）：プルプル震えて起き上がろうとする
+        if (m_stunTimer < 25)
+        {
+            float shake = std::sin(m_animTime * 65.0f) * 0.16f;
+            t.localRollZ += shake;
+            t.drawPos.y += std::abs(std::sin(m_animTime * 45.0f)) * 1.5f;
+        }
+
+        // 倒れた分高さを地面に近づけ、少しペシャっとコミカルに潰れる
+        t.drawPos.y = m_pos.y + 1.5f;
+        t.scaleVec.y = baseScale * 0.82f;
+        t.scaleVec.x = baseScale * 1.08f;
+        t.scaleVec.z = baseScale * 1.06f;
+
+        return t;
+    }
+
+    float speed = std::sqrt(m_vx * m_vx + m_vz * m_vz);
+    bool isMoving = (speed > 0.05f);
+
+    if (isMoving)
+    {
+        // 【移動中（通常徘徊・逃走ダッシュ）アニメーション】
+        // 1. ピョコピョコ跳ねるホッピングバウンス
+        float hopCycle = std::abs(std::sin(m_walkAnimPhase));
+        float hopHeight = m_isFleeingNow ? 4.8f : 2.5f;
+        if (m_type == ObjectType::FastMouse)
+        {
+            hopHeight *= 1.15f;
+        }
+        t.drawPos.y = m_pos.y + hopCycle * hopHeight;
+
+        // 2. 左右の足を交互に出すタタタッとした横揺れ（ロール）
+        float rollAmp = m_isFleeingNow ? 0.16f : 0.09f;
+        t.localRollZ = std::sin(m_walkAnimPhase * 0.5f) * rollAmp;
+
+        // 3. 前傾姿勢（ピッチ）：逃走中は必死に頭を低くして前傾！
+        if (m_isFleeingNow)
+        {
+            t.localPitchX = -0.24f + std::cos(m_walkAnimPhase) * 0.08f;
+        }
+        else
+        {
+            t.localPitchX = std::cos(m_walkAnimPhase) * 0.06f;
+        }
+
+        // 4. スカッシュ＆ストレッチ：跳ねる瞬間に縦に伸び、着地で少し横に広がる！
+        float stretch = std::sin(m_walkAnimPhase * 2.0f);
+        float stretchAmp = m_isFleeingNow ? 0.09f : 0.05f;
+        t.scaleVec.y = baseScale * (1.0f - stretch * stretchAmp);
+        t.scaleVec.x = baseScale * (1.0f + stretch * (stretchAmp * 0.6f));
+        t.scaleVec.z = baseScale * (1.0f + stretch * stretchAmp);
+    }
+    else
+    {
+        // 【待機中（Idle）アニメーション】
+        // 鼻先をクンクン上下させ、呼吸で微かに息づく
+        float sniff = std::sin(m_animTime * 10.0f) * 0.5f;
+        t.drawPos.y = m_pos.y + (std::max)(0.0f, sniff);
+        t.localPitchX = std::sin(m_animTime * 14.0f) * 0.04f;
+    }
+
+    return t;
+}
+
 void MouseBase3D::DrawStunEffect()
 {
     if (!IsStunned())
@@ -39,8 +157,8 @@ void MouseBase3D::DrawStunEffect()
         return;
     }
 
-    // ネズミモデル（スケール10倍）の頭上に合わせて高さを30.0f、半径を16.0fに拡張
-    float headY = m_pos.y + 30.0f;
+    // ネズミモデル（スケール10倍）の頭上に合わせて高さを16.0f、半径を16.0fに拡張
+    float headY = m_pos.y + 16.0f;
     float spinSpeed = m_animTime * 10.0f;
     float ringRadius = 16.0f;
 
@@ -149,53 +267,16 @@ void MouseBase3D::OnWallCollision(const VECTOR& pushNormal)
     float nx = pushNormal.x / nLen;
     float nz = pushNormal.z / nLen;
 
-    float currentSpd = GetCurrentSpeed();
-
-    // 壁に向かっていた速度成分（内積）
+    // 速度ベクトルの法線方向成分を打ち消し、壁に沿って滑らせる
     float dot = m_vx * nx + m_vz * nz;
-
-    // 壁の接線ベクトル（壁沿いにスムーズに逃げる方向）
-    float tx = -nz;
-    float tz = nx;
-    float tDot = m_vx * tx + m_vz * tz;
-    if (tDot < 0.0f)
-    {
-        tx = -tx;
-        tz = -tz;
-    }
-
     if (dot < 0.0f)
     {
-        // 壁に向かっていた場合: 壁法線への強い反発 + 壁沿いスライディング
-        float bounceVx = -dot * nx;
-        float bounceVz = -dot * nz;
-        float slideVx = tx * currentSpd * 0.75f;
-        float slideVz = tz * currentSpd * 0.75f;
-
-        m_vx = bounceVx * 1.3f + slideVx;
-        m_vz = bounceVz * 1.3f + slideVz;
-    }
-    else
-    {
-        // すでに壁から離れる方向なら、さらに法線方向へ加速＋壁沿いスライド
-        m_vx = nx * currentSpd * 0.85f + tx * currentSpd * 0.5f;
-        m_vz = nz * currentSpd * 0.85f + tz * currentSpd * 0.5f;
+        m_vx -= dot * nx * 1.5f; // 反射成分を加えて跳ね返らせる
+        m_vz -= dot * nz * 1.5f;
     }
 
-    // スピードに合わせて正規化
-    float vLen = std::sqrt(m_vx * m_vx + m_vz * m_vz);
-    if (vLen > 0.0001f)
-    {
-        m_vx = (m_vx / vLen) * currentSpd;
-        m_vz = (m_vz / vLen) * currentSpd;
-    }
-
-    // 向きを即座に更新
-    m_rotY = std::atan2(m_vx, m_vz);
-
-    // 新たな安全な目標地点を再選択し、進行を継続（部屋の内側へ誘導）
+    // 壁と向かい合っている場合はパトロール目的地を即座に再選択
     ChooseNewPatrolTarget();
-    m_patrolTimer = 90 + rand() % 90;
 }
 
 void MouseBase3D::UpdateWanderMovement(float speed)
@@ -203,38 +284,21 @@ void MouseBase3D::UpdateWanderMovement(float speed)
     m_patrolTimer--;
 
     float distToTarget = MathHelper::DistanceXZ(m_pos, m_targetWaypoint);
-    if (distToTarget < 40.0f || m_patrolTimer <= 0)
+    if (distToTarget < 35.0f || m_patrolTimer <= 0)
     {
         ChooseNewPatrolTarget();
     }
 
-    float toX = m_targetWaypoint.x - m_pos.x;
-    float toZ = m_targetWaypoint.z - m_pos.z;
-    float toLen = std::sqrt(toX * toX + toZ * toZ);
-
-    if (toLen > 0.001f)
+    // 目的地へ向かうスムーズな操舵
+    float dirX = m_targetWaypoint.x - m_pos.x;
+    float dirZ = m_targetWaypoint.z - m_pos.z;
+    float len = std::sqrt(dirX * dirX + dirZ * dirZ);
+    if (len > 0.001f)
     {
-        toX /= toLen;
-        toZ /= toLen;
-    }
-    else
-    {
-        toX = 1.0f;
-        toZ = 0.0f;
+        dirX /= len;
+        dirZ /= len;
     }
 
-    // ネズミらしい生き生きとした蛇行（サイン波）
-    float wobble = std::sin(m_animTime * 6.5f) * 0.22f;
-    float dirX = toX + (-toZ) * wobble;
-    float dirZ = toZ + (toX) * wobble;
-    float dLen = std::sqrt(dirX * dirX + dirZ * dirZ);
-    if (dLen > 0.001f)
-    {
-        dirX /= dLen;
-        dirZ /= dLen;
-    }
-
-    // 進行方向へスムーズに追従
     m_vx = MathHelper::Lerp(m_vx, dirX * speed, 0.18f);
     m_vz = MathHelper::Lerp(m_vz, dirZ * speed, 0.18f);
 
@@ -305,7 +369,6 @@ NormalMouse3D::NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player
 void NormalMouse3D::Update()
 {
     m_prevPos = m_pos;
-    m_animTime += 1.0f / 60.0f;
 
     // スタン時は完全に行動停止
     if (m_stunTimer > 0)
@@ -313,6 +376,7 @@ void NormalMouse3D::Update()
         m_stunTimer--;
         m_vx = 0.0f;
         m_vz = 0.0f;
+        UpdateAnimPhase();
         return;
     }
 
@@ -345,17 +409,25 @@ void NormalMouse3D::Update()
         float targetAngle = std::atan2(m_vx, m_vz);
         m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.30f);
     }
+
+    UpdateAnimPhase();
 }
 
 void NormalMouse3D::Draw3D()
 {
-    if (!ModelManager::GetInstance().DrawModelIfLoaded
+    MouseAnimTransform t = GetAnimTransform(ModelConfig::MOUSE_NORMAL_MODEL_SCALE, ModelConfig::MOUSE_NORMAL_MODEL_ROT_Y);
+
+    if (!ModelManager::GetInstance().DrawModelWithTransform
         (
-        ModelConfig::MOUSE_NORMAL_MODEL_PATH, m_pos, m_rotY + ModelConfig::MOUSE_NORMAL_MODEL_ROT_Y,
-        ModelConfig::MOUSE_NORMAL_MODEL_SCALE
+        ModelConfig::MOUSE_NORMAL_MODEL_PATH,
+        t.drawPos,
+        t.rotY,
+        t.scaleVec,
+        t.localPitchX,
+        t.localRollZ
         ))
     {
-        ModelManager::GetInstance().DrawFallbackNormalMouse(m_pos, m_rotY, m_animTime);
+        ModelManager::GetInstance().DrawFallbackNormalMouse(t.drawPos, t.rotY, m_animTime, t.localPitchX, t.localRollZ, t.isStunned);
     }
 
     DrawStunEffect();
@@ -380,7 +452,6 @@ FastMouse3D::FastMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
 void FastMouse3D::Update()
 {
     m_prevPos = m_pos;
-    m_animTime += 1.0f / 60.0f;
 
     // スタン時は完全に行動停止
     if (m_stunTimer > 0)
@@ -388,6 +459,7 @@ void FastMouse3D::Update()
         m_stunTimer--;
         m_vx = 0.0f;
         m_vz = 0.0f;
+        UpdateAnimPhase();
         return;
     }
 
@@ -421,17 +493,25 @@ void FastMouse3D::Update()
         float targetAngle = std::atan2(m_vx, m_vz);
         m_rotY = MathHelper::LerpAngle(m_rotY, targetAngle, 0.40f);
     }
+
+    UpdateAnimPhase();
 }
 
 void FastMouse3D::Draw3D()
 {
-    if (!ModelManager::GetInstance().DrawModelIfLoaded
+    MouseAnimTransform t = GetAnimTransform(ModelConfig::MOUSE_FAST_MODEL_SCALE, ModelConfig::MOUSE_FAST_MODEL_ROT_Y);
+
+    if (!ModelManager::GetInstance().DrawModelWithTransform
         (
-        ModelConfig::MOUSE_FAST_MODEL_PATH, m_pos, m_rotY + ModelConfig::MOUSE_FAST_MODEL_ROT_Y,
-        ModelConfig::MOUSE_FAST_MODEL_SCALE
+        ModelConfig::MOUSE_FAST_MODEL_PATH,
+        t.drawPos,
+        t.rotY,
+        t.scaleVec,
+        t.localPitchX,
+        t.localRollZ
         ))
     {
-        ModelManager::GetInstance().DrawFallbackFastMouse(m_pos, m_rotY, m_animTime);
+        ModelManager::GetInstance().DrawFallbackFastMouse(t.drawPos, t.rotY, m_animTime, t.localPitchX, t.localRollZ, t.isStunned);
     }
 
     DrawStunEffect();

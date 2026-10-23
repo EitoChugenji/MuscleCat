@@ -162,11 +162,8 @@ void Player3D::UpdateAnimation(bool isMoving)
 
     if (m_isTackling)
     {
-        targetAnim = m_animIndexPush;      // Armature|05_Push
-        playSpeed = 1.0f;
-        // 電撃疾走（スタン攻撃）中は超高速のRunモーションで疾走感を演出
-        targetAnim = m_animIndexRun;       // Armature|01_Run
-        playSpeed = 2.4f + static_cast<float>(GetEffectiveRep()) * 0.08f;
+        targetAnim = m_animIndexPush;      // Armature|05_Push (パンチ・突き出しモーション)
+        playSpeed = 2.2f + static_cast<float>(GetEffectiveRep()) * 0.06f;
     }
     else if (m_isPouncing)
     {
@@ -318,15 +315,11 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
     {
         m_tackleTimer--;
 
-        // 残像記録（半透明で控えめにし、本体のPushモーションを際立たせる）
+        // 残像記録（半透明で控えめにし、本体のPushモーションを際立たせる。2フレームに1回）
         if (m_tackleTimer % 2 == 0)
         {
             m_trails.push_back({ m_pos, m_rotY, m_repCount, 85 });
         }
-
-        // 地面を滑るような超高速直進
-        // 電撃の尾を引く高密度残像トレイル（毎フレーム記録）
-        m_trails.push_back({ m_pos, m_rotY, m_repCount, 115 });
 
         // 電気を帯びて地面を超高速疾走
         float tSpeed = GetTackleSpeed() * ((m_mapType == ModelConfig::MapType::SlopeHills) ? 1.2f : 1.0f);
@@ -335,7 +328,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
         m_pos.y = m_groundY;
 
         CustomEffectManager::GetInstance().UpdateTackleSpaceTimeRift(m_pos, m_tackleDir, m_tackleTimer, m_repCount);
-        //CustomEffectManager::GetInstance().UpdateRunDust(m_pos, m_tackleDir, tSpeed / SPEED_INITIAL, true, m_repCount);
+        CustomEffectManager::GetInstance().UpdateRunDust(m_pos, m_tackleDir, tSpeed / SPEED_INITIAL, true, m_repCount);
 
         if (m_tackleTimer <= 0)
         {
@@ -638,7 +631,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     m_pos.x += moveDir.x * m_speed;
                     m_pos.z += moveDir.z * m_speed;
 
-                   // CustomEffectManager::GetInstance().UpdateRunDust(m_pos, moveDir, m_speed / SPEED_INITIAL, false, m_repCount);
+                    CustomEffectManager::GetInstance().UpdateRunDust(m_pos, moveDir, m_speed / SPEED_INITIAL, false, m_repCount);
 
                 }
 
