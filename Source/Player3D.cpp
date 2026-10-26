@@ -70,7 +70,7 @@ void Player3D::InitModel()
         if (m_modelHandle != -1)
         {
             // モデル内のアニメーション名から各インデックスを自動検出（大文字小文字問わず柔軟に検索）
-            auto findAnim = [this](const std::vector<std::string>& keywords, int fallbackIndex) -> int
+            auto findAnimEx = [this](const std::vector<std::string>& keywords, const std::vector<std::string>& excludeKeywords, int fallbackIndex) -> int
             {
                 int num = MV1GetAnimNum(m_modelHandle);
                 for (int i = 0; i < num; ++i)
@@ -79,6 +79,16 @@ void Player3D::InitModel()
                     if (!name) continue;
                     std::string s(name);
                     for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+                    bool excluded = false;
+                    for (const auto& ex : excludeKeywords)
+                    {
+                        if (s.find(ex) != std::string::npos)
+                        {
+                            excluded = true;
+                            break;
+                        }
+                    }
+                    if (excluded) continue;
                     for (const auto& kw : keywords)
                     {
                         if (s.find(kw) != std::string::npos)
@@ -87,15 +97,34 @@ void Player3D::InitModel()
                         }
                     }
                 }
+                if (fallbackIndex >= num)
+                {
+                    return (num > 0) ? 0 : -1;
+                }
                 return fallbackIndex;
+            };
+
+            auto findAnim = [&findAnimEx](const std::vector<std::string>& keywords, int fallbackIndex) -> int
+            {
+                return findAnimEx(keywords, {}, fallbackIndex);
             };
 
             m_animIndexRun      = findAnim({ "01_run", "run" }, 0);
             m_animIndexAttack   = findAnim({ "02_attack", "attack" }, 1);
             m_animIndexSquat    = findAnim({ "03_squat", "squat" }, 2);
             m_animIndexIdol     = findAnim({ "04_idol", "idol", "idle" }, 3);
-            m_animIndexPush     = findAnim({ "05_push", "push" }, 4);
-            m_animIndexSoreness = findAnim({ "06_musclesoreness", "musclesorena", "soreness", "sore" }, 5);
+            m_animIndexPushUp   = findAnim({ "05_pushup", "pushup", "push_up" }, 4);
+            // タックル（スタン攻撃）用：pushup以外の独立したパンチ/プッシュがあれば使用。無ければAttackを使用
+            m_animIndexPush     = findAnimEx({ "punch", "05_push", "push" }, { "pushup", "push_up" }, -1);
+            if (m_animIndexPush == -1)
+            {
+                m_animIndexPush = m_animIndexAttack;
+            }
+            m_animIndexSoreness = findAnim({ "06_musclesoreness", "musclesorena", "soreness", "sore" }, -1);
+            if (m_animIndexSoreness == -1)
+            {
+                m_animIndexSoreness = m_animIndexIdol;
+            }
 
             // 初期状態はアイドルアニメーション
             m_currentAnimIndex = m_animIndexIdol;
@@ -180,6 +209,11 @@ void Player3D::UpdateAnimation(bool isMoving)
         targetAnim = m_animIndexSquat;     // Armature|03_squat
         playSpeed = 1.0f;
     }
+    else if (m_isTitlePushUp)
+    {
+        targetAnim = m_animIndexPushUp;    // Armature|05_PushUp (腕立て伏せ)
+        playSpeed = 1.0f;
+    }
     else if (isMoving)
     {
         targetAnim = m_animIndexRun;       // Armature|01_Run
@@ -225,6 +259,8 @@ void Player3D::Update()
 
 void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& targetPositions)
 {
+    m_isTitleSquat = false;
+    m_isTitlePushUp = false;
     m_prevPos = m_pos;
     m_animFrame++;
     m_animTime += 1.0f / 60.0f;
@@ -923,8 +959,8 @@ void Player3D::Draw3D()
         );
     }
 
-    // スクワット中（筋トレQTE中またはスクワットアニメーション中）に両手でバーベルを保持・描画
-    if (m_isSkillChecking || m_currentAnimIndex == m_animIndexSquat)
+    // スクワット中（筋トレQTE中またはスクワットアニメーション中）に両手でバーベルを保持・描画（腕立て伏せ中は持たない）
+    if ((m_isSkillChecking || m_currentAnimIndex == m_animIndexSquat) && !m_isTitlePushUp && m_currentAnimIndex != m_animIndexPushUp)
     {
         DrawBarbell(scale);
     }
