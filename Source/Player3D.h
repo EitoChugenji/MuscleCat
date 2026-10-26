@@ -51,6 +51,7 @@ private:
     // スキルチェック & Rep関連
     bool  m_isSkillChecking = false;
     bool  m_isTitleSquat = false;
+    bool  m_isTitlePushUp = false;
     float m_scCursor = 0.0f;         // 針の位置 (0.0f 〜 1.0f)
     float m_scCursorDir = 1.0f;      // 針の反復移動方向 (1.0f: 右向き, -1.0f: 左向き)
     float m_scZoneStart = 0.55f;     // 成功ゾーン開始
@@ -101,9 +102,10 @@ private:
     // 各アニメーションのインデックス（cat.mv1）
     int    m_animIndexRun = 0;       // Armature|01_Run (走り・移動)
     int    m_animIndexAttack = 1;    // Armature|02_Attack (飛びつき)
-    int    m_animIndexSquat = 2;     // Armature|03_squat (筋トレQTE)
+    int    m_animIndexSquat = 2;     // Armature|03_squat (筋トレQTE / スクワット)
     int    m_animIndexIdol = 3;      // Armature|04_Idol (待機)
-    int    m_animIndexPush = 4;      // Armature|05_Push (Eキー / タックル)
+    int    m_animIndexPush = 4;      // Armature|05_Push または Attack (Eキー / タックル)
+    int    m_animIndexPushUp = 4;    // Armature|05_PushUp (腕立て伏せ)
     int    m_animIndexSoreness = 5;  // Armature|06_MuscleSoreness (筋肉痛)
 
     // 手のボーンフレーム（バーベル両手アタッチ用）
@@ -218,11 +220,19 @@ public:
         return m_isSkillChecking;
     }
 
-    void UpdateTitleAnimation(bool isSquatting)
+    enum class TitleWorkoutType
+    {
+        Idle = 0,
+        Squat,
+        PushUp
+    };
+
+    void UpdateTitleAnimation(TitleWorkoutType workoutType)
     {
         m_animFrame++;
         m_animTime += 1.0f / 60.0f;
-        m_isTitleSquat = isSquatting;
+        m_isTitleSquat = (workoutType == TitleWorkoutType::Squat);
+        m_isTitlePushUp = (workoutType == TitleWorkoutType::PushUp);
         m_isSkillChecking = false;
         m_isPouncing = false;
         m_isTackling = false;
@@ -235,6 +245,11 @@ public:
         m_pos.y = m_groundY;
         m_trails.clear();
         UpdateAnimation(false);
+    }
+
+    void UpdateTitleAnimation(bool isSquatting)
+    {
+        UpdateTitleAnimation(isSquatting ? TitleWorkoutType::Squat : TitleWorkoutType::Idle);
     }
 
     // ネズミ捕獲時の祝祭リアクション（パンプ維持リフレッシュ＆祝祭オーラ）
