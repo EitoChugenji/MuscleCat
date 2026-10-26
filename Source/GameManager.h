@@ -21,6 +21,14 @@ private:
     int   m_startCount = 0;
     int   m_clearCount = 0;
     float m_clearTimeSeconds = 0.0f;
+    float m_remainingTimeSeconds = 120.0f;
+    bool  m_isTimeUp = false;
+    int   m_clearAnimTimer = 0;
+    int   m_clearSelectedBtn = 0; // 0: RETRY, 1: MAIN MENU
+    bool  m_prevKeyM = false;
+    VECTOR m_clearCamStartPos = VGet(0.0f, 0.0f, 0.0f);
+    VECTOR m_clearCamStartTarget = VGet(0.0f, 0.0f, 0.0f);
+    static constexpr int CLEAR_ZOOM_DURATION = 75; // クリア時の猫ズーム演出フレーム数（約1.25秒）
     float m_titleCameraAngle = 0.0f;
 
     // パフォーマンス計測用
@@ -78,6 +86,7 @@ private:
 
     void SetupRoomObstacles();
     void DrawTitleScreen();
+    void DrawGameClearScreen();
     void DrawHowToPlayModal();
     void UpdatePause(bool triggerEsc);
     void DrawPauseModal();

@@ -393,6 +393,8 @@ void GameManager::StartGame()
     m_startCount = GetNowCount();
     m_clearCount = 0;
     m_clearTimeSeconds = 0.0f;
+    m_remainingTimeSeconds = Config::TIME_LIMIT_SECONDS;
+    m_isTimeUp = false;
     m_state = GameState::Playing;
 }
 
@@ -748,37 +750,164 @@ void GameManager::Update()
             SetCameraPositionAndTarget_UpVecY(camPos, target);
         }
 
-        // クリア判定
-        if (m_objManager.GetRemainingMouseCount() == 0)
+        // クリア判定・制限時間（120秒）タイムアップ判定
+        float elapsedSec = (GetNowCount() - m_startCount) / 1000.0f;
+        float remainSec  = Config::TIME_LIMIT_SECONDS - elapsedSec;
+        if (remainSec < 0.0f) remainSec = 0.0f;
+
+        if (m_objManager.GetRemainingMouseCount() == 0 || (Config::USE_TIME_LIMIT_MODE && remainSec <= 0.0f))
         {
             m_state = GameState::GameClear;
             m_clearCount = GetNowCount();
-            m_clearTimeSeconds = (m_clearCount - m_startCount) / 1000.0f;
+            m_clearTimeSeconds = elapsedSec;
+            m_remainingTimeSeconds = remainSec;
+            m_isTimeUp = (Config::USE_TIME_LIMIT_MODE && m_objManager.GetRemainingMouseCount() > 0 && remainSec <= 0.0f);
+            m_clearAnimTimer = 0;
+            m_clearSelectedBtn = 0;
+            m_clearCamStartPos = m_camera.GetCameraPos();
+            m_clearCamStartTarget = m_camera.GetTargetPos();
+            m_prevKeyEnter = true;
+            m_prevKeySpace = true;
+            m_prevKeyR = true;
+            m_prevKeyT = true;
+            m_prevKeyM = true;
+            m_prevMouseLeft = true;
         }
     }
     
     else if (m_state == GameState::GameClear)
     {
         SetMouseDispFlag(TRUE); // クリア画面ではカーソル表示
-        auto player = m_objManager.GetPlayer();
+        m_clearAnimTimer++;
 
+        auto player = m_objManager.GetPlayer();
         if (player)
         {
-            const auto& stage = m_objManager.GetStage();
-            m_camera.Update(player->GetPos(), player->GetRotY(), false, false, stage.GetModelHandle(), &stage.GetMinBounds(), &stage.GetMaxBounds());
+            // 背景で猫がバーベルを持って筋トレ（スクワット）し続ける演出
+            player->UpdateTitleAnimation(true);
+
+            VECTOR pPos = player->GetPos();
+            float pRot = player->GetRotY();
+
+            // 猫の斜め前方へ回り込みながらズームインし、全身（頭から足元・バーベルまで）が綺麗に収まる距離に引く
+            int orbitFrames = (m_clearAnimTimer > CLEAR_ZOOM_DURATION) ? (m_clearAnimTimer - CLEAR_ZOOM_DURATION) : 0;
+            float frontAngle = pRot + MathHelper::PI * 0.82f + std::sin(orbitFrames * 0.012f) * 0.22f;
+            float effRep = static_cast<float>(player->GetEffectiveRep());
+            float zoomDist = 235.0f + effRep * 3.0f;   // 少し引いて全身・バーベルが見切れない距離
+            float zoomHeight = 68.0f + effRep * 1.2f;  // 猫の胸〜顔の高さに合わせてカメラ高さを調整
+
+            VECTOR goalCamPos = VGet(
+                pPos.x - std::sin(frontAngle) * zoomDist,
+                pPos.y + zoomHeight,
+                pPos.z - std::cos(frontAngle) * zoomDist
+            );
+            VECTOR goalTarget = VGet(pPos.x, pPos.y + 52.0f + effRep * 1.0f, pPos.z); // 猫の体の中央（胸付近）を注視
+
+            // ステージ壁による遮蔽チェック（猫とカメラの間に壁がある場合は手前に寄せる）
+            int stageModel = m_objManager.GetStage().GetModelHandle();
+            if (stageModel != -1)
+            {
+                MV1_COLL_RESULT_POLY hit = MV1CollCheck_Line(stageModel, -1, goalTarget, goalCamPos);
+                if (hit.HitFlag == 1 && std::abs(hit.Normal.y) < 0.85f)
+                {
+                    VECTOR dir = VSub( hit.HitPosition, goalTarget );
+                    float len = VSize(dir);
+                    if (len > 38.0f)
+                    {
+                        goalCamPos = VAdd(goalTarget, VScale(VNorm(dir), len - 10.0f));
+                    }
+                }
+            }
+
+            // イーズアウト補間でクリア直後のカメラ位置から猫へ滑らかにズームイン
+            float t = MathHelper::Clamp(static_cast<float>(m_clearAnimTimer) / static_cast<float>(CLEAR_ZOOM_DURATION), 0.0f, 1.0f);
+            float smoothT = 1.0f - (1.0f - t) * (1.0f - t) * (1.0f - t);
+
+            VECTOR curCamPos = VGet(
+                MathHelper::Lerp(m_clearCamStartPos.x, goalCamPos.x, smoothT),
+                MathHelper::Lerp(m_clearCamStartPos.y, goalCamPos.y, smoothT),
+                MathHelper::Lerp(m_clearCamStartPos.z, goalCamPos.z, smoothT)
+            );
+            VECTOR curTarget = VGet(
+                MathHelper::Lerp(m_clearCamStartTarget.x, goalTarget.x, smoothT),
+                MathHelper::Lerp(m_clearCamStartTarget.y, goalTarget.y, smoothT),
+                MathHelper::Lerp(m_clearCamStartTarget.z, goalTarget.z, smoothT)
+            );
+
+            SetCameraNearFar(5.0f, 90000.0f);
+            SetCameraPositionAndTarget_UpVecY(curCamPos, curTarget);
+
+            // 筋トレ燃焼オーラエフェクトも継続更新
+            CustomEffectManager::GetInstance().UpdateWorkoutFlame(pPos, true, player->GetRepCount(), 0.7f, true);
+            EffectManager::GetInstance().UpdateMuscleAura(pPos, true, player->GetRepCount());
         }
 
-        m_camera.Apply();
+        // マウス入力
+        int mx = 0, my = 0;
+        GetMousePoint(&mx, &my);
+        bool isLeftClick = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
+        bool isMouseTrigger = isLeftClick && !m_prevMouseLeft;
+        m_prevMouseLeft = isLeftClick;
 
-        // リトライまたはタイトル
-        if (CheckHitKey(KEY_INPUT_SPACE) || CheckHitKey(KEY_INPUT_R))
+        // キー入力
+        bool keyLeft  = (CheckHitKey(KEY_INPUT_LEFT) != 0 || CheckHitKey(KEY_INPUT_A) != 0 || CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
+        bool keyRight = (CheckHitKey(KEY_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_D) != 0 || CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
+        bool isEnter  = (CheckHitKey(KEY_INPUT_RETURN) != 0);
+        bool isSpace  = (CheckHitKey(KEY_INPUT_SPACE) != 0);
+        bool keyR     = (CheckHitKey(KEY_INPUT_R) != 0);
+        bool keyT     = (CheckHitKey(KEY_INPUT_T) != 0);
+        bool keyM     = (CheckHitKey(KEY_INPUT_M) != 0);
+
+        bool triggerLeft  = keyLeft && !m_prevKeyLeft;
+        bool triggerRight = keyRight && !m_prevKeyRight;
+        bool triggerEnter = isEnter && !m_prevKeyEnter;
+        bool triggerSpace = isSpace && !m_prevKeySpace;
+        bool triggerR     = keyR && !m_prevKeyR;
+        bool triggerT     = keyT && !m_prevKeyT;
+        bool triggerM     = keyM && !m_prevKeyM;
+
+        m_prevKeyLeft  = keyLeft;
+        m_prevKeyRight = keyRight;
+        m_prevKeyEnter = isEnter;
+        m_prevKeySpace = isSpace;
+        m_prevKeyR     = keyR;
+        m_prevKeyT     = keyT;
+        m_prevKeyM     = keyM;
+
+        // ズームイン演出中（CLEAR_ZOOM_DURATION フレームまで）はリザルトUIのボタン操作を待機（エフェクト更新は止めない）
+        if (m_clearAnimTimer > CLEAR_ZOOM_DURATION)
         {
-            StartGame();
-        }
-        
-        else if (CheckHitKey(KEY_INPUT_T))
-        {
-            SetupTitle();
+            if (triggerLeft)  m_clearSelectedBtn = 0;
+            if (triggerRight) m_clearSelectedBtn = 1;
+
+            // アクションボタン当たり判定座標
+            int btnW = 340;
+            int btnH = 66;
+            int btnGap = 50;
+            int totalBtnsW = btnW * 2 + btnGap;
+            int btn1X = (Config::SCREEN_WIDTH - totalBtnsW) / 2;
+            int btn2X = btn1X + btnW + btnGap;
+            int btnY  = 618;
+
+            bool hoverRetry = (mx >= btn1X && mx <= btn1X + btnW && my >= btnY && my <= btnY + btnH);
+            bool hoverMenu  = (mx >= btn2X && mx <= btn2X + btnW && my >= btnY && my <= btnY + btnH);
+
+            if (hoverRetry) m_clearSelectedBtn = 0;
+            if (hoverMenu)  m_clearSelectedBtn = 1;
+
+            // リトライ判定（[R]キー、または RETRY ボタンクリック / 選択決定）
+            if (triggerR || (hoverRetry && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_clearSelectedBtn == 0))
+            {
+                StartGame();
+                return;
+            }
+
+            // メインメニュー（タイトル）判定（[M]/[T]キー、または MAIN MENU ボタンクリック / 選択決定）
+            if (triggerM || triggerT || (hoverMenu && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_clearSelectedBtn == 1))
+            {
+                SetupTitle();
+                return;
+            }
         }
     }
 
@@ -924,9 +1053,22 @@ void GameManager::Draw()
         snprintf(miceBuf, sizeof(miceBuf), "%d 匹", remainMice);
         DrawStringToHandle(infoX + 60, pY + 6, miceBuf, GetColor(255, 80, 80), font18);
 
-        char timeBuf[32];
-        snprintf(timeBuf, sizeof(timeBuf), "タイム: %.1f 秒", currentSec);
-        DrawStringToHandle(infoX, pY + 32, timeBuf, white, font16);
+        char timeBuf[64];
+        if (Config::USE_TIME_LIMIT_MODE)
+        {
+            float remainSec = Config::TIME_LIMIT_SECONDS - currentSec;
+            if (remainSec < 0.0f) remainSec = 0.0f;
+            snprintf(timeBuf, sizeof(timeBuf), "残り時間: %.1f 秒", remainSec);
+            unsigned int tCol = (remainSec <= 20.0f && (GetNowCount() / 200) % 2 == 0)
+                ? GetColor(255, 70, 70)
+                : GetColor(255, 235, 60);
+            DrawStringToHandle(infoX, pY + 32, timeBuf, tCol, font16);
+        }
+        else
+        {
+            snprintf(timeBuf, sizeof(timeBuf), "タイム: %.1f 秒", currentSec);
+            DrawStringToHandle(infoX, pY + 32, timeBuf, white, font16);
+        }
 
         if (player)
         {
@@ -1042,61 +1184,753 @@ void GameManager::Draw()
 
     else if (m_state == GameState::GameClear)
     {
-        // リザルト画面（簡易）
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 190);
-        DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(10, 15, 25), TRUE);
-        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-
-        int resultBoxW = 600;
-        int resultBoxH = 380;
-        int boxX = (Config::SCREEN_WIDTH - resultBoxW) / 2;
-        int boxY = (Config::SCREEN_HEIGHT - resultBoxH) / 2;
-
-        DrawBox(boxX, boxY, boxX + resultBoxW, boxY + resultBoxH, GetColor(30, 35, 50), TRUE);
-        DrawBox(boxX, boxY, boxX + resultBoxW, boxY + resultBoxH, yellow, FALSE);
-
-        int clearW = GetDrawStringWidthToHandle("★ STAGE CLEAR!! ★", static_cast<int>(std::string("★ STAGE CLEAR!! ★").length()), font36);
-        DrawStringToHandle((Config::SCREEN_WIDTH - clearW) / 2, boxY + 30, "★ STAGE CLEAR!! ★", yellow, font36);
-
-        DrawFormatStringToHandle(boxX + 130, boxY + 110, white, font24, "クリアタイム : %.2f 秒", m_clearTimeSeconds);
-
-        // 評価ランク算出
-        bool isStage2 = (m_selectedMap == ModelConfig::MapType::NewMap);
-        float sLimit = isStage2 ? 60.0f : 30.0f;
-        float aLimit = isStage2 ? 75.0f : 45.0f;
-        float bLimit = isStage2 ? 90.0f : 60.0f;
-
-        const char* rankText = "C";
-        unsigned int rankColor = GetColor(180, 180, 180);
-        if (m_clearTimeSeconds <= sLimit)
-        {
-            rankText = "S (GOD MUSCLE CAT)";
-            rankColor = GetColor(255, 215, 0);
-        }
-        
-        else if (m_clearTimeSeconds <= aLimit)
-        {
-            rankText = "A (GREAT MUSCLE)";
-            rankColor = GetColor(255, 130, 50);
-        }
-        
-        else if (m_clearTimeSeconds <= bLimit)
-        {
-            rankText = "B (NICE PUMP)";
-            rankColor = GetColor(100, 220, 120);
-        }
-
-        DrawFormatStringToHandle(boxX + 130, boxY + 155, rankColor, font24, "ランク       : %s", rankText);
-        DrawFormatStringToHandle(boxX + 130, boxY + 195, gray, font16, "基準: S ≦ %.0f秒 / A ≦ %.0f秒 / B ≦ %.0f秒", sLimit, aLimit, bLimit);
-
-        DrawStringToHandle(boxX + 130, boxY + 240, "[SPACE] または [R] キー: リトライ", GetColor(150, 255, 150), font18);
-        DrawStringToHandle(boxX + 130, boxY + 280, "[T] キー: タイトル画面へ戻る", cyan, font18);
+        DrawGameClearScreen();
     }
 
     if (CheckHitKey(KEY_INPUT_F12))
     {
         SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "d:\\MuscleCat\\screen_shot.png");
     }
+}
+
+// ============================================================================
+// ステージクリア（リザルト）画面の描画（アメコミ・カートゥーン風ポップUIデザイン）
+// ============================================================================
+void GameManager::DrawGameClearScreen()
+{
+    auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
+    int font16 = fm.GetFont16();
+    int font18 = fm.GetFont18();
+    int font24 = fm.GetFont24();
+    int font36 = fm.GetFont36();
+    int font48 = fm.GetFont48();
+    int font60 = fm.GetFont60();
+    int font96 = fm.GetFont96();
+
+    // カラーパレット定義（イエロー、オレンジ、ブラック、ホワイト＋ゴールド＆ネオンレッド）
+    unsigned int colYellow  = GetColor(255, 235, 0);   // #FFEB00
+    unsigned int colOrange  = GetColor(255, 140, 0);   // #FF8C00
+    unsigned int colBlack   = GetColor(0, 0, 0);       // #000000
+    unsigned int colWhite   = GetColor(255, 255, 255); // #FFFFFF
+    unsigned int colGold    = GetColor(255, 215, 0);   // #FFD700
+    unsigned int colNeonRed = GetColor(255, 0, 68);    // #FF0044
+
+    float animSec = m_clearAnimTimer / 60.0f;
+
+    // =========================================================================
+    // ズームイン演出中（開始〜CLEAR_ZOOM_DURATION フレーム）：
+    // まず猫が筋トレ（スクワット）している姿へカメラがズームし、その後リザルトUIを出す
+    // =========================================================================
+    if (m_clearAnimTimer <= CLEAR_ZOOM_DURATION)
+    {
+        // 上下のシネマティック黒帯＆「★ STAGE CLEAR!! ★」ロゴだけ先行表示して猫の筋トレを強調
+        float barRatio = MathHelper::Clamp(m_clearAnimTimer / 18.0f, 0.0f, 1.0f);
+        int barH = static_cast<int>(90 * barRatio);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 190);
+        DrawBox(0, 0, Config::SCREEN_WIDTH, barH, colBlack, TRUE);
+        DrawBox(0, Config::SCREEN_HEIGHT - barH, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, colBlack, TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        DrawBox(0, 0, Config::SCREEN_WIDTH, 8, colYellow, TRUE);
+        DrawBox(0, Config::SCREEN_HEIGHT - 8, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, colYellow, TRUE);
+
+        float headerBounce = std::abs(std::sin(animSec * 5.0f)) * -8.0f;
+        int headerY = 20 + static_cast<int>(headerBounce);
+        const char* clearLogo = m_isTimeUp ? "★ TIME UP!! ★" : "★ STAGE CLEAR!! ★";
+        int logoW = GetDrawStringWidthToHandle(clearLogo, static_cast<int>(strlen(clearLogo)), font60);
+        int logoX = (Config::SCREEN_WIDTH - logoW) / 2;
+
+        for (int d = 4; d <= 8; ++d)
+        {
+            DrawStringToHandle(logoX + d, headerY + d, clearLogo, colBlack, font60);
+        }
+        for (int dy = -4; dy <= 4; ++dy)
+        {
+            for (int dx = -4; dx <= 4; ++dx)
+            {
+                if (dx != 0 || dy != 0)
+                {
+                    DrawStringToHandle(logoX + dx, headerY + dy, clearLogo, colBlack, font60);
+                }
+            }
+        }
+        DrawStringToHandle(logoX, headerY + 2, clearLogo, m_isTimeUp ? colNeonRed : colOrange, font60);
+        DrawStringToHandle(logoX, headerY,     clearLogo, colYellow, font60);
+        DrawStringToHandle(logoX, headerY - 2, clearLogo, GetColor(255, 255, 190), font60);
+        return;
+    }
+
+    int uiTimer = m_clearAnimTimer - CLEAR_ZOOM_DURATION;
+    float uiSec = uiTimer / 60.0f;
+
+    // =========================================================================
+    // 0. 背景オーバーレイ（背後の筋トレ中の猫がよく見える軽めの半透明＋ドット＋集中線）
+    // =========================================================================
+    // ベース半透明ダークレイヤー（背景の筋トレ中の猫がくっきり透けて見えるよう105に調整）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 105);
+    DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(10, 12, 22), TRUE);
+
+    // 上下端をさらに引き締めるビネット風グラデーション帯
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 95);
+    DrawBox(0, 0, Config::SCREEN_WIDTH, 135, colBlack, TRUE);
+    DrawBox(0, Config::SCREEN_HEIGHT - 120, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, colBlack, TRUE);
+
+    // アメコミ風ハーフトーン・ドットパターン（四隅・上下エリアにドット網点を配置）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 38);
+    int dotStep = 28;
+    for (int y = dotStep / 2; y < Config::SCREEN_HEIGHT; y += dotStep)
+    {
+        int rowOffset = ((y / dotStep) % 2) * (dotStep / 2);
+        for (int x = rowOffset; x < Config::SCREEN_WIDTH; x += dotStep)
+        {
+            float dx = static_cast<float>(x - Config::SCREEN_WIDTH / 2) / (Config::SCREEN_WIDTH * 0.5f);
+            float dy = static_cast<float>(y - Config::SCREEN_HEIGHT / 2) / (Config::SCREEN_HEIGHT * 0.5f);
+            float distSq = dx * dx + dy * dy;
+            if (distSq > 0.32f)
+            {
+                int radius = static_cast<int>(MathHelper::Clamp((distSq - 0.25f) * 6.5f, 2.0f, 6.0f));
+                DrawCircle(x, y, radius, colOrange, TRUE);
+            }
+        }
+    }
+
+    // 漫画風の放射集中線エフェクト（画面中央から外周へ向かうダイナミックなスピードライン）
+    int centerX = Config::SCREEN_WIDTH / 2;
+    int centerY = Config::SCREEN_HEIGHT / 2 - 20;
+    float rotBase = animSec * 0.18f;
+    int numSpeedLines = 28;
+
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 45);
+    for (int i = 0; i < numSpeedLines; ++i)
+    {
+        float baseAngle = rotBase + (MathHelper::PI * 2.0f * i) / numSpeedLines;
+        float halfWidth = 0.018f + (i % 3) * 0.008f;
+        float innerR = 340.0f + ((i * 37) % 110) + std::sin(animSec * 6.0f + i) * 20.0f;
+        float outerR = 920.0f;
+
+        int x1 = centerX + static_cast<int>(std::cos(baseAngle) * innerR);
+        int y1 = centerY + static_cast<int>(std::sin(baseAngle) * innerR);
+        int x2 = centerX + static_cast<int>(std::cos(baseAngle - halfWidth) * outerR);
+        int y2 = centerY + static_cast<int>(std::sin(baseAngle - halfWidth) * outerR);
+        int x3 = centerX + static_cast<int>(std::cos(baseAngle + halfWidth) * outerR);
+        int y3 = centerY + static_cast<int>(std::sin(baseAngle + halfWidth) * outerR);
+
+        unsigned int rayCol = (i % 2 == 0) ? colYellow : colWhite;
+        DrawTriangle(x1, y1, x2, y2, x3, y3, rayCol, TRUE);
+    }
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+    // アメコミ風の上下イエロー＆ブラックストライプフレーム
+    DrawBox(0, 0, Config::SCREEN_WIDTH, 10, colYellow, TRUE);
+    DrawBox(0, 10, Config::SCREEN_WIDTH, 14, colBlack, TRUE);
+    DrawBox(0, Config::SCREEN_HEIGHT - 14, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT - 10, colBlack, TRUE);
+    DrawBox(0, Config::SCREEN_HEIGHT - 10, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, colYellow, TRUE);
+
+    // =========================================================================
+    // 1. ヘッダー（上部）：「★ STAGE CLEAR!! ★」立体ロゴ ＆ 大小の星エフェクト
+    // =========================================================================
+    float headerBounce = std::abs(std::sin(animSec * 4.5f)) * -8.0f;
+    int headerY = 28 + static_cast<int>(headerBounce);
+
+    // 背面の斜めスピードバナー帯（アメコミ風ブラック＆ネオンレッド枠）
+    int bannerLeft  = 210;
+    int bannerRight = Config::SCREEN_WIDTH - 210;
+    int bannerTop   = 22;
+    int bannerBot   = 112;
+    DrawTriangle(bannerLeft - 25, bannerBot + 6, bannerLeft + 15, bannerTop + 6, bannerRight + 25, bannerTop + 6, colBlack, TRUE);
+    DrawTriangle(bannerLeft - 25, bannerBot + 6, bannerRight + 25, bannerTop + 6, bannerRight - 15, bannerBot + 6, colBlack, TRUE);
+
+    DrawTriangle(bannerLeft - 20, bannerBot, bannerLeft + 20, bannerTop, bannerRight + 20, bannerTop, colNeonRed, TRUE);
+    DrawTriangle(bannerLeft - 20, bannerBot, bannerRight + 20, bannerTop, bannerRight - 20, bannerBot, colNeonRed, TRUE);
+
+    DrawTriangle(bannerLeft - 12, bannerBot - 5, bannerLeft + 24, bannerTop + 5, bannerRight + 12, bannerTop + 5, GetColor(22, 24, 38), TRUE);
+    DrawTriangle(bannerLeft - 12, bannerBot - 5, bannerRight + 12, bannerTop + 5, bannerRight - 24, bannerBot - 5, GetColor(22, 24, 38), TRUE);
+
+    const char* clearLogo = m_isTimeUp ? "★ TIME UP!! ★" : "★ STAGE CLEAR!! ★";
+    int logoW = GetDrawStringWidthToHandle(clearLogo, static_cast<int>(strlen(clearLogo)), font60);
+    int logoX = (Config::SCREEN_WIDTH - logoW) / 2;
+
+    // 3D押し出しシャドウ（右下ブラック）
+    for (int d = 4; d <= 8; ++d)
+    {
+        DrawStringToHandle(logoX + d, headerY + d, clearLogo, colBlack, font60);
+    }
+    // 極太ブラックアウトライン
+    for (int dy = -4; dy <= 4; ++dy)
+    {
+        for (int dx = -4; dx <= 4; ++dx)
+        {
+            if (dx != 0 || dy != 0)
+            {
+                DrawStringToHandle(logoX + dx, headerY + dy, clearLogo, colBlack, font60);
+            }
+        }
+    }
+    // 内側オレンジ立体層 → メインイエロー → ゴールド＆ホワイトハイライト
+    DrawStringToHandle(logoX, headerY + 2, clearLogo, m_isTimeUp ? colNeonRed : colOrange, font60);
+    DrawStringToHandle(logoX, headerY,     clearLogo, colYellow, font60);
+    DrawStringToHandle(logoX, headerY - 2, clearLogo, GetColor(255, 255, 190), font60);
+
+    // 大小の星エフェクト（パルスしながら周囲に輝く）
+    int starPulse1 = static_cast<int>(std::sin(animSec * 6.0f) * 6.0f);
+    int starPulse2 = static_cast<int>(std::cos(animSec * 6.0f) * 6.0f);
+    DrawStringToHandle(bannerLeft - 68, 30 + starPulse1, "★", colGold, font36);
+    DrawStringToHandle(bannerLeft - 28, 72 + starPulse2, "✦", colWhite, font24);
+    DrawStringToHandle(bannerLeft - 92, 68 - starPulse1, "★", colOrange, font18);
+
+    DrawStringToHandle(bannerRight + 32, 28 + starPulse2, "★", colGold, font36);
+    DrawStringToHandle(bannerRight + 10, 74 + starPulse1, "✦", colWhite, font24);
+    DrawStringToHandle(bannerRight + 74, 66 - starPulse2, "★", colOrange, font18);
+
+    // =========================================================================
+    // 評価ランク・スコアの算出（制限時間モード：残り時間に応じたランク＆スコア算出）
+    // =========================================================================
+    bool isStage2 = (m_selectedMap == ModelConfig::MapType::NewMap);
+    const char* rankLetter = "C";
+    const char* rankTitle  = "ROOKIE CAT";
+    unsigned int rankMainCol = GetColor(100, 215, 255);
+    unsigned int rankSubCol  = GetColor(30, 130, 200);
+    char critBuf[96];
+
+    if (Config::USE_TIME_LIMIT_MODE)
+    {
+        // 120秒制限時間制：残り時間基準（S: 残り90秒以上[Stage2は60秒] / A: 残り75秒以上[45秒] / B: 残り60秒以上[30秒]）
+        float sRemain = isStage2 ? 60.0f : 90.0f;
+        float aRemain = isStage2 ? 45.0f : 75.0f;
+        float bRemain = isStage2 ? 30.0f : 60.0f;
+
+        if (m_isTimeUp)
+        {
+            rankLetter  = "C";
+            rankTitle   = "TIME UP...";
+            rankMainCol = GetColor(160, 175, 200);
+            rankSubCol  = GetColor(80, 90, 115);
+        }
+        else if (m_remainingTimeSeconds >= sRemain)
+        {
+            rankLetter  = "S";
+            rankTitle   = "GOD MUSCLE CAT!!";
+            rankMainCol = colGold;
+            rankSubCol  = colOrange;
+        }
+        else if (m_remainingTimeSeconds >= aRemain)
+        {
+            rankLetter  = "A";
+            rankTitle   = "GREAT MUSCLE!";
+            rankMainCol = colOrange;
+            rankSubCol  = colNeonRed;
+        }
+        else if (m_remainingTimeSeconds >= bRemain)
+        {
+            rankLetter  = "B";
+            rankTitle   = "NICE PUMP!";
+            rankMainCol = colYellow;
+            rankSubCol  = GetColor(180, 140, 0);
+        }
+
+        snprintf(critBuf, sizeof(critBuf), "残り時間基準: S ≧ %.0fs / A ≧ %.0fs / B ≧ %.0fs", sRemain, aRemain, bRemain);
+    }
+    else
+    {
+        // 従来の経過タイム制（Config::USE_TIME_LIMIT_MODE = false でいつでも戻せます）
+        float sLimit = isStage2 ? 60.0f : 30.0f;
+        float aLimit = isStage2 ? 75.0f : 45.0f;
+        float bLimit = isStage2 ? 90.0f : 60.0f;
+
+        if (m_clearTimeSeconds <= sLimit)
+        {
+            rankLetter  = "S";
+            rankTitle   = "GOD MUSCLE CAT!!";
+            rankMainCol = colGold;
+            rankSubCol  = colOrange;
+        }
+        else if (m_clearTimeSeconds <= aLimit)
+        {
+            rankLetter  = "A";
+            rankTitle   = "GREAT MUSCLE!";
+            rankMainCol = colOrange;
+            rankSubCol  = colNeonRed;
+        }
+        else if (m_clearTimeSeconds <= bLimit)
+        {
+            rankLetter  = "B";
+            rankTitle   = "NICE PUMP!";
+            rankMainCol = colYellow;
+            rankSubCol  = GetColor(180, 140, 0);
+        }
+
+        snprintf(critBuf, sizeof(critBuf), "S ≦ %.0fs  /  A ≦ %.0fs  /  B ≦ %.0fs", sLimit, aLimit, bLimit);
+    }
+
+    // =========================================================================
+    // 2. メインコンテンツ（中央左側：ランク表示 ＆ アメコミ風爆発・閃光エフェクト）
+    // =========================================================================
+    int rankCX = 310;
+    int rankCY = 355;
+
+    // スタンプが「ドカン！」と叩きつけられるアニメーション（ズーム完了後に拡大→着地バウンス）
+    float stampProgress = MathHelper::Clamp(uiTimer / 14.0f, 0.0f, 1.0f);
+    float stampBounce = (uiTimer >= 14 && uiTimer < 26)
+        ? std::sin((uiTimer - 14) * 0.5f) * 0.08f
+        : 0.0f;
+    float burstScale = stampProgress + stampBounce;
+
+    // アメコミ風ギザギザ爆発・閃光エフェクト（Boom / Flash ポリゴン）
+    // ※ 頂点ごとに半径が食い違って「ひげ線」が出ないよう、各頂点の半径を配列で事前確定してから隣接頂点同士を結合
+    constexpr int NUM_VERTICES = 28; // 14本のトゲ（偶数=外トゲ、奇数=内谷）
+    for (int layer = 0; layer < 4; ++layer)
+    {
+        float rOuterBase = 200.0f;
+        float rInnerBase = 132.0f;
+        unsigned int layerCol = colBlack;
+        float angleOffset = animSec * 0.22f;
+
+        if (layer == 0)
+        {
+            // ドロップシャドウ＆極太黒縁
+            rOuterBase = 208.0f * burstScale;
+            rInnerBase = 140.0f * burstScale;
+            layerCol = colBlack;
+        }
+        else if (layer == 1)
+        {
+            // 外側：ネオンレッド〜オレンジの爆発ギザギザ
+            rOuterBase = 196.0f * burstScale;
+            rInnerBase = 128.0f * burstScale;
+            layerCol = (rankLetter[0] == 'S') ? colNeonRed : colOrange;
+        }
+        else if (layer == 2)
+        {
+            // 中間：イエローの閃光バースト（逆回転オフセット）
+            rOuterBase = 168.0f * burstScale;
+            rInnerBase = 108.0f * burstScale;
+            layerCol = colYellow;
+            angleOffset = -animSec * 0.30f + 0.22f;
+        }
+        else
+        {
+            // 内側：ホワイトのフラッシュコア
+            rOuterBase = 132.0f * burstScale;
+            rInnerBase = 90.0f * burstScale;
+            layerCol = colWhite;
+            angleOffset = animSec * 0.15f;
+        }
+
+        int vx[NUM_VERTICES];
+        int vy[NUM_VERTICES];
+        int ox = (layer == 0) ? 6 : 0;
+        int oy = (layer == 0) ? 6 : 0;
+
+        for (int i = 0; i < NUM_VERTICES; ++i)
+        {
+            float angle = angleOffset + (MathHelper::PI * 2.0f * i) / NUM_VERTICES;
+            float r = (i % 2 == 0) ? rOuterBase : rInnerBase;
+            if (i % 4 == 0)
+            {
+                r *= 1.07f; // 1つおきに長いトゲを作る（前後の三角形で同一座標を共有するため段差線が一切出ない）
+            }
+            vx[i] = rankCX + ox + static_cast<int>(std::cos(angle) * r);
+            vy[i] = rankCY + oy + static_cast<int>(std::sin(angle) * r);
+        }
+
+        for (int i = 0; i < NUM_VERTICES; ++i)
+        {
+            int next = (i + 1) % NUM_VERTICES;
+            DrawTriangle(rankCX + ox, rankCY + oy, vx[i], vy[i], vx[next], vy[next], layerCol, TRUE);
+        }
+    }
+
+    // スタンププレート（「ドカン！」と押し出された立体ハンコ枠）
+    int stampW = static_cast<int>(220 * burstScale);
+    int stampH = static_cast<int>(210 * burstScale);
+    int stampX = rankCX - stampW / 2;
+    int stampY = rankCY - stampH / 2;
+
+    // スタンプの立体影＋極太ブラック枠＋ダーク背景
+    DrawBox(stampX + 8, stampY + 8, stampX + stampW + 8, stampY + stampH + 8, colBlack, TRUE);
+    DrawBox(stampX - 5, stampY - 5, stampX + stampW + 5, stampY + stampH + 5, colBlack, TRUE);
+    DrawBox(stampX, stampY, stampX + stampW, stampY + stampH, GetColor(20, 22, 34), TRUE);
+
+    // スタンプ内側の二重枠（ゴールドまたはランクカラー）
+    DrawBox(stampX + 6, stampY + 6, stampX + stampW - 6, stampY + stampH - 6, rankMainCol, FALSE);
+    DrawBox(stampX + 7, stampY + 7, stampX + stampW - 7, stampY + stampH - 7, rankMainCol, FALSE);
+    DrawBox(stampX + 8, stampY + 8, stampX + stampW - 8, stampY + stampH - 8, rankMainCol, FALSE);
+
+    // 左上：「BOOM!!」アメコミ擬音バッジ
+    int boomX = stampX - 28;
+    int boomY = stampY - 22;
+    DrawBox(boomX + 4, boomY + 4, boomX + 114, boomY + 36, colBlack, TRUE);
+    DrawBox(boomX - 2, boomY - 2, boomX + 110, boomY + 32, colBlack, TRUE);
+    DrawBox(boomX, boomY, boomX + 108, boomY + 30, colNeonRed, TRUE);
+    DrawStringToHandle(boomX + 10, boomY + 4, "BOOM!!", colYellow, font24);
+
+    // 特大ランク文字（S / A / B / C）の3D立体描画
+    int rLetterW = GetDrawStringWidthToHandle(rankLetter, static_cast<int>(strlen(rankLetter)), font96);
+    int rLetterX = rankCX - rLetterW / 2;
+    int rLetterY = stampY + 18;
+
+    // 3D押し出し影
+    for (int d = 4; d <= 8; ++d)
+    {
+        DrawStringToHandle(rLetterX + d, rLetterY + d, rankLetter, colBlack, font96);
+    }
+    // 極太ブラック縁取り
+    for (int dy = -4; dy <= 4; ++dy)
+    {
+        for (int dx = -4; dx <= 4; ++dx)
+        {
+            if (dx != 0 || dy != 0)
+            {
+                DrawStringToHandle(rLetterX + dx, rLetterY + dy, rankLetter, colBlack, font96);
+            }
+        }
+    }
+    // 本体カラー＆ハイライト
+    DrawStringToHandle(rLetterX, rLetterY + 3, rankLetter, rankSubCol, font96);
+    DrawStringToHandle(rLetterX, rLetterY,     rankLetter, rankMainCol, font96);
+    DrawStringToHandle(rLetterX, rLetterY - 2, rankLetter, colWhite, font96);
+
+    // 「S RANK」スタンプ下部バー
+    char rankLabelBuf[32];
+    snprintf(rankLabelBuf, sizeof(rankLabelBuf), "%s RANK", rankLetter);
+    int rLabelW = GetDrawStringWidthToHandle(rankLabelBuf, static_cast<int>(strlen(rankLabelBuf)), font36);
+    int rLabelX = rankCX - rLabelW / 2;
+    int rLabelY = stampY + stampH - 64;
+
+    for (int dy = -2; dy <= 2; ++dy)
+    {
+        for (int dx = -2; dx <= 2; ++dx)
+        {
+            if (dx != 0 || dy != 0)
+            {
+                DrawStringToHandle(rLabelX + dx, rLabelY + dy, rankLabelBuf, colBlack, font36);
+            }
+        }
+    }
+    DrawStringToHandle(rLabelX + 3, rLabelY + 3, rankLabelBuf, colBlack, font36);
+    DrawStringToHandle(rLabelX, rLabelY, rankLabelBuf, colWhite, font36);
+
+    // ランク称号リボン（スタンプ直下）
+    int titleRibbonW = 260;
+    int titleRibbonH = 34;
+    int titleRibbonX = rankCX - titleRibbonW / 2;
+    int titleRibbonY = stampY + stampH + 18;
+
+    DrawBox(titleRibbonX + 4, titleRibbonY + 4, titleRibbonX + titleRibbonW + 4, titleRibbonY + titleRibbonH + 4, colBlack, TRUE);
+    DrawBox(titleRibbonX - 2, titleRibbonY - 2, titleRibbonX + titleRibbonW + 2, titleRibbonY + titleRibbonH + 2, colBlack, TRUE);
+    DrawBox(titleRibbonX, titleRibbonY, titleRibbonX + titleRibbonW, titleRibbonY + titleRibbonH, rankMainCol, TRUE);
+
+    int rTitleW = GetDrawStringWidthToHandle(rankTitle, static_cast<int>(strlen(rankTitle)), font18);
+    DrawStringToHandle(rankCX - rTitleW / 2, titleRibbonY + 8, rankTitle, colBlack, font18);
+
+    // ランク基準目安テキスト
+    int critW = GetDrawStringWidthToHandle(critBuf, static_cast<int>(strlen(critBuf)), font13);
+    DrawBox(rankCX - critW / 2 - 10, titleRibbonY + 42, rankCX + critW / 2 + 10, titleRibbonY + 62, colBlack, TRUE);
+    DrawStringToHandle(rankCX - critW / 2, titleRibbonY + 46, critBuf, colYellow, font13);
+
+    // =========================================================================
+    // 3. サブコンテンツ（中央右側：アメコミのコマ割り・カード風プレート枠 ＆ 報酬アイコン）
+    // =========================================================================
+    int panelX = 560;
+    int panelY = 148;
+    int panelW = 640;
+    int panelH = 428;
+
+    // アメコミのコマ割りプレート（ハードブラックシャドウ＋極太黒枠＋イエロー枠＋ダークインナー）
+    DrawBox(panelX + 10, panelY + 10, panelX + panelW + 10, panelY + panelH + 10, colBlack, TRUE);
+    DrawBox(panelX - 5, panelY - 5, panelX + panelW + 5, panelY + panelH + 5, colBlack, TRUE);
+    DrawBox(panelX - 2, panelY - 2, panelX + panelW + 2, panelY + panelH + 2, colYellow, TRUE);
+    DrawBox(panelX, panelY, panelX + panelW, panelY + panelH, GetColor(22, 26, 40), TRUE);
+
+    // パネル上部コミックヘッダー帯
+    DrawBox(panelX, panelY, panelX + panelW, panelY + 44, colOrange, TRUE);
+    DrawBox(panelX, panelY + 42, panelX + panelW, panelY + 46, colBlack, TRUE);
+    DrawStringToHandle(panelX + 20, panelY + 10, "★ MISSION RESULT & REWARDS ★", colBlack, font24);
+    DrawStringToHandle(panelX + 18, panelY + 8,  "★ MISSION RESULT & REWARDS ★", colWhite, font24);
+
+    // プレイヤー・捕獲情報・各ボーナスポイントの取得
+    auto player = m_objManager.GetPlayer();
+    int achievedLv = player ? player->GetRepCount() : 0;
+    int totalMice  = Config::NORMAL_MOUSE_COUNT + Config::FAST_MOUSE_COUNT;
+    int caughtMice = m_objManager.GetCaughtCount();
+    if (!m_isTimeUp && caughtMice < totalMice) caughtMice = totalMice; // クリア時は全捕獲
+    int caughtPct  = (totalMice > 0) ? (caughtMice * 100 / totalMice) : 100;
+
+    // 各ボーナススコアの算出（残り時間によって大きくスコアが変動）
+    int dPts = achievedLv * 150 + 300;
+    int cPts = caughtMice * 200;
+    int sPts = Config::USE_TIME_LIMIT_MODE
+        ? static_cast<int>(m_remainingTimeSeconds * 30.0f) // 残り時間1秒につき30PTSボーナス（最大3600PTS）
+        : ((rankLetter[0] == 'S') ? 1500 : (rankLetter[0] == 'A' ? 1000 : (rankLetter[0] == 'B' ? 600 : 300)));
+    int totalScore = dPts + cPts + sPts;
+
+    // パネルヘッダー右側に TOTAL SCORE をインパクト表示
+    char scoreHeaderBuf[64];
+    snprintf(scoreHeaderBuf, sizeof(scoreHeaderBuf), "TOTAL SCORE: %d PTS", totalScore);
+    int shW = GetDrawStringWidthToHandle(scoreHeaderBuf, static_cast<int>(strlen(scoreHeaderBuf)), font18);
+    int shX = panelX + panelW - shW - 22;
+    DrawBox(shX - 10, panelY + 6, panelX + panelW - 10, panelY + 36, colBlack, TRUE);
+    DrawStringToHandle(shX, panelY + 12, scoreHeaderBuf, colYellow, font18);
+
+    // 表示対象タイム（制限時間モード時は残り時間、従来モード時は経過クリアタイム）を MM:SS.ms に変換
+    float displaySeconds = Config::USE_TIME_LIMIT_MODE ? m_remainingTimeSeconds : m_clearTimeSeconds;
+    int totalCentisec = static_cast<int>(displaySeconds * 100.0f + 0.5f);
+    int minutes  = totalCentisec / 6000;
+    int seconds  = (totalCentisec / 100) % 60;
+    int centisec = totalCentisec % 100;
+
+    int rowX = panelX + 24;
+    int rowW = panelW - 48;
+
+    // --- 項目1: TIME LEFT (残り時間) または CLEAR TIME: 01:24.45 ---
+    int row1Y = panelY + 60;
+    int row1H = 74;
+    DrawBox(rowX + 4, row1Y + 4, rowX + rowW + 4, row1Y + row1H + 4, colBlack, TRUE);
+    DrawBox(rowX - 2, row1Y - 2, rowX + rowW + 2, row1Y + row1H + 2, colBlack, TRUE);
+    DrawBox(rowX, row1Y, rowX + rowW, row1Y + row1H, GetColor(12, 14, 24), TRUE);
+    DrawBox(rowX, row1Y, rowX + 10, row1Y + row1H, colYellow, TRUE); // 左アクセントバー
+
+    if (Config::USE_TIME_LIMIT_MODE)
+    {
+        DrawStringToHandle(rowX + 24, row1Y + 14, "TIME LEFT", colYellow, font18);
+        char subTimeBuf[64];
+        snprintf(subTimeBuf, sizeof(subTimeBuf), "残り時間 (クリアタイム: %.2f秒 / 制限120秒)", m_clearTimeSeconds);
+        DrawStringToHandle(rowX + 24, row1Y + 40, subTimeBuf, GetColor(180, 195, 220), font13);
+    }
+    else
+    {
+        DrawStringToHandle(rowX + 24, row1Y + 14, "CLEAR TIME", colYellow, font18);
+        DrawStringToHandle(rowX + 24, row1Y + 38, "クリアタイム", GetColor(180, 195, 220), font13);
+    }
+
+    char timeStr[32];
+    snprintf(timeStr, sizeof(timeStr), "%02d:%02d.%02d", minutes, seconds, centisec);
+    int timeW = GetDrawStringWidthToHandle(timeStr, static_cast<int>(strlen(timeStr)), font48);
+    int timeX = rowX + rowW - timeW - 24;
+    int timeY = row1Y + 13;
+    DrawStringToHandle(timeX + 3, timeY + 3, timeStr, colBlack, font48);
+    DrawStringToHandle(timeX, timeY, timeStr, colWhite, font48);
+
+    // --- 項目2: LEVEL ACHIEVED: Lv. 9 ---
+    int row2Y = row1Y + row1H + 12;
+    int row2H = 62;
+    DrawBox(rowX + 4, row2Y + 4, rowX + rowW + 4, row2Y + row2H + 4, colBlack, TRUE);
+    DrawBox(rowX - 2, row2Y - 2, rowX + rowW + 2, row2Y + row2H + 2, colBlack, TRUE);
+    DrawBox(rowX, row2Y, rowX + rowW, row2Y + row2H, GetColor(12, 14, 24), TRUE);
+    DrawBox(rowX, row2Y, rowX + 10, row2Y + row2H, colOrange, TRUE);
+
+    DrawStringToHandle(rowX + 24, row2Y + 10, "LEVEL ACHIEVED", colOrange, font18);
+    DrawStringToHandle(rowX + 24, row2Y + 34, "到達マッスルレベル", GetColor(180, 195, 220), font13);
+
+    char lvStr[32];
+    snprintf(lvStr, sizeof(lvStr), "Lv. %d", achievedLv);
+    int lvW = GetDrawStringWidthToHandle(lvStr, static_cast<int>(strlen(lvStr)), font36);
+    int lvX = rowX + rowW - lvW - 24;
+    int lvY = row2Y + 13;
+    DrawStringToHandle(lvX + 3, lvY + 3, lvStr, colBlack, font36);
+    DrawStringToHandle(lvX, lvY, lvStr, colGold, font36);
+
+    // --- 項目3: CATS CAUGHT: 5 / 5 (100%) ---
+    int row3Y = row2Y + row2H + 12;
+    int row3H = 62;
+    DrawBox(rowX + 4, row3Y + 4, rowX + rowW + 4, row3Y + row3H + 4, colBlack, TRUE);
+    DrawBox(rowX - 2, row3Y - 2, rowX + rowW + 2, row3Y + row3H + 2, colBlack, TRUE);
+    DrawBox(rowX, row3Y, rowX + rowW, row3Y + row3H, GetColor(12, 14, 24), TRUE);
+    DrawBox(rowX, row3Y, rowX + 10, row3Y + row3H, colNeonRed, TRUE);
+
+    DrawStringToHandle(rowX + 24, row3Y + 10, "CATS CAUGHT", GetColor(255, 110, 140), font18);
+    DrawStringToHandle(rowX + 24, row3Y + 34, "捕獲コンプリート率", GetColor(180, 195, 220), font13);
+
+    char caughtStr[48];
+    snprintf(caughtStr, sizeof(caughtStr), "%d / %d (%d%%)", caughtMice, totalMice, caughtPct);
+    int caughtW = GetDrawStringWidthToHandle(caughtStr, static_cast<int>(strlen(caughtStr)), font36);
+    int caughtX = rowX + rowW - caughtW - 24;
+    int caughtY = row3Y + 13;
+    DrawStringToHandle(caughtX + 3, caughtY + 3, caughtStr, colBlack, font36);
+    DrawStringToHandle(caughtX, caughtY, caughtStr, colWhite, font36);
+
+    // --- 項目4: 獲得報酬・ボーナスポイントアイコン領域（ダンベル、猫缶、スター） ---
+    int rewY = row3Y + row3H + 14;
+    int rewH = 120;
+    DrawBox(rowX + 4, rewY + 4, rowX + rowW + 4, rewY + rewH + 4, colBlack, TRUE);
+    DrawBox(rowX - 2, rewY - 2, rowX + rowW + 2, rewY + rewH + 2, colBlack, TRUE);
+    DrawBox(rowX, rewY, rowX + rowW, rewY + rewH, GetColor(28, 32, 50), TRUE);
+    DrawBox(rowX, rewY, rowX + rowW, rewY + 26, colBlack, TRUE);
+    DrawStringToHandle(rowX + 14, rewY + 5, "★ BONUS REWARDS (獲得報酬ボーナス)", colYellow, font16);
+
+    int iconCardW = 178;
+    int iconCardH = 78;
+    int iconGap   = 18;
+    int iconStartX = rowX + 12;
+    int iconCardY  = rewY + 34;
+
+    // [アイコン1: ダンベル (POWER BONUS)]
+    {
+        int icX = iconStartX;
+        DrawBox(icX + 3, iconCardY + 3, icX + iconCardW + 3, iconCardY + iconCardH + 3, colBlack, TRUE);
+        DrawBox(icX - 2, iconCardY - 2, icX + iconCardW + 2, iconCardY + iconCardH + 2, colBlack, TRUE);
+        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, GetColor(18, 22, 34), TRUE);
+        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, colOrange, FALSE);
+
+        // ダンベルのグラフィカル描画（ベベル付きプレート＆シャフト）
+        int dbCX = icX + 38;
+        int dbCY = iconCardY + 38;
+        DrawBox(dbCX - 22, dbCY - 4, dbCX + 22, dbCY + 4, colBlack, TRUE);
+        DrawBox(dbCX - 20, dbCY - 2, dbCX + 20, dbCY + 2, GetColor(200, 210, 225), TRUE);
+        // 左右ウェイトプレート
+        DrawBox(dbCX - 24, dbCY - 18, dbCX - 12, dbCY + 18, colBlack, TRUE);
+        DrawBox(dbCX - 22, dbCY - 16, dbCX - 14, dbCY + 16, colOrange, TRUE);
+        DrawBox(dbCX - 29, dbCY - 12, dbCX - 23, dbCY + 12, colYellow, TRUE);
+
+        DrawBox(dbCX + 12, dbCY - 18, dbCX + 24, dbCY + 18, colBlack, TRUE);
+        DrawBox(dbCX + 14, dbCY - 16, dbCX + 22, dbCY + 16, colOrange, TRUE);
+        DrawBox(dbCX + 23, dbCY - 12, dbCX + 29, dbCY + 12, colYellow, TRUE);
+
+        DrawStringToHandle(icX + 76, iconCardY + 12, "DUMBBELL", colYellow, font16);
+        char ptBuf[32];
+        snprintf(ptBuf, sizeof(ptBuf), "+%d PTS", dPts);
+        DrawBox(icX + 74, iconCardY + 38, icX + iconCardW - 8, iconCardY + 64, colNeonRed, TRUE);
+        DrawStringToHandle(icX + 80, iconCardY + 43, ptBuf, colWhite, font16);
+    }
+
+    // [アイコン2: 猫缶 (CAT CAN BONUS)]
+    {
+        int icX = iconStartX + iconCardW + iconGap;
+        DrawBox(icX + 3, iconCardY + 3, icX + iconCardW + 3, iconCardY + iconCardH + 3, colBlack, TRUE);
+        DrawBox(icX - 2, iconCardY - 2, icX + iconCardW + 2, iconCardY + iconCardH + 2, colBlack, TRUE);
+        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, GetColor(18, 22, 34), TRUE);
+        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, colYellow, FALSE);
+
+        // 猫缶のグラフィカル描画（ゴールド＆レッドラベル缶）
+        int canCX = icX + 38;
+        int canCY = iconCardY + 40;
+        DrawBox(canCX - 22, canCY - 18, canCX + 22, canCY + 18, colBlack, TRUE);
+        DrawBox(canCX - 20, canCY - 16, canCX + 20, canCY + 16, colNeonRed, TRUE);
+        DrawBox(canCX - 20, canCY - 6,  canCX + 20, canCY + 8,  colYellow, TRUE); // 中央イエロー帯
+        DrawOval(canCX, canCY - 16, 20, 6, colBlack, FALSE);
+        DrawOval(canCX, canCY - 16, 19, 5, colGold, TRUE); // 缶の上蓋
+        DrawOval(canCX, canCY - 16, 12, 3, GetColor(255, 245, 190), FALSE);
+
+        DrawStringToHandle(icX + 76, iconCardY + 12, "CAT CAN", colYellow, font16);
+        char ptBuf[32];
+        snprintf(ptBuf, sizeof(ptBuf), "+%d PTS", cPts);
+        DrawBox(icX + 74, iconCardY + 38, icX + iconCardW - 8, iconCardY + 64, colOrange, TRUE);
+        DrawStringToHandle(icX + 80, iconCardY + 43, ptBuf, colBlack, font16);
+    }
+
+    // [アイコン3: スター (TIME BONUS / CLEAR STAR)]
+    {
+        int icX = iconStartX + (iconCardW + iconGap) * 2;
+        DrawBox(icX + 3, iconCardY + 3, icX + iconCardW + 3, iconCardY + iconCardH + 3, colBlack, TRUE);
+        DrawBox(icX - 2, iconCardY - 2, icX + iconCardW + 2, iconCardY + iconCardH + 2, colBlack, TRUE);
+        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, GetColor(18, 22, 34), TRUE);
+        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, colGold, FALSE);
+
+        // スターのグラフィカル描画
+        int stCX = icX + 38;
+        int stCY = iconCardY + 38;
+        DrawCircle(stCX, stCY, 22, colBlack, TRUE);
+        DrawCircle(stCX, stCY, 19, colNeonRed, TRUE);
+        DrawStringToHandle(stCX - 17, stCY - 18, "★", colBlack, font36);
+        DrawStringToHandle(stCX - 18, stCY - 19, "★", colGold, font36);
+
+        DrawStringToHandle(icX + 76, iconCardY + 12, Config::USE_TIME_LIMIT_MODE ? "TIME BONUS" : "CLEAR STAR", colGold, font16);
+        char ptBuf[32];
+        snprintf(ptBuf, sizeof(ptBuf), "+%d PTS", sPts);
+        DrawBox(icX + 74, iconCardY + 38, icX + iconCardW - 8, iconCardY + 64, colGold, TRUE);
+        DrawStringToHandle(icX + 80, iconCardY + 43, ptBuf, colBlack, font16);
+    }
+
+    // =========================================================================
+    // 4. アクションボタン（下部：アーケード風の立体3Dベベルボタン横並び）
+    // =========================================================================
+    int btnW = 340;
+    int btnH = 66;
+    int btnGap = 50;
+    int totalBtnsW = btnW * 2 + btnGap;
+    int btn1X = (Config::SCREEN_WIDTH - totalBtnsW) / 2;
+    int btn2X = btn1X + btnW + btnGap;
+    int btnY  = 618;
+
+    float btnPulse = (std::sin(animSec * 8.0f) + 1.0f) * 0.5f;
+
+    // アーケードボタン描画ラムダ（立体ベベル＋ネオンレッドのキーバッジ付き）
+    auto DrawArcadeButton = [&](int bx, int by, bool isSelected, const char* label, const char* keyBadge, unsigned int activeMainCol)
+    {
+        int scaleOffset = isSelected ? -3 : 0;
+        int x1 = bx + scaleOffset;
+        int y1 = by + scaleOffset;
+        int x2 = bx + btnW - scaleOffset;
+        int y2 = by + btnH - scaleOffset;
+
+        // ハードドロップシャドウ
+        DrawBox(x1 + 7, y1 + 7, x2 + 7, y2 + 7, colBlack, TRUE);
+        // 極太ブラック枠
+        DrawBox(x1 - 4, y1 - 4, x2 + 4, y2 + 4, colBlack, TRUE);
+
+        unsigned int fillCol = isSelected
+            ? activeMainCol
+            : GetColor(45, 52, 75);
+        unsigned int topBevelCol = isSelected
+            ? GetColor(255, 250, 190)
+            : GetColor(85, 98, 135);
+        unsigned int botBevelCol = isSelected
+            ? GetColor(180, 75, 0)
+            : GetColor(24, 28, 44);
+
+        // 本体塗り＋上下3Dベベルエッジ
+        DrawBox(x1, y1, x2, y2, fillCol, TRUE);
+        DrawBox(x1 + 3, y1 + 3, x2 - 3, y1 + 12, topBevelCol, TRUE); // 上部ハイライトベベル
+        DrawBox(x1 + 3, y2 - 9, x2 - 3, y2 - 2, botBevelCol, TRUE);  // 下部シャドウベベル
+
+        if (isSelected)
+        {
+            // 選択中は外周にゴールドのフラッシュ枠
+            unsigned int flashCol = (btnPulse > 0.5f) ? colGold : colWhite;
+            DrawBox(x1 - 1, y1 - 1, x2 + 1, y2 + 1, flashCol, FALSE);
+            DrawBox(x1, y1, x2, y2, flashCol, FALSE);
+        }
+
+        // 左側：入力対応キーアイコンバッジ（ネオンレッド塗り＋ホワイト枠）
+        int keyW = 76;
+        int keyH = 40;
+        int keyX = x1 + 16;
+        int keyY = (y1 + y2 - keyH) / 2;
+
+        DrawBox(keyX + 3, keyY + 3, keyX + keyW + 3, keyY + keyH + 3, colBlack, TRUE);
+        DrawBox(keyX - 2, keyY - 2, keyX + keyW + 2, keyY + keyH + 2, colWhite, TRUE);
+        DrawBox(keyX, keyY, keyX + keyW, keyY + keyH, colNeonRed, TRUE);
+
+        int kbTextW = GetDrawStringWidthToHandle(keyBadge, static_cast<int>(strlen(keyBadge)), font18);
+        DrawStringToHandle(keyX + (keyW - kbTextW) / 2, keyY + 11, keyBadge, colWhite, font18);
+
+        // 右側：ボタンメインラベル（太字アウトライン付き）
+        int labelAreaX = keyX + keyW + 12;
+        int labelAreaW = (x2 - 12) - labelAreaX;
+        int lbTextW = GetDrawStringWidthToHandle(label, static_cast<int>(strlen(label)), font24);
+        int lbX = labelAreaX + (labelAreaW - lbTextW) / 2;
+        int lbY = (y1 + y2 - 24) / 2;
+
+        for (int dy = -2; dy <= 2; ++dy)
+        {
+            for (int dx = -2; dx <= 2; ++dx)
+            {
+                if (dx != 0 || dy != 0)
+                {
+                    DrawStringToHandle(lbX + dx, lbY + dy, label, colBlack, font24);
+                }
+            }
+        }
+        DrawStringToHandle(lbX + 2, lbY + 2, label, colBlack, font24);
+        DrawStringToHandle(lbX, lbY, label, isSelected ? colWhite : GetColor(215, 225, 245), font24);
+    };
+
+    // ボタン1: RETRY [R / SPACE]
+    DrawArcadeButton(btn1X, btnY, (m_clearSelectedBtn == 0), "RETRY !!", "[R]", colOrange);
+
+    // ボタン2: MAIN MENU [M / T]
+    DrawArcadeButton(btn2X, btnY, (m_clearSelectedBtn == 1), "MAIN MENU", "[M]", colYellow);
 }
 
 // ============================================================================

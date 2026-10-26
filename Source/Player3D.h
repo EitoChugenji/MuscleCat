@@ -220,6 +220,16 @@ public:
         m_animTime += 1.0f / 60.0f;
         m_isTitleSquat = isSquatting;
         m_isSkillChecking = false;
+        m_isPouncing = false;
+        m_isTackling = false;
+        m_stunTimer = 0;
+        m_sorenessTimer = 0;
+        if (m_state == MuscleState::Soreness)
+        {
+            m_state = (m_repCount > 0) ? MuscleState::Muscular : MuscleState::Normal;
+        }
+        m_pos.y = m_groundY;
+        m_trails.clear();
         UpdateAnimation(false);
     }
     
