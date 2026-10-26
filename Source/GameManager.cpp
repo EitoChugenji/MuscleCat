@@ -12,6 +12,110 @@
 #include "DxLib.h"
 #include <cstdlib>
 
+// ============================================================================
+// ふわっとしたUI共通描画ヘルパー（角丸・多層ソフトシャドウ・マシュマロフロスト・浮遊感）
+// ============================================================================
+namespace SoftUI
+{
+    // ふわっとしたソフト角丸カード描画
+    inline void DrawSoftCard(int x, int y, int w, int h, int radius,
+                             unsigned int bgColor, int bgAlpha = 220,
+                             unsigned int borderColor = 0, int borderThickness = 1,
+                             bool hasGlow = false, unsigned int glowColor = 0)
+    {
+        // 1. 3層の拡散ソフトドロップシャドウ（ふんわりした落ち影）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 24);
+        DrawRoundRect(x - 3, y + 5, x + w + 3, y + h + 8, radius + 4, radius + 4, GetColor(0, 0, 0), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 50);
+        DrawRoundRect(x - 1, y + 3, x + w + 1, y + h + 6, radius + 2, radius + 2, GetColor(0, 0, 0), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 80);
+        DrawRoundRect(x, y + 2, x + w, y + h + 3, radius, radius, GetColor(0, 0, 0), TRUE);
+
+        // 2. ほんのり外側ソフトグロー（フォーカス・選択時）
+        if (hasGlow)
+        {
+            SetDrawBlendMode(DX_BLENDMODE_ADD, 55);
+            DrawRoundRect(x - 4, y - 4, x + w + 4, y + h + 4, radius + 4, radius + 4, glowColor, TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_ADD, 90);
+            DrawRoundRect(x - 2, y - 2, x + w + 2, y + h + 2, radius + 2, radius + 2, glowColor, TRUE);
+        }
+
+        // 3. メインボディ（角丸＋半透明ブレンド）
+        if (bgAlpha < 255)
+        {
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, bgAlpha);
+        }
+        else
+        {
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        }
+        DrawRoundRect(x, y, x + w, y + h, radius, radius, bgColor, TRUE);
+
+        // 4. 上部ソフトハイライト（マシュマロ・ガラス風のやわらかい光沢）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 38);
+        int hiH = h / 3;
+        if (hiH > 2)
+        {
+            int hiR = (radius > 4) ? (radius - 2) : 2;
+            DrawRoundRect(x + 2, y + 2, x + w - 2, y + hiH, hiR, hiR, GetColor(255, 255, 255), TRUE);
+        }
+
+        // 5. 境界アウトライン
+        if (borderColor != 0)
+        {
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 160);
+            DrawRoundRect(x, y, x + w, y + h, radius, radius, borderColor, FALSE);
+            if (borderThickness > 1)
+            {
+                DrawRoundRect(x - 1, y - 1, x + w + 1, y + h + 1, radius + 1, radius + 1, borderColor, FALSE);
+            }
+        }
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    }
+
+    // ふわふわの雲・マシュマロ吹き出し描画
+    inline void DrawFluffySpeechBubble(int x, int y, int w, int h, int radius,
+                                       unsigned int bgColor, unsigned int textColor,
+                                       bool isRight, const char* text, int fontHandle)
+    {
+        // 1. 拡散ソフトシャドウ
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 25);
+        DrawRoundRect(x - 2, y + 4, x + w + 2, y + h + 7, radius + 3, radius + 3, GetColor(0, 0, 0), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 55);
+        DrawRoundRect(x, y + 2, x + w, y + h + 4, radius, radius, GetColor(0, 0, 0), TRUE);
+
+        // 2. 吹き出し本体（角丸マシュマロ）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 245);
+        DrawRoundRect(x, y, x + w, y + h, radius, radius, bgColor, TRUE);
+
+        // 3. ふんわり上部ハイライト
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 50);
+        DrawRoundRect(x + 3, y + 2, x + w - 3, y + (h / 2), (radius - 2 > 1) ? (radius - 2) : 1, (radius - 2 > 1) ? (radius - 2) : 1, GetColor(255, 255, 255), TRUE);
+
+        // 4. まるっこい接続バブル（しっぽの代わりにふわっと浮かぶ小さな丸）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 240);
+        if (isRight)
+        {
+            DrawCircle(x + 16, y + h + 4, 5, bgColor, TRUE);
+            DrawCircle(x + 7,  y + h + 10, 3, bgColor, TRUE);
+        }
+        else
+        {
+            DrawCircle(x + w - 16, y + h + 4, 5, bgColor, TRUE);
+            DrawCircle(x + w - 7,  y + h + 10, 3, bgColor, TRUE);
+        }
+
+        // 5. 優しい白光リム
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 110);
+        DrawRoundRect(x, y, x + w, y + h, radius, radius, GetColor(255, 255, 255), FALSE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        // 6. テキスト描画（柔らかい影＋本体）
+        DrawStringToHandle(x + 15, y + 11, text, GetColor(20, 25, 35), fontHandle);
+        DrawStringToHandle(x + 14, y + 10, text, textColor, fontHandle);
+    }
+}
+
 void GameManager::Init()
 {
     m_state = GameState::Title;
@@ -410,9 +514,15 @@ void GameManager::Update()
         auto player = m_objManager.GetPlayer();
         float catY = (player) ? player->GetPos().y : 0.0f;
         float camDist = 240.0f;
-        float camHeight = catY + 38.0f + std::sin(m_titleAnimTimer * 0.02f) * 6.0f;
+
+        // 猫のアニメーション：スクワット運動と腕立て伏せ（プッシュアップ）を交互にトレーニング！
+        int cycle = m_titleAnimTimer % 540;
+        bool isPushUp = (cycle >= 270 && cycle < 470);
+        float targetY = isPushUp ? (catY + 14.0f) : (catY + 20.0f);
+        float camHeight = (isPushUp ? (catY + 34.0f) : (catY + 38.0f)) + std::sin(m_titleAnimTimer * 0.02f) * 5.0f;
+
         VECTOR catPos = (player) ? player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
-        VECTOR center = VGet(catPos.x, catY + 20.0f, catPos.z);
+        VECTOR center = VGet(catPos.x, targetY, catPos.z);
         VECTOR camPos = VGet(
             catPos.x + std::sin(m_titleCameraAngle) * camDist,
             camHeight,
@@ -420,12 +530,23 @@ void GameManager::Update()
         );
         SetCameraPositionAndTarget_UpVecY(camPos, center);
 
-        // 猫のアニメーション：定期的にスクワット運動（タイトル画面ではエフェクトは出さない）
         if (player)
         {
-            // 2.5秒ごとにスクワットと待機を切り替え
-            bool isSquatting = ((m_titleAnimTimer / 140) % 2 == 0);
-            player->UpdateTitleAnimation(isSquatting);
+            // 筋トレルーティン：
+            // 0〜200F (約3.3秒): スクワット (バーベル保持)
+            // 200〜270F (約1.2秒): 待機・息抜きポーズ
+            // 270〜470F (約3.3秒): 腕立て伏せ (プッシュアップ)
+            // 470〜540F (約1.2秒): 待機・息抜きポーズ
+            Player3D::TitleWorkoutType workout = Player3D::TitleWorkoutType::Idle;
+            if (cycle < 200)
+            {
+                workout = Player3D::TitleWorkoutType::Squat;
+            }
+            else if (isPushUp)
+            {
+                workout = Player3D::TitleWorkoutType::PushUp;
+            }
+            player->UpdateTitleAnimation(workout);
         }
 
         // キー入力
@@ -927,6 +1048,12 @@ void GameManager::Draw()
 
     m_objManager.Draw3D();
 
+    // タイトル画面専用の超ド派手3D演出（ワークアウトステージリング・金粉パーティクル・スポットライト・マッスルオーラ）
+    if (m_state == GameState::Title)
+    {
+        DrawTitle3DScene();
+    }
+
     // F1デバッグモード時の3Dオーバーレイ描画（10m×10m×10m目測キューブ・1.8m身長バー・スポーン位置・当たり判定リング）
     if (m_state == GameState::Playing && m_cheatEnabled)
     {
@@ -986,43 +1113,40 @@ void GameManager::Draw()
         float currentSec = (m_isPaused ? (m_pauseStartTime - m_startCount) : (GetNowCount() - m_startCount)) / 1000.0f;
 
         // =========================================================================
-        // 1. 左上：プレイヤーステータス ＆ 特大レベルバッジ（一目で現在Lv・現在スピードがわかる）
+        // 1. 左上：プレイヤーステータス ＆ 特大レベルバッジ（ふわっと浮遊する角丸カード）
         // =========================================================================
+        float hudFloatY = std::sin(GetNowCount() * 0.0022f) * 3.0f;
         int pX = 14;
-        int pY = 14;
-        int pW = 365;
+        int pY = 14 + static_cast<int>(hudFloatY);
+        int pW = 380;
         int pH = 84;
 
-        // 白いステージ床でもクッキリ浮き立つ黒半透明プレート＆オレンジ太縁
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 215);
-        DrawBox(pX - 4, pY - 4, pX + pW + 4, pY + pH + 4, GetColor(0, 0, 0), TRUE);
-        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-        DrawBox(pX - 2, pY - 2, pX + pW + 2, pY + pH + 2, GetColor(255, 110, 30), FALSE);
-        DrawBox(pX, pY, pX + pW, pY + pH, GetColor(20, 24, 38), TRUE);
+        // 白いステージ床でも優しく浮き立つふわっとした角丸プレート＆ソフトシャドウ
+        SoftUI::DrawSoftCard(pX, pY, pW, pH, 18, GetColor(20, 25, 40), 220, GetColor(255, 140, 50), 2);
 
         auto player = m_objManager.GetPlayer();
         int reps = player ? player->GetRepCount() : 0;
         MuscleState ms = player ? player->GetMuscleState() : MuscleState::Normal;
         bool isGod = (reps >= Player3D::MAX_EFFECTIVE_REP);
 
-        // --- 左側：レベルバッジ（Lv.数字を特大表示） ---
+        // --- 左側：レベルバッジ（角丸カプセル・Lv.数字を特大表示） ---
         int badgeX = pX + 8;
         int badgeY = pY + 8;
         int badgeW = 96;
         int badgeH = 68;
 
-        unsigned int badgeBg = isGod ? GetColor(60, 20, 25) : GetColor(32, 40, 62);
-        DrawBox(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, badgeBg, TRUE);
-        DrawBox(badgeX, badgeY, badgeX + badgeW, badgeY + badgeH, isGod ? GetColor(255, 60, 40) : GetColor(255, 130, 30), FALSE);
+        unsigned int badgeBg = isGod ? GetColor(70, 22, 28) : GetColor(34, 44, 68);
+        unsigned int badgeBorder = isGod ? GetColor(255, 70, 50) : GetColor(255, 150, 40);
+        SoftUI::DrawSoftCard(badgeX, badgeY, badgeW, badgeH, 12, badgeBg, 240, badgeBorder, 1);
 
-        DrawStringToHandle(badgeX + 14, badgeY + 4, "LEVEL", GetColor(180, 195, 225), font13);
+        DrawStringToHandle(badgeX + 18, badgeY + 4, "LEVEL", GetColor(190, 205, 235), font13);
 
         char lvBuf[16];
         snprintf(lvBuf, sizeof(lvBuf), "Lv.%d", reps);
-        unsigned int lvColor = isGod ? GetColor(255, 60, 40) : (reps >= 4 ? GetColor(255, 130, 30) : white);
-        DrawStringToHandle(badgeX + 10, badgeY + 18, lvBuf, lvColor, font24);
+        unsigned int lvColor = isGod ? GetColor(255, 70, 50) : (reps >= 4 ? GetColor(255, 150, 40) : white);
+        DrawStringToHandle(badgeX + 12, badgeY + 18, lvBuf, lvColor, font24);
 
-        // 筋肉減衰ゲージバー（残り15秒の維持時間をバー表示）
+        // 筋肉減衰ゲージバー（残り15秒の維持時間を角丸バー表示）
         if (player && reps > 0 && ms != MuscleState::Soreness)
         {
             float decaySec = player->GetPumpDecayRemainingSeconds();
@@ -1031,13 +1155,18 @@ void GameManager::Draw()
             if (gaugeRatio < 0.0f) gaugeRatio = 0.0f;
 
             int gBarW = badgeW - 14;
-            int gBarH = 5;
+            int gBarH = 6;
             int gBarX = badgeX + 7;
             int gBarY = badgeY + badgeH - 12;
 
-            DrawBox(gBarX, gBarY, gBarX + gBarW, gBarY + gBarH, GetColor(10, 10, 15), TRUE);
-            unsigned int gColor = (decaySec <= 4.0f && (GetNowCount() / 200) % 2 == 0) ? GetColor(255, 50, 50) : GetColor(255, 130, 30);
-            DrawBox(gBarX, gBarY, gBarX + static_cast<int>(gBarW * gaugeRatio), gBarY + gBarH, gColor, TRUE);
+            DrawRoundRect(gBarX, gBarY, gBarX + gBarW, gBarY + gBarH, 3, 3, GetColor(10, 10, 15), TRUE);
+            unsigned int gColor = (decaySec <= 4.0f && (GetNowCount() / 200) % 2 == 0) ? GetColor(255, 50, 50) : GetColor(255, 140, 40);
+            int fillW = static_cast<int>(gBarW * gaugeRatio);
+            if (fillW > 0)
+            {
+                int rVal = (fillW > 4) ? 3 : 1;
+                DrawRoundRect(gBarX, gBarY, gBarX + fillW, gBarY + gBarH, rVal, rVal, gColor, TRUE);
+            }
         }
         else if (ms == MuscleState::Soreness)
         {
@@ -1051,7 +1180,10 @@ void GameManager::Draw()
         DrawStringToHandle(infoX, pY + 8, "ネズミ:", GetColor(200, 215, 240), font16);
         char miceBuf[32];
         snprintf(miceBuf, sizeof(miceBuf), "%d 匹", remainMice);
-        DrawStringToHandle(infoX + 60, pY + 6, miceBuf, GetColor(255, 80, 80), font18);
+        // ふわっとした角丸ネズミ数タグバッジ
+        SoftUI::DrawSoftCard(infoX + 58, pY + 4, 64, 24, 10, GetColor(230, 60, 75), 240, GetColor(255, 180, 190), 1);
+        int mTxtW = GetDrawStringWidthToHandle(miceBuf, static_cast<int>(strlen(miceBuf)), font16);
+        DrawStringToHandle(infoX + 58 + (64 - mTxtW) / 2, pY + 7, miceBuf, white, font16);
 
         char timeBuf[64];
         if (Config::USE_TIME_LIMIT_MODE)
@@ -1081,19 +1213,16 @@ void GameManager::Draw()
         }
 
         // =========================================================================
-        // 2. 画面右下：スマート操作ガイドカード（マウス攻撃・視点移動対応）
+        // 2. 画面右下：スマート操作ガイドカード（ふわっと浮遊する角丸カード）
         // =========================================================================
-        int gW = 590;
+        float guideFloatY = std::sin(GetNowCount() * 0.0020f + 1.2f) * 2.5f;
+        int gW = 640;
         int gH = 72;
         int gX = Config::SCREEN_WIDTH - gW - 20;
-        int gY = Config::SCREEN_HEIGHT - gH - 20;
+        int gY = Config::SCREEN_HEIGHT - gH - 20 + static_cast<int>(guideFloatY);
 
-        // 半透明プレート（ゲーム画面・床を邪魔しないコンパクトサイズ）
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 215);
-        DrawBox(gX - 3, gY - 3, gX + gW + 3, gY + gH + 3, GetColor(0, 0, 0), TRUE);
-        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-        DrawBox(gX - 1, gY - 1, gX + gW + 1, gY + gH + 1, GetColor(80, 100, 140), FALSE);
-        DrawBox(gX, gY, gX + gW, gY + gH, GetColor(18, 22, 34), TRUE);
+        // ふわっとした角丸プレート＆ソフトシャドウ
+        SoftUI::DrawSoftCard(gX, gY, gW, gH, 16, GetColor(18, 24, 38), 220, GetColor(100, 130, 180), 1);
 
         // 上段：アクションスキル（左クリック: 飛びつき、右クリック: スタン攻撃、SPACE: 筋トレ）
         if (reps >= 4)
@@ -1143,35 +1272,33 @@ void GameManager::Draw()
         }
         else
         {
-            // F1 OFF時は右上に案内バッジを表示
-            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 185);
-            DrawBox(Config::SCREEN_WIDTH - 270, 34, Config::SCREEN_WIDTH - 10, 56, GetColor(15, 20, 35), TRUE);
-            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-            DrawBox(Config::SCREEN_WIDTH - 270, 34, Config::SCREEN_WIDTH - 10, 56, GetColor(80, 120, 170), FALSE);
-            DrawStringToHandle(Config::SCREEN_WIDTH - 262, 38, "[F1] デバッグ情報・マップ・10m目測表示", GetColor(160, 210, 255), font13);
+            // F1 OFF時は右上に案内バッジを表示（ふわっとした角丸バッジ）
+            int f1W = 265;
+            int f1H = 26;
+            int f1X = Config::SCREEN_WIDTH - f1W - 12;
+            int f1Y = 32;
+            SoftUI::DrawSoftCard(f1X, f1Y, f1W, f1H, 10, GetColor(18, 24, 40), 200, GetColor(90, 130, 190), 1);
+            DrawStringToHandle(f1X + 8, f1Y + 4, "[F1] デバッグ情報・マップ・10m目測表示", GetColor(170, 220, 255), font13);
         }
 
-        // プレイ中の感度変更通知ポップアップ
+        // プレイ中の感度変更通知ポップアップ（ふわっと浮遊する角丸カード）
         if (m_sensitivityNoticeTimer > 0 && !m_isPaused)
         {
             float alphaRatio = (m_sensitivityNoticeTimer < 20) ? (m_sensitivityNoticeTimer / 20.0f) : 1.0f;
             int alpha = static_cast<int>(230 * alphaRatio);
-            SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
 
-            int notW = 300;
-            int notH = 46;
+            int notW = 310;
+            int notH = 48;
             int notX = (Config::SCREEN_WIDTH - notW) / 2;
-            int notY = 24;
+            int notY = 24 + static_cast<int>(std::sin(GetNowCount() * 0.005f) * 3.0f);
 
-            DrawBox(notX + 4, notY + 4, notX + notW + 4, notY + notH + 4, GetColor(0, 0, 0), TRUE);
-            DrawBox(notX, notY, notX + notW, notY + notH, GetColor(18, 22, 36), TRUE);
-            DrawBox(notX, notY, notX + notW, notY + notH, GetColor(100, 220, 255), FALSE);
+            SoftUI::DrawSoftCard(notX, notY, notW, notH, 16, GetColor(20, 26, 42), alpha, GetColor(100, 220, 255), 2, true, GetColor(80, 200, 255));
 
             char notBuf[64];
             snprintf(notBuf, sizeof(notBuf), "🎯 マウス感度: %.1fx", m_camera.GetMouseSensitivity());
             int nW = GetDrawStringWidthToHandle(notBuf, static_cast<int>(strlen(notBuf)), font18);
-            DrawStringToHandle((Config::SCREEN_WIDTH - nW) / 2, notY + 12, notBuf, GetColor(255, 230, 70), font18);
-
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
+            DrawStringToHandle((Config::SCREEN_WIDTH - nW) / 2, notY + 13, notBuf, GetColor(255, 235, 80), font18);
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         }
 
@@ -1541,29 +1668,20 @@ void GameManager::DrawGameClearScreen()
         }
     }
 
-    // スタンププレート（「ドカン！」と押し出された立体ハンコ枠）
+    // スタンププレート（ふわっとした角丸スタンプ）
     int stampW = static_cast<int>(220 * burstScale);
     int stampH = static_cast<int>(210 * burstScale);
     int stampX = rankCX - stampW / 2;
     int stampY = rankCY - stampH / 2;
 
-    // スタンプの立体影＋極太ブラック枠＋ダーク背景
-    DrawBox(stampX + 8, stampY + 8, stampX + stampW + 8, stampY + stampH + 8, colBlack, TRUE);
-    DrawBox(stampX - 5, stampY - 5, stampX + stampW + 5, stampY + stampH + 5, colBlack, TRUE);
-    DrawBox(stampX, stampY, stampX + stampW, stampY + stampH, GetColor(20, 22, 34), TRUE);
-
-    // スタンプ内側の二重枠（ゴールドまたはランクカラー）
-    DrawBox(stampX + 6, stampY + 6, stampX + stampW - 6, stampY + stampH - 6, rankMainCol, FALSE);
-    DrawBox(stampX + 7, stampY + 7, stampX + stampW - 7, stampY + stampH - 7, rankMainCol, FALSE);
-    DrawBox(stampX + 8, stampY + 8, stampX + stampW - 8, stampY + stampH - 8, rankMainCol, FALSE);
+    SoftUI::DrawSoftCard(stampX, stampY, stampW, stampH, 20, GetColor(20, 22, 34), 245, rankMainCol, 2, true, rankMainCol);
+    DrawRoundRect(stampX + 6, stampY + 6, stampX + stampW - 6, stampY + stampH - 6, 14, 14, rankMainCol, FALSE);
 
     // 左上：「BOOM!!」アメコミ擬音バッジ
     int boomX = stampX - 28;
     int boomY = stampY - 22;
-    DrawBox(boomX + 4, boomY + 4, boomX + 114, boomY + 36, colBlack, TRUE);
-    DrawBox(boomX - 2, boomY - 2, boomX + 110, boomY + 32, colBlack, TRUE);
-    DrawBox(boomX, boomY, boomX + 108, boomY + 30, colNeonRed, TRUE);
-    DrawStringToHandle(boomX + 10, boomY + 4, "BOOM!!", colYellow, font24);
+    SoftUI::DrawSoftCard(boomX, boomY, 110, 32, 12, colNeonRed, 255, colYellow, 1, true, colYellow);
+    DrawStringToHandle(boomX + 12, boomY + 5, "BOOM!!", colYellow, font24);
 
     // 特大ランク文字（S / A / B / C）の3D立体描画
     int rLetterW = GetDrawStringWidthToHandle(rankLetter, static_cast<int>(strlen(rankLetter)), font96);
@@ -1630,22 +1748,21 @@ void GameManager::DrawGameClearScreen()
     DrawStringToHandle(rankCX - critW / 2, titleRibbonY + 46, critBuf, colYellow, font13);
 
     // =========================================================================
-    // 3. サブコンテンツ（中央右側：アメコミのコマ割り・カード風プレート枠 ＆ 報酬アイコン）
+    // 3. サブコンテンツ（中央右側：ふわっとした角丸プレート枠 ＆ 報酬アイコン）
     // =========================================================================
     int panelX = 560;
     int panelY = 148;
     int panelW = 640;
     int panelH = 428;
 
-    // アメコミのコマ割りプレート（ハードブラックシャドウ＋極太黒枠＋イエロー枠＋ダークインナー）
-    DrawBox(panelX + 10, panelY + 10, panelX + panelW + 10, panelY + panelH + 10, colBlack, TRUE);
-    DrawBox(panelX - 5, panelY - 5, panelX + panelW + 5, panelY + panelH + 5, colBlack, TRUE);
-    DrawBox(panelX - 2, panelY - 2, panelX + panelW + 2, panelY + panelH + 2, colYellow, TRUE);
-    DrawBox(panelX, panelY, panelX + panelW, panelY + panelH, GetColor(22, 26, 40), TRUE);
+    // ふわっとしたコミック結果プレート（角丸＋ソフトシャドウ）
+    SoftUI::DrawSoftCard(panelX, panelY, panelW, panelH, 20, GetColor(22, 26, 40), 240, colYellow, 2);
 
-    // パネル上部コミックヘッダー帯
-    DrawBox(panelX, panelY, panelX + panelW, panelY + 44, colOrange, TRUE);
-    DrawBox(panelX, panelY + 42, panelX + panelW, panelY + 46, colBlack, TRUE);
+    // パネル上部コミックヘッダー帯（角丸）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 230);
+    DrawRoundRect(panelX + 2, panelY + 2, panelX + panelW - 2, panelY + 44, 18, 18, colOrange, TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    DrawLine(panelX + 16, panelY + 44, panelX + panelW - 16, panelY + 44, colBlack);
     DrawStringToHandle(panelX + 20, panelY + 10, "★ MISSION RESULT & REWARDS ★", colBlack, font24);
     DrawStringToHandle(panelX + 18, panelY + 8,  "★ MISSION RESULT & REWARDS ★", colWhite, font24);
 
@@ -1670,7 +1787,7 @@ void GameManager::DrawGameClearScreen()
     snprintf(scoreHeaderBuf, sizeof(scoreHeaderBuf), "TOTAL SCORE: %d PTS", totalScore);
     int shW = GetDrawStringWidthToHandle(scoreHeaderBuf, static_cast<int>(strlen(scoreHeaderBuf)), font18);
     int shX = panelX + panelW - shW - 22;
-    DrawBox(shX - 10, panelY + 6, panelX + panelW - 10, panelY + 36, colBlack, TRUE);
+    SoftUI::DrawSoftCard(shX - 10, panelY + 6, shW + 20, 30, 10, colBlack, 220, colYellow, 1);
     DrawStringToHandle(shX, panelY + 12, scoreHeaderBuf, colYellow, font18);
 
     // 表示対象タイム（制限時間モード時は残り時間、従来モード時は経過クリアタイム）を MM:SS.ms に変換
@@ -1686,10 +1803,8 @@ void GameManager::DrawGameClearScreen()
     // --- 項目1: TIME LEFT (残り時間) または CLEAR TIME: 01:24.45 ---
     int row1Y = panelY + 60;
     int row1H = 74;
-    DrawBox(rowX + 4, row1Y + 4, rowX + rowW + 4, row1Y + row1H + 4, colBlack, TRUE);
-    DrawBox(rowX - 2, row1Y - 2, rowX + rowW + 2, row1Y + row1H + 2, colBlack, TRUE);
-    DrawBox(rowX, row1Y, rowX + rowW, row1Y + row1H, GetColor(12, 14, 24), TRUE);
-    DrawBox(rowX, row1Y, rowX + 10, row1Y + row1H, colYellow, TRUE); // 左アクセントバー
+    SoftUI::DrawSoftCard(rowX, row1Y, rowW, row1H, 14, GetColor(12, 14, 24), 235, colYellow, 1);
+    DrawRoundRect(rowX + 3, row1Y + 3, rowX + 11, row1Y + row1H - 3, 4, 4, colYellow, TRUE); // 左アクセントバー
 
     if (Config::USE_TIME_LIMIT_MODE)
     {
@@ -1715,10 +1830,8 @@ void GameManager::DrawGameClearScreen()
     // --- 項目2: LEVEL ACHIEVED: Lv. 9 ---
     int row2Y = row1Y + row1H + 12;
     int row2H = 62;
-    DrawBox(rowX + 4, row2Y + 4, rowX + rowW + 4, row2Y + row2H + 4, colBlack, TRUE);
-    DrawBox(rowX - 2, row2Y - 2, rowX + rowW + 2, row2Y + row2H + 2, colBlack, TRUE);
-    DrawBox(rowX, row2Y, rowX + rowW, row2Y + row2H, GetColor(12, 14, 24), TRUE);
-    DrawBox(rowX, row2Y, rowX + 10, row2Y + row2H, colOrange, TRUE);
+    SoftUI::DrawSoftCard(rowX, row2Y, rowW, row2H, 14, GetColor(12, 14, 24), 235, colOrange, 1);
+    DrawRoundRect(rowX + 3, row2Y + 3, rowX + 11, row2Y + row2H - 3, 4, 4, colOrange, TRUE);
 
     DrawStringToHandle(rowX + 24, row2Y + 10, "LEVEL ACHIEVED", colOrange, font18);
     DrawStringToHandle(rowX + 24, row2Y + 34, "到達マッスルレベル", GetColor(180, 195, 220), font13);
@@ -1734,10 +1847,8 @@ void GameManager::DrawGameClearScreen()
     // --- 項目3: CATS CAUGHT: 5 / 5 (100%) ---
     int row3Y = row2Y + row2H + 12;
     int row3H = 62;
-    DrawBox(rowX + 4, row3Y + 4, rowX + rowW + 4, row3Y + row3H + 4, colBlack, TRUE);
-    DrawBox(rowX - 2, row3Y - 2, rowX + rowW + 2, row3Y + row3H + 2, colBlack, TRUE);
-    DrawBox(rowX, row3Y, rowX + rowW, row3Y + row3H, GetColor(12, 14, 24), TRUE);
-    DrawBox(rowX, row3Y, rowX + 10, row3Y + row3H, colNeonRed, TRUE);
+    SoftUI::DrawSoftCard(rowX, row3Y, rowW, row3H, 14, GetColor(12, 14, 24), 235, colNeonRed, 1);
+    DrawRoundRect(rowX + 3, row3Y + 3, rowX + 11, row3Y + row3H - 3, 4, 4, colNeonRed, TRUE);
 
     DrawStringToHandle(rowX + 24, row3Y + 10, "CATS CAUGHT", GetColor(255, 110, 140), font18);
     DrawStringToHandle(rowX + 24, row3Y + 34, "捕獲コンプリート率", GetColor(180, 195, 220), font13);
@@ -1753,11 +1864,8 @@ void GameManager::DrawGameClearScreen()
     // --- 項目4: 獲得報酬・ボーナスポイントアイコン領域（ダンベル、猫缶、スター） ---
     int rewY = row3Y + row3H + 14;
     int rewH = 120;
-    DrawBox(rowX + 4, rewY + 4, rowX + rowW + 4, rewY + rewH + 4, colBlack, TRUE);
-    DrawBox(rowX - 2, rewY - 2, rowX + rowW + 2, rewY + rewH + 2, colBlack, TRUE);
-    DrawBox(rowX, rewY, rowX + rowW, rewY + rewH, GetColor(28, 32, 50), TRUE);
-    DrawBox(rowX, rewY, rowX + rowW, rewY + 26, colBlack, TRUE);
-    DrawStringToHandle(rowX + 14, rewY + 5, "★ BONUS REWARDS (獲得報酬ボーナス)", colYellow, font16);
+    SoftUI::DrawSoftCard(rowX, rewY, rowW, rewH, 14, GetColor(28, 32, 50), 235, colGold, 1);
+    DrawStringToHandle(rowX + 14, rewY + 7, "★ BONUS REWARDS (獲得報酬ボーナス)", colYellow, font16);
 
     int iconCardW = 178;
     int iconCardH = 78;
@@ -1768,10 +1876,7 @@ void GameManager::DrawGameClearScreen()
     // [アイコン1: ダンベル (POWER BONUS)]
     {
         int icX = iconStartX;
-        DrawBox(icX + 3, iconCardY + 3, icX + iconCardW + 3, iconCardY + iconCardH + 3, colBlack, TRUE);
-        DrawBox(icX - 2, iconCardY - 2, icX + iconCardW + 2, iconCardY + iconCardH + 2, colBlack, TRUE);
-        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, GetColor(18, 22, 34), TRUE);
-        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, colOrange, FALSE);
+        SoftUI::DrawSoftCard(icX, iconCardY, iconCardW, iconCardH, 12, GetColor(18, 22, 34), 235, colOrange, 1);
 
         // ダンベルのグラフィカル描画（ベベル付きプレート＆シャフト）
         int dbCX = icX + 38;
@@ -1797,10 +1902,7 @@ void GameManager::DrawGameClearScreen()
     // [アイコン2: 猫缶 (CAT CAN BONUS)]
     {
         int icX = iconStartX + iconCardW + iconGap;
-        DrawBox(icX + 3, iconCardY + 3, icX + iconCardW + 3, iconCardY + iconCardH + 3, colBlack, TRUE);
-        DrawBox(icX - 2, iconCardY - 2, icX + iconCardW + 2, iconCardY + iconCardH + 2, colBlack, TRUE);
-        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, GetColor(18, 22, 34), TRUE);
-        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, colYellow, FALSE);
+        SoftUI::DrawSoftCard(icX, iconCardY, iconCardW, iconCardH, 12, GetColor(18, 22, 34), 235, colYellow, 1);
 
         // 猫缶のグラフィカル描画（ゴールド＆レッドラベル缶）
         int canCX = icX + 38;
@@ -1822,10 +1924,7 @@ void GameManager::DrawGameClearScreen()
     // [アイコン3: スター (TIME BONUS / CLEAR STAR)]
     {
         int icX = iconStartX + (iconCardW + iconGap) * 2;
-        DrawBox(icX + 3, iconCardY + 3, icX + iconCardW + 3, iconCardY + iconCardH + 3, colBlack, TRUE);
-        DrawBox(icX - 2, iconCardY - 2, icX + iconCardW + 2, iconCardY + iconCardH + 2, colBlack, TRUE);
-        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, GetColor(18, 22, 34), TRUE);
-        DrawBox(icX, iconCardY, icX + iconCardW, iconCardY + iconCardH, colGold, FALSE);
+        SoftUI::DrawSoftCard(icX, iconCardY, iconCardW, iconCardH, 12, GetColor(18, 22, 34), 235, colGold, 1);
 
         // スターのグラフィカル描画
         int stCX = icX + 38;
@@ -1843,7 +1942,7 @@ void GameManager::DrawGameClearScreen()
     }
 
     // =========================================================================
-    // 4. アクションボタン（下部：アーケード風の立体3Dベベルボタン横並び）
+    // 4. アクションボタン（下部：ふわっと浮遊する角丸ピルボタン）
     // =========================================================================
     int btnW = 340;
     int btnH = 66;
@@ -1855,62 +1954,41 @@ void GameManager::DrawGameClearScreen()
 
     float btnPulse = (std::sin(animSec * 8.0f) + 1.0f) * 0.5f;
 
-    // アーケードボタン描画ラムダ（立体ベベル＋ネオンレッドのキーバッジ付き）
+    // ふわっとした角丸カプセルボタン描画ラムダ
     auto DrawArcadeButton = [&](int bx, int by, bool isSelected, const char* label, const char* keyBadge, unsigned int activeMainCol)
     {
-        int scaleOffset = isSelected ? -3 : 0;
-        int x1 = bx + scaleOffset;
-        int y1 = by + scaleOffset;
-        int x2 = bx + btnW - scaleOffset;
-        int y2 = by + btnH - scaleOffset;
+        float floatY = isSelected ? (std::sin(animSec * 6.0f) * 3.0f) : 0.0f;
+        int curBy = by + static_cast<int>(floatY);
 
-        // ハードドロップシャドウ
-        DrawBox(x1 + 7, y1 + 7, x2 + 7, y2 + 7, colBlack, TRUE);
-        // 極太ブラック枠
-        DrawBox(x1 - 4, y1 - 4, x2 + 4, y2 + 4, colBlack, TRUE);
+        unsigned int fillCol = isSelected ? activeMainCol : GetColor(45, 52, 75);
+        unsigned int borderCol = isSelected ? colGold : GetColor(70, 80, 110);
 
-        unsigned int fillCol = isSelected
-            ? activeMainCol
-            : GetColor(45, 52, 75);
-        unsigned int topBevelCol = isSelected
-            ? GetColor(255, 250, 190)
-            : GetColor(85, 98, 135);
-        unsigned int botBevelCol = isSelected
-            ? GetColor(180, 75, 0)
-            : GetColor(24, 28, 44);
-
-        // 本体塗り＋上下3Dベベルエッジ
-        DrawBox(x1, y1, x2, y2, fillCol, TRUE);
-        DrawBox(x1 + 3, y1 + 3, x2 - 3, y1 + 12, topBevelCol, TRUE); // 上部ハイライトベベル
-        DrawBox(x1 + 3, y2 - 9, x2 - 3, y2 - 2, botBevelCol, TRUE);  // 下部シャドウベベル
+        SoftUI::DrawSoftCard(bx, curBy, btnW, btnH, 28, fillCol, 255, borderCol, 2, isSelected, borderCol);
 
         if (isSelected)
         {
-            // 選択中は外周にゴールドのフラッシュ枠
-            unsigned int flashCol = (btnPulse > 0.5f) ? colGold : colWhite;
-            DrawBox(x1 - 1, y1 - 1, x2 + 1, y2 + 1, flashCol, FALSE);
-            DrawBox(x1, y1, x2, y2, flashCol, FALSE);
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
+            DrawRoundRect(bx + 6, curBy + 3, bx + btnW - 6, curBy + 18, 14, 14, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
         }
 
-        // 左側：入力対応キーアイコンバッジ（ネオンレッド塗り＋ホワイト枠）
+        // 左側：入力対応キーアイコンバッジ（角丸ピル）
         int keyW = 76;
         int keyH = 40;
-        int keyX = x1 + 16;
-        int keyY = (y1 + y2 - keyH) / 2;
+        int keyX = bx + 16;
+        int keyY = curBy + (btnH - keyH) / 2;
 
-        DrawBox(keyX + 3, keyY + 3, keyX + keyW + 3, keyY + keyH + 3, colBlack, TRUE);
-        DrawBox(keyX - 2, keyY - 2, keyX + keyW + 2, keyY + keyH + 2, colWhite, TRUE);
-        DrawBox(keyX, keyY, keyX + keyW, keyY + keyH, colNeonRed, TRUE);
+        SoftUI::DrawSoftCard(keyX, keyY, keyW, keyH, 12, colNeonRed, 255, colWhite, 1);
 
         int kbTextW = GetDrawStringWidthToHandle(keyBadge, static_cast<int>(strlen(keyBadge)), font18);
         DrawStringToHandle(keyX + (keyW - kbTextW) / 2, keyY + 11, keyBadge, colWhite, font18);
 
         // 右側：ボタンメインラベル（太字アウトライン付き）
         int labelAreaX = keyX + keyW + 12;
-        int labelAreaW = (x2 - 12) - labelAreaX;
+        int labelAreaW = (bx + btnW - 12) - labelAreaX;
         int lbTextW = GetDrawStringWidthToHandle(label, static_cast<int>(strlen(label)), font24);
         int lbX = labelAreaX + (labelAreaW - lbTextW) / 2;
-        int lbY = (y1 + y2 - 24) / 2;
+        int lbY = curBy + (btnH - 24) / 2;
 
         for (int dy = -2; dy <= 2; ++dy)
         {
@@ -1934,7 +2012,173 @@ void GameManager::DrawGameClearScreen()
 }
 
 // ============================================================================
-// タイトル画面の描画（ポップ＆カートゥーン風デザイン・アメコミ演出）
+// タイトル画面専用の超豪華3Dステージ演出（ゴールデンステージリング・金粉・ライト柱・マッスルオーラ）
+// ============================================================================
+void GameManager::DrawTitle3DScene()
+{
+    auto player = m_objManager.GetPlayer();
+    VECTOR catPos = (player) ? player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
+    float catY = catPos.y;
+
+    int cycle = m_titleAnimTimer % 540;
+    bool isSquat = (cycle < 200);
+    bool isPushUp = (cycle >= 270 && cycle < 470);
+    bool isTraining = isSquat || isPushUp;
+
+    // ------------------------------------------------------------------------
+    // 1. 床面：ゴールデン・マッスル・ステージリング（同心円＆回転放射スポーク）
+    // ------------------------------------------------------------------------
+    float ringY = catY + 0.35f; // 地面とのZファイティング防止
+    int segments = 32;
+
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 160);
+
+    // 内円リング (半径 32)
+    for (int i = 0; i < segments; ++i)
+    {
+        float a1 = static_cast<float>(i) * (2.0f * MathHelper::PI / segments);
+        float a2 = static_cast<float>(i + 1) * (2.0f * MathHelper::PI / segments);
+        VECTOR p1 = VGet(catPos.x + std::cos(a1) * 32.0f, ringY, catPos.z + std::sin(a1) * 32.0f);
+        VECTOR p2 = VGet(catPos.x + std::cos(a2) * 32.0f, ringY, catPos.z + std::sin(a2) * 32.0f);
+        DrawLine3D(p1, p2, GetColor(255, 215, 60));
+    }
+
+    // 中円リング (半径 55)
+    for (int i = 0; i < segments; ++i)
+    {
+        float a1 = static_cast<float>(i) * (2.0f * MathHelper::PI / segments);
+        float a2 = static_cast<float>(i + 1) * (2.0f * MathHelper::PI / segments);
+        VECTOR p1 = VGet(catPos.x + std::cos(a1) * 55.0f, ringY, catPos.z + std::sin(a1) * 55.0f);
+        VECTOR p2 = VGet(catPos.x + std::cos(a2) * 55.0f, ringY, catPos.z + std::sin(a2) * 55.0f);
+        DrawLine3D(p1, p2, GetColor(255, 140, 40));
+    }
+
+    // 外円リング (半径 78) ＆ 回転放射スポーク
+    float rotSpoke = m_titleAnimTimer * 0.012f;
+    for (int i = 0; i < segments; ++i)
+    {
+        float a1 = static_cast<float>(i) * (2.0f * MathHelper::PI / segments);
+        float a2 = static_cast<float>(i + 1) * (2.0f * MathHelper::PI / segments);
+        VECTOR p1 = VGet(catPos.x + std::cos(a1) * 78.0f, ringY, catPos.z + std::sin(a1) * 78.0f);
+        VECTOR p2 = VGet(catPos.x + std::cos(a2) * 78.0f, ringY, catPos.z + std::sin(a2) * 78.0f);
+        DrawLine3D(p1, p2, GetColor(80, 220, 255));
+    }
+
+    // 16本の回転放射スポーク線
+    for (int i = 0; i < 16; ++i)
+    {
+        float a = rotSpoke + static_cast<float>(i) * (2.0f * MathHelper::PI / 16.0f);
+        VECTOR pInner = VGet(catPos.x + std::cos(a) * 32.0f, ringY, catPos.z + std::sin(a) * 32.0f);
+        VECTOR pOuter = VGet(catPos.x + std::cos(a) * 78.0f, ringY, catPos.z + std::sin(a) * 78.0f);
+        DrawLine3D(pInner, pOuter, (i % 2 == 0) ? GetColor(255, 230, 80) : GetColor(255, 120, 30));
+    }
+
+    // ------------------------------------------------------------------------
+    // 2. 筋トレ連動・床面拡散ショックウェーブ（レップのリズムで広がる光の輪）
+    // ------------------------------------------------------------------------
+    for (int w = 0; w < 2; ++w)
+    {
+        float waveProgress = std::fmod(m_titleAnimTimer * 2.2f + static_cast<float>(w) * 45.0f, 90.0f);
+        float waveRadius = waveProgress;
+        int waveAlpha = static_cast<int>((1.0f - waveProgress / 90.0f) * 190.0f);
+        if (waveAlpha > 0)
+        {
+            SetDrawBlendMode(DX_BLENDMODE_ADD, waveAlpha);
+            unsigned int waveColor = isPushUp ? GetColor(80, 220, 255) : GetColor(255, 215, 60);
+            for (int i = 0; i < segments; ++i)
+            {
+                float a1 = static_cast<float>(i) * (2.0f * MathHelper::PI / segments);
+                float a2 = static_cast<float>(i + 1) * (2.0f * MathHelper::PI / segments);
+                VECTOR p1 = VGet(catPos.x + std::cos(a1) * waveRadius, ringY + 0.1f, catPos.z + std::sin(a1) * waveRadius);
+                VECTOR p2 = VGet(catPos.x + std::cos(a2) * waveRadius, ringY + 0.1f, catPos.z + std::sin(a2) * waveRadius);
+                DrawLine3D(p1, p2, waveColor);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 3. 天空へ昇るゴールド・ライトシャフト（8本の光の柱）
+    // ------------------------------------------------------------------------
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 120);
+    for (int i = 0; i < 8; ++i)
+    {
+        float beamAngle = rotSpoke * 0.7f + static_cast<float>(i) * (2.0f * MathHelper::PI / 8.0f);
+        float bx = catPos.x + std::cos(beamAngle) * 55.0f;
+        float bz = catPos.z + std::sin(beamAngle) * 55.0f;
+        float beamHeight = 90.0f + std::sin(m_titleAnimTimer * 0.05f + static_cast<float>(i)) * 20.0f;
+
+        VECTOR bBase = VGet(bx, catY, bz);
+        VECTOR bTop = VGet(bx, catY + beamHeight, bz);
+        unsigned int bCol = (i % 2 == 0) ? GetColor(255, 220, 70) : GetColor(100, 230, 255);
+        DrawLine3D(bBase, bTop, bCol);
+        DrawLine3D(VGet(bx + 0.6f, catY, bz), VGet(bx + 0.6f, catY + beamHeight, bz), bCol);
+        DrawLine3D(VGet(bx, catY, bz + 0.6f), VGet(bx, catY + beamHeight, bz + 0.6f), bCol);
+    }
+
+    // ------------------------------------------------------------------------
+    // 4. マッスル・パワーオーラ（猫の体から立ち昇るエネルギースフィア）
+    // ------------------------------------------------------------------------
+    if (isTraining)
+    {
+        SetDrawBlendMode(DX_BLENDMODE_ADD, 150);
+        for (int i = 0; i < 8; ++i)
+        {
+            float phase = m_titleAnimTimer * 0.06f + static_cast<float>(i) * 0.785f;
+            float orbR = 12.0f + std::sin(phase * 1.5f) * 4.0f;
+            float orbX = catPos.x + std::sin(phase) * orbR;
+            float orbZ = catPos.z + std::cos(phase) * orbR;
+            float orbY = catY + 4.0f + std::fmod(m_titleAnimTimer * 1.1f + static_cast<float>(i) * 6.0f, 38.0f);
+            float orbRadius = 2.0f + std::sin(phase * 2.0f) * 0.7f;
+            unsigned int orbCol = (i % 2 == 0) ? GetColor(255, 190, 40) : GetColor(255, 90, 20);
+            DrawSphere3D(VGet(orbX, orbY, orbZ), orbRadius, 6, orbCol, orbCol, TRUE);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 5. 3D空間を舞う金粉・紙吹雪（50個のパーティクル）
+    // ------------------------------------------------------------------------
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 190);
+    for (int i = 0; i < 50; ++i)
+    {
+        float pAngle = static_cast<float>(i) * 0.628f + m_titleAnimTimer * 0.003f;
+        float pDist = 35.0f + std::fmod(static_cast<float>(i * 37 + 13), 130.0f);
+        float px = catPos.x + std::sin(pAngle) * pDist;
+        float pz = catPos.z + std::cos(pAngle) * pDist;
+        float py = catY + std::fmod(static_cast<float>(i * 13) + m_titleAnimTimer * 0.65f, 110.0f);
+
+        unsigned int pCol;
+        int colType = i % 4;
+        if (colType == 0) pCol = GetColor(255, 220, 60);      // ゴールド
+        else if (colType == 1) pCol = GetColor(255, 80, 180); // ホットピンク
+        else if (colType == 2) pCol = GetColor(60, 220, 255); // スカイブルー
+        else pCol = GetColor(100, 255, 120);                   // ネオングリーン
+
+        float pSize = 1.3f + std::fmod(static_cast<float>(i), 3.0f) * 0.5f;
+        DrawSphere3D(VGet(px, py, pz), pSize, 4, pCol, pCol, TRUE);
+    }
+
+    // ------------------------------------------------------------------------
+    // 6. 猫の頭上を回るチャンピオン・オービット星（3つの光る星）
+    // ------------------------------------------------------------------------
+    float starBaseY = (isPushUp) ? (catY + 22.0f) : (catY + 38.0f);
+    for (int i = 0; i < 3; ++i)
+    {
+        float starAngle = m_titleAnimTimer * 0.045f + static_cast<float>(i) * (2.0f * MathHelper::PI / 3.0f);
+        float sx = catPos.x + std::sin(starAngle) * 16.0f;
+        float sz = catPos.z + std::cos(starAngle) * 16.0f;
+        float sy = starBaseY + std::sin(m_titleAnimTimer * 0.08f + static_cast<float>(i)) * 2.5f;
+
+        SetDrawBlendMode(DX_BLENDMODE_ADD, 230);
+        DrawSphere3D(VGet(sx, sy, sz), 2.2f, 6, GetColor(255, 230, 80), GetColor(255, 200, 40), TRUE);
+        DrawLine3D(VGet(sx - 3.5f, sy, sz), VGet(sx + 3.5f, sy, sz), GetColor(255, 255, 220));
+        DrawLine3D(VGet(sx, sy - 3.5f, sz), VGet(sx, sy + 3.5f, sz), GetColor(255, 255, 220));
+    }
+
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+}
+
+// ============================================================================
+// タイトル画面の描画（超ド派手ポップ＆カートゥーン風デザイン・アメコミ演出）
 // ============================================================================
 void GameManager::DrawTitleScreen()
 {
@@ -1945,59 +2189,130 @@ void GameManager::DrawTitleScreen()
     int font24 = fm.GetFont24();
     int font60 = fm.GetFont60();
 
-    // 1. ポップなコミック風ヘッダー＆フッターバー
-    // 上部バー（ビビッドなインディゴブルー＋イエローの太いボーダーライン）
+    // ------------------------------------------------------------------------
+    // 1. デュアル・シアター・サーチライト（底面左右の角から大空へ交差する超巨大光線）
+    // ------------------------------------------------------------------------
+    {
+        SetDrawBlendMode(DX_BLENDMODE_ADD, 48);
+        // 左サーチライト（スカイシアン）
+        float aL = -0.72f + std::sin(m_titleAnimTimer * 0.016f) * 0.32f;
+        int lx1 = 0, ly1 = Config::SCREEN_HEIGHT;
+        int lx2 = static_cast<int>(std::cos(aL - 0.12f) * 1300.0f);
+        int ly2 = Config::SCREEN_HEIGHT + static_cast<int>(std::sin(aL - 0.12f) * 1300.0f);
+        int lx3 = static_cast<int>(std::cos(aL + 0.12f) * 1300.0f);
+        int ly3 = Config::SCREEN_HEIGHT + static_cast<int>(std::sin(aL + 0.12f) * 1300.0f);
+        DrawTriangle(lx1, ly1, lx2, ly2, lx3, ly3, GetColor(60, 200, 255), TRUE);
+
+        // 右サーチライト（ゴールデンアンバー）
+        float aR = -2.42f + std::sin(m_titleAnimTimer * 0.019f + 1.2f) * 0.32f;
+        int rx1 = Config::SCREEN_WIDTH, ry1 = Config::SCREEN_HEIGHT;
+        int rx2 = Config::SCREEN_WIDTH + static_cast<int>(std::cos(aR - 0.12f) * 1300.0f);
+        int ry2 = Config::SCREEN_HEIGHT + static_cast<int>(std::sin(aR - 0.12f) * 1300.0f);
+        int rx3 = Config::SCREEN_WIDTH + static_cast<int>(std::cos(aR + 0.12f) * 1300.0f);
+        int ry3 = Config::SCREEN_HEIGHT + static_cast<int>(std::sin(aR + 0.12f) * 1300.0f);
+        DrawTriangle(rx1, ry1, rx2, ry2, rx3, ry3, GetColor(255, 210, 50), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    }
+
+    // ------------------------------------------------------------------------
+    // 2. 超ド派手ダブル・ハイパー・サンバースト（2層の逆回転光条＆中心グロー）
+    // ------------------------------------------------------------------------
+    int sunburstCX = Config::SCREEN_WIDTH / 2;
+    int sunburstCY = 150;
+
+    // A. 外層サンバースト（20光条・正回転・シアン＆マゼンタ）
+    float sunAngleOuter = m_titleAnimTimer * 0.005f;
+    int rayCountOuter = 20;
+    float rayRadiusOuter = 720.0f;
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 40);
+    for (int r = 0; r < rayCountOuter; ++r)
+    {
+        float a1 = sunAngleOuter + static_cast<float>(r * 2) * (MathHelper::PI / rayCountOuter);
+        float a2 = a1 + (MathHelper::PI / rayCountOuter) * 0.85f;
+        int p1x = sunburstCX + static_cast<int>(std::cos(a1) * rayRadiusOuter);
+        int p1y = sunburstCY + static_cast<int>(std::sin(a1) * rayRadiusOuter);
+        int p2x = sunburstCX + static_cast<int>(std::cos(a2) * rayRadiusOuter);
+        int p2y = sunburstCY + static_cast<int>(std::sin(a2) * rayRadiusOuter);
+
+        unsigned int col = (r % 2 == 0) ? GetColor(100, 220, 255) : GetColor(255, 80, 200);
+        DrawTriangle(sunburstCX, sunburstCY, p1x, p1y, p2x, p2y, col, TRUE);
+    }
+
+    // B. 内層サンバースト（16光条・逆回転・ビタミンゴールド）
+    float sunAngleInner = -m_titleAnimTimer * 0.008f;
+    int rayCountInner = 16;
+    float rayRadiusInner = 500.0f;
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 85);
+    for (int r = 0; r < rayCountInner; ++r)
+    {
+        float a1 = sunAngleInner + static_cast<float>(r * 2) * (MathHelper::PI / rayCountInner);
+        float a2 = a1 + (MathHelper::PI / rayCountInner) * 0.85f;
+        int p1x = sunburstCX + static_cast<int>(std::cos(a1) * rayRadiusInner);
+        int p1y = sunburstCY + static_cast<int>(std::sin(a1) * rayRadiusInner);
+        int p2x = sunburstCX + static_cast<int>(std::cos(a2) * rayRadiusInner);
+        int p2y = sunburstCY + static_cast<int>(std::sin(a2) * rayRadiusInner);
+
+        DrawTriangle(sunburstCX, sunburstCY, p1x, p1y, p2x, p2y, GetColor(255, 220, 50), TRUE);
+    }
+
+    // C. 中心ラジアルブルーム
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 55);
+    DrawCircle(sunburstCX, sunburstCY, 190, GetColor(255, 230, 100), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+    // ------------------------------------------------------------------------
+    // 3. 画面を飛び交うポップな2D漫符・星・キラキラ（24個の浮遊パーティクル）
+    // ------------------------------------------------------------------------
+    for (int i = 0; i < 24; ++i)
+    {
+        float pX = std::fmod(static_cast<float>(i * 57 + 35) + std::sin(m_titleAnimTimer * 0.02f + static_cast<float>(i)) * 22.0f, static_cast<float>(Config::SCREEN_WIDTH));
+        float pY = static_cast<float>(Config::SCREEN_HEIGHT) - std::fmod(static_cast<float>(i * 42) + m_titleAnimTimer * 1.25f, static_cast<float>(Config::SCREEN_HEIGHT + 30));
+
+        const char* pGlyph = (i % 5 == 0) ? "★" : (i % 5 == 1 ? "✦" : (i % 5 == 2 ? "⚡" : (i % 5 == 3 ? "◆" : "💥")));
+        unsigned int pCol = (i % 3 == 0) ? GetColor(255, 230, 60) : (i % 3 == 1 ? GetColor(255, 100, 180) : GetColor(80, 220, 255));
+        int pFont = (i % 2 == 0) ? font18 : font24;
+
+        if (pY > 48.0f && pY < static_cast<float>(Config::SCREEN_HEIGHT - 50))
+        {
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 175);
+            DrawStringToHandle(static_cast<int>(pX), static_cast<int>(pY), pGlyph, pCol, pFont);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 4. ポップなコミック風ヘッダー＆フッターバー
+    // ------------------------------------------------------------------------
     DrawBox(0, 0, Config::SCREEN_WIDTH, 48, GetColor(20, 24, 45), TRUE);
     DrawBox(0, 44, Config::SCREEN_WIDTH, 48, GetColor(255, 215, 30), TRUE);
     DrawBox(0, 48, Config::SCREEN_WIDTH, 50, GetColor(0, 0, 0), TRUE);
 
-    // 下部バー（インディゴブルー＋イエローライン＋ブラック枠）
     DrawBox(0, Config::SCREEN_HEIGHT - 50, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT - 48, GetColor(0, 0, 0), TRUE);
     DrawBox(0, Config::SCREEN_HEIGHT - 48, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT - 44, GetColor(255, 215, 30), TRUE);
     DrawBox(0, Config::SCREEN_HEIGHT - 44, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(20, 24, 45), TRUE);
 
-    // 上部ヘッダー（アメコミ風の元気なタイトルタグライン）
     DrawStringToHandle(25, 14, "★ THE MOST PUMPED FELINE ADVENTURE! ★", GetColor(255, 230, 60), font16);
+    DrawStringToHandle(Config::SCREEN_WIDTH - 280, 14, "★ WORLD MUSCLE LEAGUE 2026 ★", GetColor(100, 230, 255), font16);
 
-    // 下部操作ガイド（ポップなコミックガイドプレート）
     const char* helpStr = "[ ↑ / ↓ ] SELECT   [ ← / → ] CHANGE STAGE   [ ENTER / SPACE ] DECIDE   [ H / TAB ] HOW TO PLAY";
     int helpW = GetDrawStringWidthToHandle(helpStr, static_cast<int>(strlen(helpStr)), font16);
     DrawStringToHandle((Config::SCREEN_WIDTH - helpW) / 2, Config::SCREEN_HEIGHT - 32, helpStr, GetColor(255, 255, 255), font16);
     DrawStringToHandle(Config::SCREEN_WIDTH - 100, Config::SCREEN_HEIGHT - 30, "VER 1.0", GetColor(100, 220, 255), font13);
 
-    // 2. カートゥーン・サンバースト（回転するポップな放射状の光条）
-    int sunburstCX = Config::SCREEN_WIDTH / 2;
-    int sunburstCY = 150;
-    float sunAngle = GetNowCount() * 0.0006f;
-    int rayCount = 14;
-    float rayRadius = 480.0f;
-
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 75);
-    for (int r = 0; r < rayCount; ++r)
-    {
-        float a1 = sunAngle + static_cast<float>(r * 2) * (MathHelper::PI / rayCount);
-        float a2 = a1 + (MathHelper::PI / rayCount) * 0.85f;
-        int p1x = sunburstCX + static_cast<int>(std::cos(a1) * rayRadius);
-        int p1y = sunburstCY + static_cast<int>(std::sin(a1) * rayRadius);
-        int p2x = sunburstCX + static_cast<int>(std::cos(a2) * rayRadius);
-        int p2y = sunburstCY + static_cast<int>(std::sin(a2) * rayRadius);
-
-        DrawTriangle(sunburstCX, sunburstCY, p1x, p1y, p2x, p2y, GetColor(255, 220, 50), TRUE);
-    }
-    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-
-    // 3. タイトルロゴ背面の半透明コミックプレート
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 110);
+    // ------------------------------------------------------------------------
+    // 5. タイトルロゴ背面の半透明コミックプレート
+    // ------------------------------------------------------------------------
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 115);
     DrawBox(0, 65, Config::SCREEN_WIDTH, 275, GetColor(15, 18, 30), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // 4. 元気で弾む「MUSCLE CAT 3D」カートゥーンロゴ（ボヨヨンバウンス＋極太ブラックアウトライン＋ビビッドカラー）
-    // リズミカルなバウンスアニメーション
+    // ------------------------------------------------------------------------
+    // 6. 元気で弾む「MUSCLE CAT 3D」カートゥーンロゴ（ボヨヨンバウンス＋極太ブラックアウトライン＋ビビッドカラー）
+    // ------------------------------------------------------------------------
     float t = GetNowCount() * 0.005f;
     float bounceOffset = std::abs(std::sin(t)) * -12.0f; // ポンポン弾むバウンス
     int logoBaseY = static_cast<int>(88.0f + bounceOffset);
 
-    // 単語ごとの幅を計算
     const char* txtMuscle = "MUSCLE ";
     const char* txtCat    = "CAT ";
     const char* txt3D     = "3D";
@@ -2052,14 +2367,39 @@ void GameManager::DrawTitleScreen()
     DrawStringToHandle(x3D, logoBaseY,     txt3D, GetColor(255, 80, 180), font60);
     DrawStringToHandle(x3D, logoBaseY - 2, txt3D, GetColor(255, 220, 240), font60);
 
-    // D. ロゴ周囲のポップな星漫符（★ ✦ 💥）
-    int star1Y = logoBaseY - 12 + static_cast<int>(std::sin(t * 1.5f) * 6.0f);
-    int star2Y = logoBaseY + 16 + static_cast<int>(std::cos(t * 1.5f) * 6.0f);
-    DrawStringToHandle(logoStartX - 48, star1Y, "★", GetColor(255, 230, 40), font24);
-    DrawStringToHandle(logoStartX + totalLogoW + 20, star2Y, "★", GetColor(255, 100, 200), font24);
-    DrawStringToHandle(logoStartX + totalLogoW + 48, star1Y - 6, "✦", GetColor(80, 230, 255), font18);
+    // D. 光の筋・シネマティックスペキュラースイープ（ロゴを横切る白い閃光）
+    int glintCycle = m_titleAnimTimer % 180;
+    if (glintCycle < 40)
+    {
+        float glintProgress = static_cast<float>(glintCycle) / 40.0f;
+        int glintX = logoStartX - 60 + static_cast<int>(glintProgress * (totalLogoW + 120));
+        int glintY1 = logoBaseY - 18;
+        int glintY2 = logoBaseY + 75;
 
-    // E. サブタイトル（アメコミバナー風）
+        SetDrawBlendMode(DX_BLENDMODE_ADD, 175);
+        DrawTriangle(glintX - 18, glintY2, glintX + 18, glintY1, glintX + 42, glintY1, GetColor(255, 255, 255), TRUE);
+        DrawTriangle(glintX - 18, glintY2, glintX + 42, glintY1, glintX + 6, glintY2, GetColor(255, 255, 255), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    }
+
+    // E. ロゴ左右のダイナミック・コミックバッジ
+    {
+        float badgePulse = std::sin(m_titleAnimTimer * 0.08f) * 4.0f;
+
+        // 左バッジ: [ ★ PUMP ★ ]（ふわっとした丸みカプセル）
+        int lBadgeX = logoStartX - 105;
+        int lBadgeY = logoBaseY + 14 + static_cast<int>(badgePulse);
+        SoftUI::DrawSoftCard(lBadgeX, lBadgeY, 92, 30, 15, GetColor(255, 120, 20), 245, GetColor(255, 220, 80), 1);
+        DrawStringToHandle(lBadgeX + 7, lBadgeY + 6, "★ PUMP ★", GetColor(255, 255, 255), font16);
+
+        // 右バッジ: [ ★ BULK ★ ]（ふわっとした丸みカプセル）
+        int rBadgeX = logoStartX + totalLogoW + 15;
+        int rBadgeY = logoBaseY + 14 - static_cast<int>(badgePulse);
+        SoftUI::DrawSoftCard(rBadgeX, rBadgeY, 92, 30, 15, GetColor(240, 40, 120), 245, GetColor(255, 180, 230), 1);
+        DrawStringToHandle(rBadgeX + 7, lBadgeY + 6, "★ BULK ★", GetColor(255, 255, 255), font16);
+    }
+
+    // F. サブタイトル（アメコミバナー風）
     const char* subText = "★ MAXIMUM CARTOON PUMP CHASE ★";
     int subW = GetDrawStringWidthToHandle(subText, static_cast<int>(strlen(subText)), font18);
     int subX = (Config::SCREEN_WIDTH - subW) / 2;
@@ -2073,48 +2413,188 @@ void GameManager::DrawTitleScreen()
     DrawStringToHandle(subX,     subY + 1, subText, GetColor(0, 0, 0), font18);
     DrawStringToHandle(subX,     subY,     subText, GetColor(255, 245, 150), font18);
 
-    // 5. カートゥーン・ステッカー風メニューボタン（3項目）
+    // ------------------------------------------------------------------------
+    // 7. 爆笑・ボディービル掛け声ポップアップ演出（ふわふわマシュマロ雲吹き出し！）
+    // ------------------------------------------------------------------------
+    {
+        // A. 状況別の多彩な筋肉コール・ライブラリ（合計48種類以上！）
+        // 1. スクワット中 (0〜200F)
+        static const char* squatShouts[] = {
+            "しゃがみが深い！ナイススクワット！",
+            "大腿四頭筋が咆哮してる！",
+            "脚が丸太！樹齢一千年！",
+            "重力に勝ってるぞ猫ちゃん！",
+            "地球を押し下げろ！",
+            "大殿筋のパワー全開！",
+            "バーベルが羽毛に見える！",
+            "フルスクワットの神！",
+            "太ももに恐竜飼ってんのかい！",
+            "スクワットで床が鳴いてる！",
+            "ニャイススクワット！！",
+            "脚のキレが異次元！"
+        };
+        // 2. 腕立て伏せ中 (270〜470F)
+        static const char* pushUpShouts[] = {
+            "床を押すな！地球を押せ！",
+            "大胸筋で床を割れ！",
+            "プッシュ！限界突破！",
+            "腕立ての鬼神降臨！",
+            "上腕三頭筋が爆発寸前！",
+            "前足が油圧ジャッキ！",
+            "胸筋が巨大メロンパン！",
+            "床がビビって逃げてるぞ！",
+            "プッシュアップの極致！",
+            "大胸筋が歩き出しそう！",
+            "ニャイスプッシュアップ！！",
+            "鋼鉄の肉球プレス！"
+        };
+        // 3. インターバル・ポーズ中 (200〜270F & 470〜540F)
+        static const char* poseShouts[] = {
+            "ナイスバルク！！",
+            "キレてるよ！キレてる！",
+            "肩にちっちゃい重機乗せてんのかい！",
+            "大胸筋が歩いてる！",
+            "背中に鬼の顔！",
+            "腹筋が板チョコ！",
+            "筋肉大爆発！！",
+            "パワーーーッ！！",
+            "肩メロン！！巨大メロン！",
+            "広背筋で空飛べそう！",
+            "僧帽筋が富士山！",
+            "巨塔！スカイツリー！",
+            "血管が高速道路網！",
+            "新時代のダビデ猫像！",
+            "筋肉の猫国宝！！",
+            "大胸筋が喜びの歌を歌ってる！",
+            "マッチョの最高峰！",
+            "バリバリにキレてる！",
+            "上腕二頭筋がチョモランマ！",
+            "ニャイスバルク！！",
+            "筋肉が怒涛の進撃！",
+            "仕上がりすぎてる！！",
+            "筋肉界のファンタジスタ！",
+            "カリカリ食ってパンプアップ！"
+        };
+
+        int cycle = m_titleAnimTimer % 540;
+        const char** activePool = poseShouts;
+        int activeCount = sizeof(poseShouts) / sizeof(poseShouts[0]);
+
+        if (cycle < 200)
+        {
+            activePool = squatShouts;
+            activeCount = sizeof(squatShouts) / sizeof(squatShouts[0]);
+        }
+        else if (cycle >= 270 && cycle < 470)
+        {
+            activePool = pushUpShouts;
+            activeCount = sizeof(pushUpShouts) / sizeof(pushUpShouts[0]);
+        }
+
+        // --- 6個の掛け声吹き出し（左右3箇所ずつ配置、約3秒スパンでリズミカルに入れ替え） ---
+        const int SHOUT_SPAN = 180; // 約3秒スパン (60fps * 3s)
+
+        struct BubbleSlot
+        {
+            bool isRight;
+            int baseY;
+            int timerOffset;
+            unsigned int bgCol;
+            unsigned int textCol;
+        };
+
+        BubbleSlot slots[6] = {
+            // 左側3箇所 (上・中・下) - パステルマシュマロカラー
+            { false, 125,   0, GetColor(255, 240, 140), GetColor(35, 30, 20) }, // クリームバター
+            { false, 280,  60, GetColor(165, 235, 255), GetColor(20, 35, 45) }, // パステルシアン
+            { false, 435, 120, GetColor(175, 245, 195), GetColor(20, 40, 25) }, // ミントグリーン
+
+            // 右側3箇所 (上・中・下) - パステルマシュマロカラー
+            { true,  125,  30, GetColor(255, 185, 215), GetColor(45, 20, 35) }, // サクラピンク
+            { true,  280,  90, GetColor(255, 200, 150), GetColor(45, 30, 20) }, // アプリコットピーチ
+            { true,  435, 150, GetColor(220, 190, 255), GetColor(35, 20, 45) }  // パステルラベンダー
+        };
+
+        for (int i = 0; i < 6; ++i)
+        {
+            const auto& slot = slots[i];
+            int timer = m_titleAnimTimer + slot.timerOffset;
+            int step = timer / SHOUT_SPAN;
+            int frame = timer % SHOUT_SPAN;
+
+            // アニメーション：3秒ごとの切り替え時に弾むポップバウンス
+            float bounce = (frame < 18) ? (std::sin((static_cast<float>(frame) / 18.0f) * MathHelper::PI) * -8.0f) : 0.0f;
+            // ふわふわ浮遊アニメーション（スロットごとに独立した周期で優しく揺れる）
+            float floatY = std::sin(m_titleAnimTimer * 0.045f + i * 1.05f) * 3.5f;
+
+            // 6個が被らないようスロットごとのオフセットを付与
+            int idx = (step * 5 + i * 2) % activeCount;
+            const char* shoutText = activePool[idx];
+
+            int textW = GetDrawStringWidthToHandle(shoutText, static_cast<int>(strlen(shoutText)), font16);
+            int sW = textW + 30;
+            int sH = 38;
+            int sX = slot.isRight ? (Config::SCREEN_WIDTH - sW - 32) : 32;
+            int sY = slot.baseY + static_cast<int>(floatY + bounce);
+
+            // ふわふわの雲・マシュマロ吹き出しを描画
+            SoftUI::DrawFluffySpeechBubble(sX, sY, sW, sH, 18, slot.bgCol, slot.textCol, slot.isRight, shoutText, font16);
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 8. ふわふわカプセル・メニューボタン（3項目・ソフトピルデザイン＆浮遊感）
+    // ------------------------------------------------------------------------
     int btnW = 420;
-    int btnH = 52;
+    int btnH = 54;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
     int startBtnY = 356;
-    int stageBtnY = 420;
-    int howBtnY   = 484;
+    int stageBtnY = 422;
+    int howBtnY   = 488;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
     // --- ボタン1: GAME START ---
     bool isStartSelected = (m_selectedMenuItem == 0);
-    if (isStartSelected)
     {
-        // ドロップシャドウ
-        DrawBox(btnX + 6, startBtnY + 6, btnX + btnW + 6, startBtnY + btnH + 6, GetColor(0, 0, 0), TRUE);
+        float floatY = isStartSelected ? (std::sin(GetNowCount() * 0.0055f) * 3.0f) : 0.0f;
+        int curY = startBtnY + static_cast<int>(floatY);
 
-        // ビタミンイエローの弾力ボディ＋極太ブラック枠
-        DrawBox(btnX - 2, startBtnY - 2, btnX + btnW + 2, startBtnY + btnH + 2, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, startBtnY, btnX + btnW, startBtnY + btnH, GetColor(255, 220 + static_cast<int>(35 * btnPulse), 20), TRUE);
-        DrawBox(btnX + 3, startBtnY + 3, btnX + btnW - 3, startBtnY + 12, GetColor(255, 255, 180), TRUE); // 上部ハイライト
+        if (isStartSelected)
+        {
+            unsigned int neonColor = ((m_titleAnimTimer / 15) % 2 == 0) ? GetColor(255, 220, 60) : GetColor(255, 140, 40);
+            unsigned int bodyColor = GetColor(255, 220 + static_cast<int>(30 * btnPulse), 35);
+            SoftUI::DrawSoftCard(btnX, curY, btnW, btnH, 27, bodyColor, 255, neonColor, 2, true, neonColor);
 
-        // 元気な肉球／星アイコン
-        int bounceX = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 5.0f);
-        DrawStringToHandle(btnX + 22 + bounceX, startBtnY + 12, "🐾", GetColor(20, 20, 20), font24);
+            // 上部ハイライトピル
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
+            DrawRoundRect(btnX + 6, curY + 3, btnX + btnW - 6, curY + 16, 12, 12, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        const char* startTxt = "GAME START !!";
-        int tW = GetDrawStringWidthToHandle(startTxt, static_cast<int>(strlen(startTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 13, startTxt, GetColor(20, 20, 30), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 12, startTxt, GetColor(0, 0, 0), font24);
-    }
-    else
-    {
-        // 通常状態: コミックブルーグレー
-        DrawBox(btnX + 4, startBtnY + 4, btnX + btnW + 4, startBtnY + btnH + 4, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 1, startBtnY - 1, btnX + btnW + 1, startBtnY + btnH + 1, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, startBtnY, btnX + btnW, startBtnY + btnH, GetColor(32, 42, 65), TRUE);
-        DrawBox(btnX + 2, startBtnY + 2, btnX + btnW - 2, startBtnY + 8, GetColor(60, 75, 110), TRUE);
+            // ボタン上を滑る光の筋（スペキュラーハイライト）
+            float glintX = btnX + std::fmod(m_titleAnimTimer * 5.0f, static_cast<float>(btnW + 80)) - 40.0f;
+            SetDrawBlendMode(DX_BLENDMODE_ADD, 90);
+            DrawRoundRect(static_cast<int>(glintX), curY + 3, static_cast<int>(glintX + 28), curY + btnH - 3, 10, 10, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        const char* startTxt = "GAME START";
-        int tW = GetDrawStringWidthToHandle(startTxt, static_cast<int>(strlen(startTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, startBtnY + 13, startTxt, GetColor(210, 230, 255), font24);
+            // 元気な矢印アイコン
+            int bounceX = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 5.0f);
+            DrawStringToHandle(btnX + 22 + bounceX, curY + 13, "▶", GetColor(25, 25, 30), font24);
+            DrawStringToHandle(btnX + btnW - 42 - bounceX, curY + 13, "◀", GetColor(25, 25, 30), font24);
+
+            const char* startTxt = "GAME START !!";
+            int tW = GetDrawStringWidthToHandle(startTxt, static_cast<int>(strlen(startTxt)), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 14, startTxt, GetColor(20, 20, 30), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 13, startTxt, GetColor(0, 0, 0), font24);
+        }
+        else
+        {
+            SoftUI::DrawSoftCard(btnX, curY, btnW, btnH, 24, GetColor(30, 40, 62), 225, GetColor(60, 80, 120), 1);
+
+            const char* startTxt = "GAME START";
+            int tW = GetDrawStringWidthToHandle(startTxt, static_cast<int>(strlen(startTxt)), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 14, startTxt, GetColor(210, 230, 255), font24);
+        }
     }
 
     // --- ボタン2: STAGE SELECT (MAP SWITCH) ---
@@ -2122,93 +2602,185 @@ void GameManager::DrawTitleScreen()
     const char* stageNameStr = (m_selectedMap == ModelConfig::MapType::House)
         ? "STAGE : MAP 1 (HOUSE)"
         : "STAGE : MAP 2 (NEW MAP)";
-
-    if (isStageSelected)
     {
-        DrawBox(btnX + 6, stageBtnY + 6, btnX + btnW + 6, stageBtnY + btnH + 6, GetColor(0, 0, 0), TRUE);
+        float floatY = isStageSelected ? (std::sin(GetNowCount() * 0.0055f) * 3.0f) : 0.0f;
+        int curY = stageBtnY + static_cast<int>(floatY);
 
-        // ビビッドオレンジの弾力ボディ＋極太ブラック枠
-        DrawBox(btnX - 2, stageBtnY - 2, btnX + btnW + 2, stageBtnY + btnH + 2, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, stageBtnY, btnX + btnW, stageBtnY + btnH, GetColor(255, 140 + static_cast<int>(35 * btnPulse), 40), TRUE);
-        DrawBox(btnX + 3, stageBtnY + 3, btnX + btnW - 3, stageBtnY + 11, GetColor(255, 230, 180), TRUE);
+        if (isStageSelected)
+        {
+            unsigned int neonColor = ((m_titleAnimTimer / 15) % 2 == 0) ? GetColor(255, 170, 50) : GetColor(255, 70, 50);
+            unsigned int bodyColor = GetColor(255, 140 + static_cast<int>(30 * btnPulse), 45);
+            SoftUI::DrawSoftCard(btnX, curY, btnW, btnH, 27, bodyColor, 255, neonColor, 2, true, neonColor);
 
-        // 左右の切り替え矢印 [◀] [▶] (アニメーションでパルス)
-        int arrowPulse = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 4.0f);
-        DrawStringToHandle(btnX + 18 - arrowPulse, stageBtnY + 12, "◀", GetColor(20, 20, 20), font24);
-        DrawStringToHandle(btnX + btnW - 38 + arrowPulse, stageBtnY + 12, "▶", GetColor(20, 20, 20), font24);
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
+            DrawRoundRect(btnX + 6, curY + 3, btnX + btnW - 6, curY + 16, 12, 12, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        int tW = GetDrawStringWidthToHandle(stageNameStr, static_cast<int>(strlen(stageNameStr)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, stageBtnY + 13, stageNameStr, GetColor(20, 20, 30), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, stageBtnY + 12, stageNameStr, GetColor(0, 0, 0), font24);
-    }
-    else
-    {
-        DrawBox(btnX + 4, stageBtnY + 4, btnX + btnW + 4, stageBtnY + btnH + 4, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 1, stageBtnY - 1, btnX + btnW + 1, stageBtnY + btnH + 1, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, stageBtnY, btnX + btnW, stageBtnY + btnH, GetColor(32, 42, 65), TRUE);
-        DrawBox(btnX + 2, stageBtnY + 2, btnX + btnW - 2, stageBtnY + 8, GetColor(60, 75, 110), TRUE);
+            float glintX = btnX + std::fmod(m_titleAnimTimer * 5.0f, static_cast<float>(btnW + 80)) - 40.0f;
+            SetDrawBlendMode(DX_BLENDMODE_ADD, 90);
+            DrawRoundRect(static_cast<int>(glintX), curY + 3, static_cast<int>(glintX + 28), curY + btnH - 3, 10, 10, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        DrawStringToHandle(btnX + 20, stageBtnY + 12, "‹", GetColor(140, 170, 210), font24);
-        DrawStringToHandle(btnX + btnW - 32, stageBtnY + 12, "›", GetColor(140, 170, 210), font24);
+            int arrowPulse = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 4.0f);
+            DrawStringToHandle(btnX + 22 - arrowPulse, curY + 13, "◀", GetColor(25, 25, 30), font24);
+            DrawStringToHandle(btnX + btnW - 42 + arrowPulse, curY + 13, "▶", GetColor(25, 25, 30), font24);
 
-        int tW = GetDrawStringWidthToHandle(stageNameStr, static_cast<int>(strlen(stageNameStr)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, stageBtnY + 13, stageNameStr, GetColor(210, 230, 255), font24);
+            int tW = GetDrawStringWidthToHandle(stageNameStr, static_cast<int>(strlen(stageNameStr)), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 14, stageNameStr, GetColor(20, 20, 30), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 13, stageNameStr, GetColor(0, 0, 0), font24);
+        }
+        else
+        {
+            SoftUI::DrawSoftCard(btnX, curY, btnW, btnH, 24, GetColor(30, 40, 62), 225, GetColor(60, 80, 120), 1);
+
+            DrawStringToHandle(btnX + 22, curY + 13, "‹", GetColor(140, 170, 210), font24);
+            DrawStringToHandle(btnX + btnW - 34, curY + 13, "›", GetColor(140, 170, 210), font24);
+
+            int tW = GetDrawStringWidthToHandle(stageNameStr, static_cast<int>(strlen(stageNameStr)), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 14, stageNameStr, GetColor(210, 230, 255), font24);
+        }
     }
 
     // --- ボタン3: ゲーム説明 ---
     bool isHowSelected = (m_selectedMenuItem == 2);
-    if (isHowSelected)
     {
-        DrawBox(btnX + 6, howBtnY + 6, btnX + btnW + 6, howBtnY + btnH + 6, GetColor(0, 0, 0), TRUE);
+        float floatY = isHowSelected ? (std::sin(GetNowCount() * 0.0055f) * 3.0f) : 0.0f;
+        int curY = howBtnY + static_cast<int>(floatY);
 
-        // ビビッドスカイブルー＋極太黒枠
-        DrawBox(btnX - 2, howBtnY - 2, btnX + btnW + 2, howBtnY + btnH + 2, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, howBtnY, btnX + btnW, howBtnY + btnH, GetColor(80, 220 + static_cast<int>(35 * btnPulse), 255), TRUE);
-        DrawBox(btnX + 3, howBtnY + 3, btnX + btnW - 3, howBtnY + 12, GetColor(210, 250, 255), TRUE);
+        if (isHowSelected)
+        {
+            unsigned int neonColor = ((m_titleAnimTimer / 15) % 2 == 0) ? GetColor(80, 220, 255) : GetColor(60, 150, 255);
+            unsigned int bodyColor = GetColor(80, 220 + static_cast<int>(30 * btnPulse), 255);
+            SoftUI::DrawSoftCard(btnX, curY, btnW, btnH, 27, bodyColor, 255, neonColor, 2, true, neonColor);
 
-        int bounceX = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 5.0f);
-        DrawStringToHandle(btnX + 22 + bounceX, howBtnY + 12, "📖", GetColor(20, 20, 20), font24);
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
+            DrawRoundRect(btnX + 6, curY + 3, btnX + btnW - 6, curY + 16, 12, 12, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        const char* howTxt = "ゲーム説明 !!";
-        int tW = GetDrawStringWidthToHandle(howTxt, static_cast<int>(strlen(howTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 13, howTxt, GetColor(20, 20, 30), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 12, howTxt, GetColor(0, 0, 0), font24);
+            float glintX = btnX + std::fmod(m_titleAnimTimer * 5.0f, static_cast<float>(btnW + 80)) - 40.0f;
+            SetDrawBlendMode(DX_BLENDMODE_ADD, 90);
+            DrawRoundRect(static_cast<int>(glintX), curY + 3, static_cast<int>(glintX + 28), curY + btnH - 3, 10, 10, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+            int bounceX = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 5.0f);
+            DrawStringToHandle(btnX + 22 + bounceX, curY + 13, "▶", GetColor(25, 25, 30), font24);
+            DrawStringToHandle(btnX + btnW - 42 - bounceX, curY + 13, "◀", GetColor(25, 25, 30), font24);
+
+            const char* howTxt = "ゲーム説明 !!";
+            int tW = GetDrawStringWidthToHandle(howTxt, static_cast<int>(strlen(howTxt)), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 14, howTxt, GetColor(20, 20, 30), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 13, howTxt, GetColor(0, 0, 0), font24);
+        }
+        else
+        {
+            SoftUI::DrawSoftCard(btnX, curY, btnW, btnH, 24, GetColor(30, 40, 62), 225, GetColor(60, 80, 120), 1);
+
+            const char* howTxt = "ゲーム説明";
+            int tW = GetDrawStringWidthToHandle(howTxt, static_cast<int>(strlen(howTxt)), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 14, howTxt, GetColor(210, 230, 255), font24);
+        }
     }
-    else
-    {
-        DrawBox(btnX + 4, howBtnY + 4, btnX + btnW + 4, howBtnY + btnH + 4, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 1, howBtnY - 1, btnX + btnW + 1, howBtnY + btnH + 1, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, howBtnY, btnX + btnW, howBtnY + btnH, GetColor(32, 42, 65), TRUE);
-        DrawBox(btnX + 2, howBtnY + 2, btnX + btnW - 2, howBtnY + 8, GetColor(60, 75, 110), TRUE);
 
-        const char* howTxt = "ゲーム説明";
-        int tW = GetDrawStringWidthToHandle(howTxt, static_cast<int>(strlen(howTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, howBtnY + 13, howTxt, GetColor(210, 230, 255), font24);
-    }
-
-    // ステージ切り替えガイドヒント（半透明コミックプレート付きで視認性抜群）
+    // ステージ切り替えガイドヒント（ふわっとした半透明角丸プレート）
     const char* stageHint = (m_selectedMap == ModelConfig::MapType::House)
         ? "★ [ ← / → ] またはクリックで MAP 2: NEW MAP に切替"
         : "★ [ ← / → ] またはクリックで MAP 1: 通常ハウス に切替";
     int hintW = GetDrawStringWidthToHandle(stageHint, static_cast<int>(strlen(stageHint)), font13);
     int hintX = (Config::SCREEN_WIDTH - hintW) / 2;
-    int hintY = 546;
+    int hintY = 550;
 
-    // 半透明ブラックプレート＋イエロー枠
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 190);
-    DrawBox(hintX - 18, hintY - 4, hintX + hintW + 18, hintY + 20, GetColor(15, 20, 36), TRUE);
-    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-    DrawBox(hintX - 18, hintY - 4, hintX + hintW + 18, hintY + 20, GetColor(255, 215, 40), FALSE);
-
+    SoftUI::DrawSoftCard(hintX - 18, hintY - 4, hintW + 36, 26, 13, GetColor(18, 24, 40), 200, GetColor(255, 215, 60), 1);
     DrawStringToHandle(hintX, hintY, stageHint, GetColor(255, 235, 120), font13);
 
-    // 6. 遊び方モーダルが開いていれば描画
+    // ------------------------------------------------------------------------
+    // 9. 豪華チャンピオン・ワークアウトHUD（画面左下：ふわっと浮遊する角丸HUD）
+    // ------------------------------------------------------------------------
+    {
+        int cycle = m_titleAnimTimer % 540;
+        float workoutFloat = std::sin(m_titleAnimTimer * 0.035f) * 2.5f;
+        int bX = 32;
+        int bY = Config::SCREEN_HEIGHT - 124 + static_cast<int>(workoutFloat);
+        int bW = 314;
+        int bH = 64;
+
+        unsigned int borderCol = (cycle < 200)
+            ? GetColor(255, 150, 40)
+            : ((cycle >= 270 && cycle < 470) ? GetColor(80, 220, 255) : GetColor(120, 240, 160));
+
+        SoftUI::DrawSoftCard(bX, bY, bW, bH, 16, GetColor(20, 26, 44), 225, borderCol, 2);
+
+        // ヘッダー小見出し
+        DrawStringToHandle(bX + 14, bY + 6, "★ LIVE TRAINING ROUTINE ★", GetColor(255, 230, 90), font13);
+
+        if (cycle < 200)
+        {
+            // スクワットセット (0〜200F)
+            int rep = (cycle < 65) ? 1 : ((cycle < 130) ? 2 : 3);
+            float repProgress = std::fmod(static_cast<float>(cycle), 65.0f) / 65.0f;
+
+            char buf[64];
+            snprintf(buf, sizeof(buf), "SQUAT SET : REP %d / 3", rep);
+            DrawStringToHandle(bX + 14, bY + 24, buf, GetColor(255, 220, 60), font18);
+
+            // ゲージバー（角丸）
+            int gX = bX + 14, gY = bY + 49, gW = bW - 28, gH = 6;
+            DrawRoundRect(gX, gY, gX + gW, gY + gH, 3, 3, GetColor(12, 14, 20), TRUE);
+            int fillW = static_cast<int>(gW * repProgress);
+            if (fillW > 0)
+            {
+                int rVal = (fillW > 4) ? 3 : 1;
+                DrawRoundRect(gX, gY, gX + fillW, gY + gH, rVal, rVal, GetColor(255, 145, 35), TRUE);
+            }
+        }
+        else if (cycle >= 270 && cycle < 470)
+        {
+            // 腕立て伏せセット (270〜470F)
+            int pCycle = cycle - 270;
+            int rep = (pCycle < 50) ? 1 : ((pCycle < 100) ? 2 : ((pCycle < 150) ? 3 : 4));
+            float repProgress = std::fmod(static_cast<float>(pCycle), 50.0f) / 50.0f;
+
+            char buf[64];
+            snprintf(buf, sizeof(buf), "PUSH-UP SET : REP %d / 4", rep);
+            DrawStringToHandle(bX + 14, bY + 24, buf, GetColor(110, 235, 255), font18);
+
+            // ゲージバー（角丸）
+            int gX = bX + 14, gY = bY + 49, gW = bW - 28, gH = 6;
+            DrawRoundRect(gX, gY, gX + gW, gY + gH, 3, 3, GetColor(12, 14, 20), TRUE);
+            int fillW = static_cast<int>(gW * repProgress);
+            if (fillW > 0)
+            {
+                int rVal = (fillW > 4) ? 3 : 1;
+                DrawRoundRect(gX, gY, gX + fillW, gY + gH, rVal, rVal, GetColor(80, 220, 255), TRUE);
+            }
+        }
+        else
+        {
+            // インターバル・ポーズ
+            DrawStringToHandle(bX + 14, bY + 24, "INTERVAL : POSING TIME!", GetColor(140, 255, 180), font18);
+
+            float restRatio = (cycle < 270) ? (static_cast<float>(cycle - 200) / 70.0f) : (static_cast<float>(cycle - 470) / 70.0f);
+            int gX = bX + 14, gY = bY + 49, gW = bW - 28, gH = 6;
+            DrawRoundRect(gX, gY, gX + gW, gY + gH, 3, 3, GetColor(12, 14, 20), TRUE);
+            int fillW = static_cast<int>(gW * (1.0f - restRatio));
+            if (fillW > 0)
+            {
+                int rVal = (fillW > 4) ? 3 : 1;
+                DrawRoundRect(gX, gY, gX + fillW, gY + gH, rVal, rVal, GetColor(120, 240, 160), TRUE);
+            }
+        }
+    }
+
+    // ------------------------------------------------------------------------
+    // 10. 遊び方モーダルが開いていれば描画
+    // ------------------------------------------------------------------------
     if (m_showHowToPlay)
     {
         DrawHowToPlayModal();
     }
 
-    // 7. ゲーム開始ホワイトトランジション
+    // ------------------------------------------------------------------------
+    // 11. ゲーム開始ホワイトトランジション
+    // ------------------------------------------------------------------------
     if (m_startTransitionTimer > 0)
     {
         float alphaRatio = (22.0f - m_startTransitionTimer) / 22.0f;
@@ -2235,29 +2807,25 @@ void GameManager::DrawHowToPlayModal()
     DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 16), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // 2. モーダルウィンドウ本体（ゲーム中HUDと同じネイビー基調＆オレンジアクセント）
+    // 2. モーダルウィンドウ本体（ふわっとしたソフト角丸ウィンドウ）
     int modalW = 860;
     int modalH = 520;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
-    // ドロップシャドウ＆極太外枠
-    DrawBox(modalX + 8, modalY + 8, modalX + modalW + 8, modalY + modalH + 8, GetColor(0, 0, 0), TRUE);
-    DrawBox(modalX - 3, modalY - 3, modalX + modalW + 3, modalY + modalH + 3, GetColor(0, 0, 0), TRUE);
-    DrawBox(modalX - 1, modalY - 1, modalX + modalW + 1, modalY + modalH + 1, GetColor(255, 110, 30), FALSE);
+    SoftUI::DrawSoftCard(modalX, modalY, modalW, modalH, 22, GetColor(18, 22, 34), 235, GetColor(255, 130, 40), 2);
 
-    // 本体背景（ゲーム画面HUDと同じダークネイビー）
-    DrawBox(modalX, modalY, modalX + modalW, modalY + modalH, GetColor(18, 22, 34), TRUE);
-
-    // ヘッダーバー
-    DrawBox(modalX, modalY, modalX + modalW, modalY + 52, GetColor(26, 32, 50), TRUE);
-    DrawBox(modalX, modalY + 50, modalX + modalW, modalY + 53, GetColor(255, 110, 30), TRUE);
+    // ヘッダーバー（角丸）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 90);
+    DrawRoundRect(modalX + 3, modalY + 3, modalX + modalW - 3, modalY + 52, 20, 20, GetColor(32, 42, 68), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    DrawLine(modalX + 24, modalY + 52, modalX + modalW - 24, modalY + 52, GetColor(255, 130, 40));
 
     const char* modalHeader = "💥 ゲーム説明 - 筋肉ネズミ大捕獲作戦!! 💥";
     int hW = GetDrawStringWidthToHandle(modalHeader, static_cast<int>(strlen(modalHeader)), font24);
     DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 13, modalHeader, GetColor(255, 230, 80), font24);
 
-    // 3. 上段：3ステップ基本ルールカード（シンプル＆要点のみ）
+    // 3. 上段：3ステップ基本ルールカード（ふわっとした角丸カード）
     int cardY = modalY + 68;
     int cardH = 196;
     int cardW = 260;
@@ -2266,12 +2834,8 @@ void GameManager::DrawHowToPlayModal()
 
     // --- CARD 1: 筋トレ ---
     int c1X = cardStartX;
-    DrawBox(c1X + 4, cardY + 4, c1X + cardW + 4, cardY + cardH + 4, GetColor(0, 0, 0), TRUE);
-    DrawBox(c1X - 2, cardY - 2, c1X + cardW + 2, cardY + cardH + 2, GetColor(0, 0, 0), TRUE);
-    DrawBox(c1X, cardY, c1X + cardW, cardY + cardH, GetColor(24, 30, 46), TRUE);
-    DrawBox(c1X, cardY, c1X + cardW, cardY + 32, GetColor(35, 55, 70), TRUE);
-    DrawBox(c1X, cardY + 30, c1X + cardW, cardY + 32, GetColor(100, 245, 140), TRUE);
-    DrawStringToHandle(c1X + 14, cardY + 6, "① 筋トレ (パワーUP)", GetColor(100, 245, 140), font16);
+    SoftUI::DrawSoftCard(c1X, cardY, cardW, cardH, 14, GetColor(24, 30, 46), 235, GetColor(100, 245, 140), 1);
+    DrawStringToHandle(c1X + 14, cardY + 8, "① 筋トレ (パワーUP)", GetColor(100, 245, 140), font16);
 
     DrawStringToHandle(c1X + 14, cardY + 46, "・[SPACE] 長押し ➔ 緑で離す", GetColor(255, 255, 255), font13);
     DrawStringToHandle(c1X + 14, cardY + 74, "・成功: 巨大化＆スピードUP!", GetColor(100, 245, 140), font13);
@@ -2280,12 +2844,8 @@ void GameManager::DrawHowToPlayModal()
 
     // --- CARD 2: 必殺技 ---
     int c2X = cardStartX + cardW + gap;
-    DrawBox(c2X + 4, cardY + 4, c2X + cardW + 4, cardY + cardH + 4, GetColor(0, 0, 0), TRUE);
-    DrawBox(c2X - 2, cardY - 2, c2X + cardW + 2, cardY + cardH + 2, GetColor(0, 0, 0), TRUE);
-    DrawBox(c2X, cardY, c2X + cardW, cardY + cardH, GetColor(24, 30, 46), TRUE);
-    DrawBox(c2X, cardY, c2X + cardW, cardY + 32, GetColor(55, 45, 40), TRUE);
-    DrawBox(c2X, cardY + 30, c2X + cardW, cardY + 32, GetColor(255, 150, 40), TRUE);
-    DrawStringToHandle(c2X + 14, cardY + 6, "② アクション (Lv.4~)", GetColor(255, 150, 40), font16);
+    SoftUI::DrawSoftCard(c2X, cardY, cardW, cardH, 14, GetColor(24, 30, 46), 235, GetColor(255, 150, 40), 1);
+    DrawStringToHandle(c2X + 14, cardY + 8, "② アクション (Lv.4~)", GetColor(255, 150, 40), font16);
 
     DrawStringToHandle(c2X + 14, cardY + 46, "・[右クリック / E] スタン攻撃", GetColor(255, 150, 40), font13);
     DrawStringToHandle(c2X + 26, cardY + 68, "➔ 突進して気絶! (Lv.4以上)", GetColor(255, 255, 255), font13);
@@ -2294,30 +2854,22 @@ void GameManager::DrawHowToPlayModal()
 
     // --- CARD 3: 目標 ---
     int c3X = cardStartX + (cardW + gap) * 2;
-    DrawBox(c3X + 4, cardY + 4, c3X + cardW + 4, cardY + cardH + 4, GetColor(0, 0, 0), TRUE);
-    DrawBox(c3X - 2, cardY - 2, c3X + cardW + 2, cardY + cardH + 2, GetColor(0, 0, 0), TRUE);
-    DrawBox(c3X, cardY, c3X + cardW, cardY + cardH, GetColor(24, 30, 46), TRUE);
-    DrawBox(c3X, cardY, c3X + cardW, cardY + 32, GetColor(30, 50, 65), TRUE);
-    DrawBox(c3X, cardY + 30, c3X + cardW, cardY + 32, GetColor(80, 210, 255), TRUE);
-    DrawStringToHandle(c3X + 14, cardY + 6, "③ 目標 (ネズミ全滅)", GetColor(80, 210, 255), font16);
+    SoftUI::DrawSoftCard(c3X, cardY, cardW, cardH, 14, GetColor(24, 30, 46), 235, GetColor(80, 210, 255), 1);
+    DrawStringToHandle(c3X + 14, cardY + 8, "③ 目標 (ネズミ全滅)", GetColor(80, 210, 255), font16);
 
     DrawStringToHandle(c3X + 14, cardY + 46, "・部屋のネズミを全員捕獲!", GetColor(255, 255, 255), font13);
     DrawStringToHandle(c3X + 14, cardY + 74, "・気絶したネズミは捕まえやすい!", GetColor(100, 245, 140), font13);
     DrawStringToHandle(c3X + 14, cardY + 106, "・数が減るとネズミがスピードUP!", GetColor(255, 150, 150), font13);
     DrawStringToHandle(c3X + 14, cardY + 134, "・早いクリアで高ランク獲得!", GetColor(255, 215, 40), font13);
 
-    // 4. 下段：操作一覧（シンプルに要点のみ配置）
+    // 4. 下段：操作一覧（ふわっとした角丸カード）
     int keyTableY = modalY + 278;
     int keyTableW = 812;
     int keyTableH = 180;
     int keyTableX = modalX + 24;
 
-    DrawBox(keyTableX + 4, keyTableY + 4, keyTableX + keyTableW + 4, keyTableY + keyTableH + 4, GetColor(0, 0, 0), TRUE);
-    DrawBox(keyTableX - 2, keyTableY - 2, keyTableX + keyTableW + 2, keyTableY + keyTableH + 2, GetColor(0, 0, 0), TRUE);
-    DrawBox(keyTableX, keyTableY, keyTableX + keyTableW, keyTableY + keyTableH, GetColor(20, 25, 38), TRUE);
-    DrawBox(keyTableX, keyTableY, keyTableX + keyTableW, keyTableY + 30, GetColor(30, 38, 56), TRUE);
-    DrawBox(keyTableX, keyTableY + 28, keyTableX + keyTableW, keyTableY + 30, GetColor(255, 110, 30), TRUE);
-    DrawStringToHandle(keyTableX + 16, keyTableY + 6, "🎮 操作方法", GetColor(255, 220, 60), font16);
+    SoftUI::DrawSoftCard(keyTableX, keyTableY, keyTableW, keyTableH, 14, GetColor(20, 25, 38), 235, GetColor(255, 130, 40), 1);
+    DrawStringToHandle(keyTableX + 16, keyTableY + 8, "🎮 操作方法", GetColor(255, 220, 60), font16);
 
     // 2列レイアウト
     int col1X = keyTableX + 24;
@@ -2345,7 +2897,7 @@ void GameManager::DrawHowToPlayModal()
     DrawStringToHandle(col2X, row1Y + rowStep * 2, "視点リセット: [F]  |  一時停止: [ESC]", GetColor(180, 210, 255), font16);
     DrawStringToHandle(col2X + 18, row1Y + rowStep * 2 + 20, "➔ カメラを猫背後に戻す / ポーズ開閉", GetColor(210, 225, 245), font13);
 
-    // 5. 閉じるボタン
+    // 5. 閉じるボタン（角丸カプセル）
     int closeBtnW = 140;
     int closeBtnH = 38;
     int closeBtnX = modalX + modalW - 164;
@@ -2356,21 +2908,10 @@ void GameManager::DrawHowToPlayModal()
     bool hoverClose = (mx >= closeBtnX && mx <= closeBtnX + closeBtnW &&
                        my >= closeBtnY && my <= closeBtnY + closeBtnH);
 
-    DrawBox(closeBtnX + 3, closeBtnY + 3, closeBtnX + closeBtnW + 3, closeBtnY + closeBtnH + 3, GetColor(0, 0, 0), TRUE);
-    DrawBox(closeBtnX - 2, closeBtnY - 2, closeBtnX + closeBtnW + 2, closeBtnY + closeBtnH + 2, GetColor(0, 0, 0), TRUE);
-
-    if (hoverClose)
-    {
-        DrawBox(closeBtnX, closeBtnY, closeBtnX + closeBtnW, closeBtnY + closeBtnH, GetColor(255, 80, 80), TRUE);
-        DrawBox(closeBtnX + 2, closeBtnY + 2, closeBtnX + closeBtnW - 2, closeBtnY + 8, GetColor(255, 180, 180), TRUE);
-        DrawStringToHandle(closeBtnX + 20, closeBtnY + 9, "閉じる (ESC)", GetColor(255, 255, 255), font16);
-    }
-    else
-    {
-        DrawBox(closeBtnX, closeBtnY, closeBtnX + closeBtnW, closeBtnY + closeBtnH, GetColor(200, 40, 40), TRUE);
-        DrawBox(closeBtnX + 2, closeBtnY + 2, closeBtnX + closeBtnW - 2, closeBtnY + 8, GetColor(240, 100, 100), TRUE);
-        DrawStringToHandle(closeBtnX + 20, closeBtnY + 9, "閉じる (ESC)", GetColor(255, 255, 255), font16);
-    }
+    unsigned int closeBg = hoverClose ? GetColor(255, 75, 75) : GetColor(210, 45, 45);
+    unsigned int closeBorder = hoverClose ? GetColor(255, 200, 200) : GetColor(240, 100, 100);
+    SoftUI::DrawSoftCard(closeBtnX, closeBtnY, closeBtnW, closeBtnH, 19, closeBg, 245, closeBorder, 1, hoverClose, GetColor(255, 80, 80));
+    DrawStringToHandle(closeBtnX + 22, closeBtnY + 10, "閉じる (ESC)", GetColor(255, 255, 255), font16);
 }
 
 // ============================================================================
@@ -2556,23 +3097,19 @@ void GameManager::DrawPauseModal()
     DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 18), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // 2. モーダルウィンドウ外枠・本体
+    // 2. モーダルウィンドウ外枠・本体（ふわっとした角丸カード）
     int modalW = 480;
     int modalH = 400;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
-    // ドロップシャドウ
-    DrawBox(modalX + 8, modalY + 8, modalX + modalW + 8, modalY + modalH + 8, GetColor(0, 0, 0), TRUE);
-    // 極太枠
-    DrawBox(modalX - 3, modalY - 3, modalX + modalW + 3, modalY + modalH + 3, GetColor(0, 0, 0), TRUE);
-    DrawBox(modalX - 1, modalY - 1, modalX + modalW + 1, modalY + modalH + 1, GetColor(255, 120, 30), FALSE);
-    // 背景
-    DrawBox(modalX, modalY, modalX + modalW, modalY + modalH, GetColor(20, 24, 38), TRUE);
+    SoftUI::DrawSoftCard(modalX, modalY, modalW, modalH, 22, GetColor(20, 24, 38), 235, GetColor(255, 125, 35), 2);
 
-    // ヘッダーバー
-    DrawBox(modalX, modalY, modalX + modalW, modalY + 52, GetColor(26, 32, 50), TRUE);
-    DrawBox(modalX, modalY + 50, modalX + modalW, modalY + 53, GetColor(255, 120, 30), TRUE);
+    // ヘッダーバー（角丸）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 90);
+    DrawRoundRect(modalX + 3, modalY + 3, modalX + modalW - 3, modalY + 52, 20, 20, GetColor(32, 42, 68), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    DrawLine(modalX + 20, modalY + 52, modalX + modalW - 20, modalY + 52, GetColor(255, 125, 35));
 
     const char* pauseHeader = "⏸ PAUSE (一時停止)";
     int hW = GetDrawStringWidthToHandle(pauseHeader, static_cast<int>(strlen(pauseHeader)), font24);
@@ -2590,61 +3127,59 @@ void GameManager::DrawPauseModal()
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
-    // --- ボタン1: リトライ ---
+    // --- ボタン1: リトライ（ふわっとした角丸ピルボタン） ---
     bool isRetrySelected = (m_pauseMenuItem == 0);
     if (isRetrySelected)
     {
-        DrawBox(btnX + 5, retryBtnY + 5, btnX + btnW + 5, retryBtnY + retryBtnH + 5, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 2, retryBtnY - 2, btnX + btnW + 2, retryBtnY + retryBtnH + 2, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, retryBtnY, btnX + btnW, retryBtnY + retryBtnH, GetColor(100, 230 + static_cast<int>(25 * btnPulse), 120), TRUE);
-        DrawBox(btnX + 3, retryBtnY + 3, btnX + btnW - 3, retryBtnY + 11, GetColor(210, 255, 220), TRUE);
+        unsigned int col = GetColor(100, 230 + static_cast<int>(25 * btnPulse), 120);
+        SoftUI::DrawSoftCard(btnX, retryBtnY, btnW, retryBtnH, 25, col, 255, GetColor(160, 255, 180), 2, true, GetColor(100, 240, 130));
 
-        DrawStringToHandle(btnX + 20, retryBtnY + 11, "🔄", GetColor(20, 20, 20), font24);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
+        DrawRoundRect(btnX + 6, retryBtnY + 3, btnX + btnW - 6, retryBtnY + 16, 12, 12, GetColor(255, 255, 255), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        DrawStringToHandle(btnX + 22, retryBtnY + 12, "🔄", GetColor(20, 20, 20), font24);
         const char* retryTxt = "リトライ (R)";
         int tW = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 12, retryTxt, GetColor(15, 25, 20), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 13, retryTxt, GetColor(15, 25, 20), font24);
     }
     else
     {
-        DrawBox(btnX + 3, retryBtnY + 3, btnX + btnW + 3, retryBtnY + retryBtnH + 3, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 1, retryBtnY - 1, btnX + btnW + 1, retryBtnY + retryBtnH + 1, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, retryBtnY, btnX + btnW, retryBtnY + retryBtnH, GetColor(32, 42, 65), TRUE);
-        DrawBox(btnX + 2, retryBtnY + 2, btnX + btnW - 2, retryBtnY + 8, GetColor(60, 75, 110), TRUE);
+        SoftUI::DrawSoftCard(btnX, retryBtnY, btnW, retryBtnH, 25, GetColor(32, 42, 65), 235, GetColor(60, 75, 110), 1);
 
-        DrawStringToHandle(btnX + 20, retryBtnY + 11, "🔄", GetColor(140, 170, 210), font24);
+        DrawStringToHandle(btnX + 22, retryBtnY + 12, "🔄", GetColor(140, 170, 210), font24);
         const char* retryTxt = "リトライ";
         int tW = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 12, retryTxt, GetColor(210, 230, 255), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 13, retryTxt, GetColor(210, 230, 255), font24);
     }
 
-    // --- ボタン2: タイトルに戻る ---
+    // --- ボタン2: タイトルに戻る（ふわっとした角丸ピルボタン） ---
     bool isTitleSelected = (m_pauseMenuItem == 1);
     if (isTitleSelected)
     {
-        DrawBox(btnX + 5, titleBtnY + 5, btnX + btnW + 5, titleBtnY + titleBtnH + 5, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 2, titleBtnY - 2, btnX + btnW + 2, titleBtnY + titleBtnH + 2, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, titleBtnY, btnX + btnW, titleBtnY + titleBtnH, GetColor(70, 190 + static_cast<int>(35 * btnPulse), 255), TRUE);
-        DrawBox(btnX + 3, titleBtnY + 3, btnX + btnW - 3, titleBtnY + 11, GetColor(210, 240, 255), TRUE);
+        unsigned int col = GetColor(70, 190 + static_cast<int>(35 * btnPulse), 255);
+        SoftUI::DrawSoftCard(btnX, titleBtnY, btnW, titleBtnH, 25, col, 255, GetColor(160, 230, 255), 2, true, GetColor(80, 200, 255));
 
-        DrawStringToHandle(btnX + 20, titleBtnY + 11, "🏠", GetColor(20, 20, 20), font24);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
+        DrawRoundRect(btnX + 6, titleBtnY + 3, btnX + btnW - 6, titleBtnY + 16, 12, 12, GetColor(255, 255, 255), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        DrawStringToHandle(btnX + 22, titleBtnY + 12, "🏠", GetColor(20, 20, 20), font24);
         const char* titleTxt = "タイトルに戻る (T)";
         int tW = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 12, titleTxt, GetColor(15, 20, 30), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 13, titleTxt, GetColor(15, 20, 30), font24);
     }
     else
     {
-        DrawBox(btnX + 3, titleBtnY + 3, btnX + btnW + 3, titleBtnY + titleBtnH + 3, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX - 1, titleBtnY - 1, btnX + btnW + 1, titleBtnY + titleBtnH + 1, GetColor(0, 0, 0), TRUE);
-        DrawBox(btnX, titleBtnY, btnX + btnW, titleBtnY + titleBtnH, GetColor(32, 42, 65), TRUE);
-        DrawBox(btnX + 2, titleBtnY + 2, btnX + btnW - 2, titleBtnY + 8, GetColor(60, 75, 110), TRUE);
+        SoftUI::DrawSoftCard(btnX, titleBtnY, btnW, titleBtnH, 25, GetColor(32, 42, 65), 235, GetColor(60, 75, 110), 1);
 
-        DrawStringToHandle(btnX + 20, titleBtnY + 11, "🏠", GetColor(140, 170, 210), font24);
+        DrawStringToHandle(btnX + 22, titleBtnY + 12, "🏠", GetColor(140, 170, 210), font24);
         const char* titleTxt = "タイトルに戻る";
         int tW = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 12, titleTxt, GetColor(210, 230, 255), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 13, titleTxt, GetColor(210, 230, 255), font24);
     }
 
-    // --- コントロール3: マウス感度調整 ---
+    // --- コントロール3: マウス感度調整（ふわっとした角丸カード） ---
     bool isSensSelected = (m_pauseMenuItem == 2);
     int sensBtnW   = 46;
     int sensBtnH   = 28;
@@ -2662,13 +3197,10 @@ void GameManager::DrawPauseModal()
     bool hoverPlus  = (mx >= plusBtnX && mx <= plusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
 
     // 感度行の外枠・背景
-    DrawBox(btnX + 3, sensRowY + 3, btnX + btnW + 3, sensRowY + sensRowH + 3, GetColor(0, 0, 0), TRUE);
-    DrawBox(btnX - 1, sensRowY - 1, btnX + btnW + 1, sensRowY + sensRowH + 1, isSensSelected ? GetColor(255, 180, 50) : GetColor(0, 0, 0), TRUE);
-    DrawBox(btnX, sensRowY, btnX + btnW, sensRowY + sensRowH, isSensSelected ? GetColor(28, 38, 62) : GetColor(24, 30, 48), TRUE);
-    if (isSensSelected)
-    {
-        DrawBox(btnX, sensRowY, btnX + btnW, sensRowY + sensRowH, GetColor(255, 180, 50), FALSE);
-    }
+    SoftUI::DrawSoftCard(btnX, sensRowY, btnW, sensRowH, 16,
+                         isSensSelected ? GetColor(28, 38, 62) : GetColor(24, 30, 48), 235,
+                         isSensSelected ? GetColor(255, 180, 50) : GetColor(50, 65, 95),
+                         isSensSelected ? 2 : 1, isSensSelected, GetColor(255, 180, 50));
 
     // 感度テキスト表示（上段）
     float currentSens = m_camera.GetMouseSensitivity();
@@ -2680,42 +3212,47 @@ void GameManager::DrawPauseModal()
     DrawStringToHandle(btnX + btnW - 110, sensRowY + 11, sensHint, GetColor(140, 165, 195), font13);
 
     // [◀ -] ボタン描画
-    DrawBox(minusBtnX, sensBtnY, minusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverMinus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), TRUE);
-    DrawBox(minusBtnX, sensBtnY, minusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverMinus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), FALSE);
+    SoftUI::DrawSoftCard(minusBtnX, sensBtnY, sensBtnW, sensBtnH, 10,
+                         hoverMinus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), 235,
+                         hoverMinus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), 1,
+                         hoverMinus, GetColor(100, 220, 255));
     DrawStringToHandle(minusBtnX + 11, sensBtnY + 5, "◀ -", hoverMinus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font16);
 
-    // スライダーバー背景（溝）
-    DrawBox(sliderBarX, sliderBarY, sliderBarX + sliderBarW, sliderBarY + sliderBarH, GetColor(12, 16, 26), TRUE);
-    DrawBox(sliderBarX, sliderBarY, sliderBarX + sliderBarW, sliderBarY + sliderBarH, GetColor(60, 75, 105), FALSE);
+    // スライダーバー背景（角丸溝）
+    DrawRoundRect(sliderBarX, sliderBarY, sliderBarX + sliderBarW, sliderBarY + sliderBarH, 6, 6, GetColor(12, 16, 26), TRUE);
+    DrawRoundRect(sliderBarX, sliderBarY, sliderBarX + sliderBarW, sliderBarY + sliderBarH, 6, 6, GetColor(60, 75, 105), FALSE);
 
     // 1.0x（標準位置）の目盛りマーク
     float standardRatio = (1.0f - 0.2f) / (3.0f - 0.2f);
     int standardX = sliderBarX + static_cast<int>(sliderBarW * standardRatio);
     DrawLine(standardX, sliderBarY - 3, standardX, sliderBarY + sliderBarH + 3, GetColor(180, 200, 220));
 
-    // 現在感度に応じた塗りつぶしプログレス
+    // 現在感度に応じた塗りつぶしプログレス（角丸）
     float sensRatio = (currentSens - 0.2f) / (3.0f - 0.2f);
     sensRatio = MathHelper::Clamp(sensRatio, 0.0f, 1.0f);
     int fillW = static_cast<int>(sliderBarW * sensRatio);
     if (fillW > 0)
     {
         unsigned int progColor = (currentSens >= 2.0f) ? GetColor(255, 120, 60) : ((currentSens >= 1.0f) ? GetColor(100, 220, 255) : GetColor(70, 180, 240));
-        DrawBox(sliderBarX + 1, sliderBarY + 1, sliderBarX + fillW, sliderBarY + sliderBarH - 1, progColor, TRUE);
+        int rVal = (fillW > 6) ? 5 : 2;
+        DrawRoundRect(sliderBarX + 1, sliderBarY + 1, sliderBarX + fillW, sliderBarY + sliderBarH - 1, rVal, rVal, progColor, TRUE);
     }
 
     // スライダーつまみ（ノブ）
     int knobX = sliderBarX + fillW;
     int knobY = sliderBarY + sliderBarH / 2;
-    DrawCircle(knobX, knobY, 8, GetColor(0, 0, 0), TRUE);
-    DrawCircle(knobX, knobY, 7, isSensSelected ? GetColor(255, 230, 80) : GetColor(220, 240, 255), TRUE);
+    DrawCircle(knobX, knobY, 9, GetColor(0, 0, 0), TRUE);
+    DrawCircle(knobX, knobY, 8, isSensSelected ? GetColor(255, 230, 80) : GetColor(220, 240, 255), TRUE);
     DrawCircle(knobX, knobY, 4, GetColor(30, 40, 60), TRUE);
 
     // [+ ▶] ボタン描画
-    DrawBox(plusBtnX, sensBtnY, plusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverPlus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), TRUE);
-    DrawBox(plusBtnX, sensBtnY, plusBtnX + sensBtnW, sensBtnY + sensBtnH, hoverPlus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), FALSE);
+    SoftUI::DrawSoftCard(plusBtnX, sensBtnY, sensBtnW, sensBtnH, 10,
+                         hoverPlus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), 235,
+                         hoverPlus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), 1,
+                         hoverPlus, GetColor(100, 220, 255));
     DrawStringToHandle(plusBtnX + 11, sensBtnY + 5, "+ ▶", hoverPlus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font16);
 
-    // --- 下部: ゲームに戻る (ESC) ガイドボタン ---
+    // --- 下部: ゲームに戻る (ESC) ガイドボタン（角丸カプセル） ---
     int resumeBtnW = 260;
     int resumeBtnH = 36;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
@@ -2724,9 +3261,10 @@ void GameManager::DrawPauseModal()
     bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW &&
                        my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
-    DrawBox(resumeBtnX + 2, resumeBtnY + 2, resumeBtnX + resumeBtnW + 2, resumeBtnY + resumeBtnH + 2, GetColor(0, 0, 0), TRUE);
-    DrawBox(resumeBtnX, resumeBtnY, resumeBtnX + resumeBtnW, resumeBtnY + resumeBtnH, hoverResume ? GetColor(45, 60, 90) : GetColor(24, 30, 46), TRUE);
-    DrawBox(resumeBtnX, resumeBtnY, resumeBtnX + resumeBtnW, resumeBtnY + resumeBtnH, hoverResume ? GetColor(100, 220, 255) : GetColor(60, 75, 110), FALSE);
+    SoftUI::DrawSoftCard(resumeBtnX, resumeBtnY, resumeBtnW, resumeBtnH, 18,
+                         hoverResume ? GetColor(45, 60, 90) : GetColor(24, 30, 46), 235,
+                         hoverResume ? GetColor(100, 220, 255) : GetColor(60, 75, 110), 1,
+                         hoverResume, GetColor(80, 200, 255));
 
     const char* resumeTxt = "▶ ゲームに戻る (ESC)";
     int rW = GetDrawStringWidthToHandle(resumeTxt, static_cast<int>(strlen(resumeTxt)), font16);

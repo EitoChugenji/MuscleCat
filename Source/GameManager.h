@@ -86,6 +86,7 @@ private:
 
     void SetupRoomObstacles();
     void DrawTitleScreen();
+    void DrawTitle3DScene();
     void DrawGameClearScreen();
     void DrawHowToPlayModal();
     void UpdatePause(bool triggerEsc);

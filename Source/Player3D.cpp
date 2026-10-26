@@ -1057,13 +1057,14 @@ void Player3D::Draw2D()
     int font18 = fm.GetFont18();
     int font24 = fm.GetFont24();
 
-    // スキルチェックQTEバー（画面中央下部に表示）
+    // スキルチェックQTEバー（画面中央下部にふわっと浮遊するソフトカプセルバー）
     if (m_isSkillChecking)
     {
+        float qteFloat = std::sin(GetNowCount() * 0.004f) * 2.5f;
         int barW = 340;
-        int barH = 30;
+        int barH = 32;
         int barX = (Config::SCREEN_WIDTH - barW) / 2;
-        int barY = Config::SCREEN_HEIGHT - 125;
+        int barY = Config::SCREEN_HEIGHT - 125 + static_cast<int>(qteFloat);
 
         // 輪郭付きテキスト描画ラムダ（白いステージでもクッキリ目立つ黒縁取り）
         auto DrawOutlinedText = [](int x, int y, const char* str, unsigned int textColor, int fontHandle)
@@ -1082,44 +1083,79 @@ void Player3D::Draw2D()
             DrawStringToHandle(x, y, str, textColor, fontHandle);
         };
 
-        // ポップな極太枠付きバー背景（バカゲー風：白い床でも締まるバーニングオレンジ枠）
-        DrawBox(barX - 6, barY - 6, barX + barW + 6, barY + barH + 6, GetColor(0, 0, 0), TRUE);
-        DrawBox(barX - 3, barY - 3, barX + barW + 3, barY + barH + 3, GetColor(255, 110, 30), TRUE);
-        DrawBox(barX, barY, barX + barW, barY + barH, GetColor(40, 40, 50), TRUE);
+        // 1. ふわっと拡散するソフトドロップシャドウ（3層）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 24);
+        DrawRoundRect(barX - 4, barY + 5, barX + barW + 4, barY + barH + 9, 20, 20, GetColor(0, 0, 0), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 50);
+        DrawRoundRect(barX - 2, barY + 3, barX + barW + 2, barY + barH + 6, 18, 18, GetColor(0, 0, 0), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 80);
+        DrawRoundRect(barX, barY + 2, barX + barW, barY + barH + 3, 16, 16, GetColor(0, 0, 0), TRUE);
 
-        // 成功ゾーン（ビビッドグリーン）
+        // 2. カプセル外枠＆ベースボディ（角丸ピル形状）
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        DrawRoundRect(barX - 3, barY - 3, barX + barW + 3, barY + barH + 3, 18, 18, GetColor(255, 140, 45), TRUE);
+        DrawRoundRect(barX - 1, barY - 1, barX + barW + 1, barY + barH + 1, 16, 16, GetColor(15, 18, 28), TRUE);
+        DrawRoundRect(barX, barY, barX + barW, barY + barH, 15, 15, GetColor(32, 36, 52), TRUE);
+
+        // 3. 上部ソフトハイライト
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 45);
+        DrawRoundRect(barX + 4, barY + 2, barX + barW - 4, barY + (barH / 3), 10, 10, GetColor(255, 255, 255), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        // 4. 成功ゾーン（ふんわりグリーン＆角丸ゾーン）
         int zoneX1 = barX + static_cast<int>(m_scZoneStart * barW);
         int zoneX2 = barX + static_cast<int>(m_scZoneEnd * barW);
-        DrawBox(zoneX1, barY, zoneX2, barY + barH, GetColor(40, 240, 100), TRUE);
-        DrawBox(zoneX1, barY, zoneX2, barY + barH, GetColor(255, 255, 255), FALSE);
+        if (zoneX2 > zoneX1 + 4)
+        {
+            // ゾーン外側のソフトパルスグロー
+            float pulse = (std::sin(GetNowCount() * 0.008f) + 1.0f) * 0.5f;
+            SetDrawBlendMode(DX_BLENDMODE_ADD, 60 + static_cast<int>(40 * pulse));
+            DrawRoundRect(zoneX1 - 2, barY - 2, zoneX2 + 2, barY + barH + 2, 8, 8, GetColor(60, 255, 140), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-        // 針（通常時はビビッドレッド、停止確定時は判定結果色）
+            // 成功ゾーン本体
+            DrawRoundRect(zoneX1, barY + 1, zoneX2, barY + barH - 1, 6, 6, GetColor(50, 240, 120), TRUE);
+            // ゾーンの白リム
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 180);
+            DrawRoundRect(zoneX1, barY + 1, zoneX2, barY + barH - 1, 6, 6, GetColor(255, 255, 255), FALSE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+        }
+
+        // 5. 針（角丸ピル形状のソフトインジケーター）
         int cursorX = barX + static_cast<int>(m_scCursor * barW);
-        unsigned int needleColor = GetColor(255, 40, 40);
+        unsigned int needleColor = GetColor(255, 55, 55);
         if (m_scStoppedTimer > 0)
         {
-            needleColor = m_lastResultSuccess ? GetColor(255, 120, 30) : GetColor(255, 30, 30);
+            needleColor = m_lastResultSuccess ? GetColor(255, 140, 40) : GetColor(255, 40, 40);
         }
-        DrawBox(cursorX - 5, barY - 10, cursorX + 5, barY + barH + 10, GetColor(0, 0, 0), TRUE);
-        DrawBox(cursorX - 3, barY - 8, cursorX + 3, barY + barH + 8, needleColor, TRUE);
 
-        // ガイドテキスト（白い床でも視認性抜群の黒縁取り＋燃えるマッスルオレンジ）
+        // 針のソフトシャドウ
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 60);
+        DrawRoundRect(cursorX - 5, barY - 8, cursorX + 5, barY + barH + 10, 5, 5, GetColor(0, 0, 0), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        // 針本体
+        DrawRoundRect(cursorX - 4, barY - 9, cursorX + 4, barY + barH + 9, 4, 4, GetColor(20, 20, 20), TRUE);
+        DrawRoundRect(cursorX - 2, barY - 7, cursorX + 2, barY + barH + 7, 3, 3, needleColor, TRUE);
+        DrawRoundRect(cursorX - 1, barY - 5, cursorX + 1, barY + barH + 5, 1, 1, GetColor(255, 255, 255), TRUE);
+
+        // ガイドテキスト（バーと一緒にふわっと浮遊）
         if (m_scStoppedTimer > 0)
         {
             if (m_lastResultSuccess)
             {
-                DrawOutlinedText(barX + 85, barY - 34, "★ NICE PUMP!! ★", GetColor(255, 110, 25), font24);
+                DrawOutlinedText(barX + 85, barY - 34, "★ NICE PUMP!! ★", GetColor(255, 140, 40), font24);
             }
             
             else
             {
-                DrawOutlinedText(barX + 115, barY - 34, "× MISS! ×", GetColor(255, 60, 60), font24);
+                DrawOutlinedText(barX + 115, barY - 34, "× MISS! ×", GetColor(255, 70, 70), font24);
             }
         }
         
         else
         {
-            DrawOutlinedText(barX + 12, barY - 32, "長押し→緑のゾーンで [SPACE] を離せ！", GetColor(255, 130, 35), font18);
+            DrawOutlinedText(barX + 12, barY - 32, "長押し→緑のゾーンで [SPACE] を離せ！", GetColor(255, 160, 50), font18);
         }
     }
 
