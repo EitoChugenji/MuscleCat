@@ -13,6 +13,10 @@ namespace Config
     constexpr int NORMAL_MOUSE_COUNT = 3; // 通常ネズミの配置数（合計5匹）
     constexpr int FAST_MOUSE_COUNT   = 2; // 高速逃走ネズミの配置数
 
+    // 制限時間モード設定（false にすると元の経過タイム計測モードに戻せます）
+    constexpr bool  USE_TIME_LIMIT_MODE = true;
+    constexpr float TIME_LIMIT_SECONDS  = 120.0f; // 制限時間 120秒
+
     // 3Dステージ設定（広々としたジム空間）
     constexpr float STAGE_HALF_WIDTH  = 500.0f; // X方向の半幅 (-500 〜 +500)
     constexpr float STAGE_HALF_DEPTH  = 300.0f; // Z方向の半奥行 (-380 〜 +380)

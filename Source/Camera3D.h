@@ -49,6 +49,7 @@ public:
 
     float GetAngleH() const { return m_angleH; }
     VECTOR GetCameraPos() const { return m_currentPos; }
+    VECTOR GetTargetPos() const { return m_targetPos; }
     VECTOR GetForwardXZ() const;
     VECTOR GetRightXZ() const;
 
