@@ -80,6 +80,8 @@ private:
     ModelConfig::MapType m_selectedMap          = ModelConfig::MapType::SlopeHills; // 現在選択中のステージ
     float                m_titleCameraAngle     = 0.0f;  // タイトル画面の3D旋回カメラ角度（ラジアン）
     bool                 m_showHowToPlay        = false; // ゲーム説明モーダル表示中フラグ
+    bool                 m_showSoundSettings    = false; // サウンド設定モーダル表示中フラグ
+    int                  m_titleSoundSettingItem= 0;     // タイトルサウンド設定選択 (0: BGM, 1: SE, 2: 感度)
     int                  m_startTransitionTimer = 0;     // ゲーム開始時のホワイトアウト演出タイマー
     int                  m_titleAnimTimer       = 0;     // タイトル画面のアニメーション経過フレーム
     int                  m_selectedMenuItem     = 0;     // 選択中のメニュー項目 (0: START, 1: STAGE, 2: ゲーム説明)
@@ -94,13 +96,14 @@ private:
     bool                 m_prevKeySpace         = false;
     bool                 m_prevKeyR             = false;
     bool                 m_prevKeyT             = false;
+    bool                 m_prevKeyO             = false;
 
     // ------------------------------------------------------------------------
     // ポーズ（一時停止）画面・終了管理メンバ
     // ------------------------------------------------------------------------
     bool  m_isPaused               = false; // ポーズ中フラグ
     int   m_pauseStartTime         = 0;     // ポーズ開始時刻（ポーズ中の経過時間を除外するため記録）
-    int   m_pauseMenuItem          = 0;     // ポーズメニュー選択項目 (0: リトライ, 1: タイトル, 2: マウス感度)
+    int   m_pauseMenuItem          = 0;     // ポーズメニュー選択項目 (0: リトライ, 1: タイトル, 2: マウス感度, 3: BGM音量, 4: SE音量)
     bool  m_shouldQuit             = false; // アプリケーション終了要求フラグ
 
     // ------------------------------------------------------------------------
@@ -118,6 +121,8 @@ private:
     void DrawTitle3DScene();             // タイトル画面3D演出（ステージリング・ライト柱・金粉）描画
     void DrawGameClearScreen();          // リザルト画面（アメコミ風ランクスタンプ・スコア・報酬）描画
     void DrawHowToPlayModal();           // ゲーム説明モーダルダイアログ描画
+    void DrawSoundSettingsModal();       // サウンド設定モーダルダイアログ描画
+    void UpdateTitleSoundSettings();     // タイトル画面でのサウンド設定更新
     void UpdatePause(bool triggerEsc);   // ポーズ画面中の入力・感度調整更新
     void DrawPauseModal();               // ポーズモーダルダイアログ描画
     void DrawDebug3DOverlay();           // F1デバッグ時の3Dオーバーレイ（10m目測■・1.8m物差し・壁可視化）描画

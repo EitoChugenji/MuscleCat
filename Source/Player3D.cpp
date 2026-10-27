@@ -3,6 +3,7 @@
 // @brief  Player3D クラスの実装（移動・筋トレQTE・飛びつき・スタン攻撃・3D描画）
 // ============================================================================
 #include "Player3D.h"
+#include "SoundManager.h"
 #include "Camera3D.h"
 #include "ModelConfig.h"
 #include "ModelManager.h"
@@ -483,6 +484,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
             {
                 if (--m_pumpDecayTimer <= 0)
                 {
+                    SoundManager::GetInstance().PlaySE(SeType::PumpDecay);
                     if (m_repCount > 3)
                     {
                         m_repCount -= 3;
@@ -526,6 +528,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                 if (CanTackle() && isTackleJustPressed)
                 {
                     m_isTackling = true;
+                    SoundManager::GetInstance().PlaySE(SeType::Tackle);
                     m_tackleTimer = GetTackleDuration();
 
                     VECTOR forwardXZ = camera.GetForwardXZ();
@@ -563,6 +566,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                 if (CanPounce() && isPounceJustPressed)
                 {
                     m_isPouncing = true;
+                    SoundManager::GetInstance().PlaySE(SeType::Pounce);
                     m_pounceTimer = GetPounceDuration();
 
                     VECTOR forwardXZ = camera.GetForwardXZ();
@@ -673,12 +677,24 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
 
                     CustomEffectManager::GetInstance().UpdateRunDust(m_pos, moveDir, m_speed / SPEED_INITIAL, false, m_repCount);
 
+                    m_footstepTimer++;
+                    int stepInterval = (std::max)(9, static_cast<int>(18.0f - m_speed * 1.1f));
+                    if (m_footstepTimer >= stepInterval)
+                    {
+                        m_footstepTimer = 0;
+                        SoundManager::GetInstance().PlaySE(SeType::Footstep, 0.45f);
+                    }
+                }
+                else
+                {
+                    m_footstepTimer = 8;
                 }
 
                 // 筋トレ開始チェック
                 if (isTriggerJustPressed)
                 {
                     m_isSkillChecking = true;
+                    SoundManager::GetInstance().PlaySE(SeType::SquatStart);
                     m_scCursor = 0.0f;
                     m_scCursorDir = 1.0f; // 初期方向: 右進
                     m_wasDecayed = false;
@@ -788,6 +804,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     if (m_scHoldingFrames >= 900)
                     {
                         m_lastResultSuccess = false;
+                        SoundManager::GetInstance().PlaySE(SeType::SquatFail);
                         m_resultShowTimer = 90;
                         m_scStoppedTimer = 22;
                         camera.TriggerShake(8.0f, 8);
@@ -810,6 +827,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         {
                             // 【成功】Rep追加 & 15秒タイマーリセット
                             m_repCount++;
+                            SoundManager::GetInstance().PlaySE(SeType::SquatSuccess);
                             m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒
                             m_lastResultSuccess = true;
                             m_resultShowTimer = 60;
@@ -825,6 +843,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         {
                             // 【失敗】針を止めて位置を確認させてから筋肉痛へ
                             m_lastResultSuccess = false;
+                            SoundManager::GetInstance().PlaySE(SeType::SquatFail);
                             m_resultShowTimer = 90;
                             m_scStoppedTimer = 22; // 約0.36秒間針を止めて失敗位置を表示
                             camera.TriggerShake(8.0f, 8);

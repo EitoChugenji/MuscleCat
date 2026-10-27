@@ -3,6 +3,7 @@
 // @brief  GameManager クラスの実装（タイトル・ゲーム本編・リザルト・ポーズ・デバッグ）
 // ============================================================================
 #include "GameManager.h"
+#include "SoundManager.h"
 #include "Player3D.h"
 #include "Mouse3D.h"
 #include "Obstacle3D.h"
@@ -117,6 +118,79 @@ namespace SoftUI
         // 6. テキスト描画（柔らかい影＋本体）
         DrawStringToHandle(x + 15, y + 11, text, GetColor(20, 25, 35), fontHandle);
         DrawStringToHandle(x + 14, y + 10, text, textColor, fontHandle);
+    }
+}
+
+namespace
+{
+    // 設定スライダーカード共通描画ヘルパー（マウス感度・BGM音量・SE音量）
+    void DrawSettingSliderCard(
+        int x, int y, int w, int h,
+        bool isSelected,
+        const char* label,
+        const char* valueStr,
+        float currentRatio,
+        unsigned int barColor,
+        bool hoverMinus,
+        bool hoverPlus,
+        int font16, int font13
+    )
+    {
+        // 1. 背景カード（選択時はゴールド枠・グロー）
+        SoftUI::DrawSoftCard(x, y, w, h, 16,
+                             isSelected ? GetColor(28, 38, 62) : GetColor(24, 30, 48), 235,
+                             isSelected ? GetColor(255, 180, 50) : GetColor(50, 65, 95),
+                             isSelected ? 2 : 1, isSelected, GetColor(255, 180, 50));
+
+        // 2. ラベルと現在値
+        DrawStringToHandle(x + 14, y + 8, label, isSelected ? GetColor(255, 230, 90) : GetColor(220, 235, 255), font16);
+
+        int valW = GetDrawStringWidthToHandle(valueStr, static_cast<int>(strlen(valueStr)), font16);
+        DrawStringToHandle(x + w - valW - 14, y + 8, valueStr, isSelected ? GetColor(255, 215, 60) : GetColor(160, 220, 255), font16);
+
+        // 3. [-] ボタン
+        int btnW = 46;
+        int btnH = 26;
+        int btnY = y + 33;
+        int minusX = x + 10;
+        int plusX = x + w - 56;
+        int barX = x + 64;
+        int barW = w - 128;
+        int barY = y + 40;
+        int barH = 12;
+
+        SoftUI::DrawSoftCard(minusX, btnY, btnW, btnH, 8,
+                             hoverMinus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), 235,
+                             hoverMinus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), 1,
+                             hoverMinus, GetColor(100, 220, 255));
+        DrawStringToHandle(minusX + 11, btnY + 4, "◀ -", hoverMinus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font13);
+
+        // 4. スライダー溝背景
+        DrawRoundRect(barX, barY, barX + barW, barY + barH, 6, 6, GetColor(12, 16, 26), TRUE);
+        DrawRoundRect(barX, barY, barX + barW, barY + barH, 6, 6, GetColor(60, 75, 105), FALSE);
+
+        // 5. 塗りつぶしプログレス
+        float r = MathHelper::Clamp(currentRatio, 0.0f, 1.0f);
+        int fillW = static_cast<int>(barW * r);
+        if (fillW > 0)
+        {
+            int rVal = (fillW > 6) ? 5 : 2;
+            DrawRoundRect(barX + 1, barY + 1, barX + fillW, barY + barH - 1, rVal, rVal, barColor, TRUE);
+        }
+
+        // 6. スライダーつまみ（ノブ）
+        int knobX = barX + fillW;
+        int knobY = barY + barH / 2;
+        DrawCircle(knobX, knobY, 9, GetColor(0, 0, 0), TRUE);
+        DrawCircle(knobX, knobY, 8, isSelected ? GetColor(255, 230, 80) : GetColor(220, 240, 255), TRUE);
+        DrawCircle(knobX, knobY, 4, GetColor(30, 40, 60), TRUE);
+
+        // 7. [+] ボタン
+        SoftUI::DrawSoftCard(plusX, btnY, btnW, btnH, 8,
+                             hoverPlus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), 235,
+                             hoverPlus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), 1,
+                             hoverPlus, GetColor(100, 220, 255));
+        DrawStringToHandle(plusX + 11, btnY + 4, "+ ▶", hoverPlus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font13);
     }
 }
 
@@ -323,6 +397,7 @@ void GameManager::SwitchSelectedMap(ModelConfig::MapType newMap)
 {
     if (m_selectedMap != newMap)
     {
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
         m_selectedMap = newMap;
         m_objManager.LoadStage(m_selectedMap);
 
@@ -382,6 +457,8 @@ void GameManager::SetupTitle()
 
     m_titleCameraAngle = -0.7f;
     m_showHowToPlay = false;
+    m_showSoundSettings = false;
+    m_titleSoundSettingItem = 0;
     m_isPaused = false;
     m_pauseStartTime = 0;
     m_pauseMenuItem = 0;
@@ -390,6 +467,7 @@ void GameManager::SetupTitle()
     m_selectedMenuItem = 0;
 
     SetupRoomObstacles();
+    SoundManager::GetInstance().PlayBGM(BgmType::Title);
 }
 
 void GameManager::StartGame()
@@ -504,6 +582,7 @@ void GameManager::StartGame()
     m_remainingTimeSeconds = Config::TIME_LIMIT_SECONDS;
     m_isTimeUp = false;
     m_state = GameState::Playing;
+    SoundManager::GetInstance().PlayBGM(BgmType::Stage);
 }
 
 void GameManager::Update()
@@ -563,8 +642,10 @@ void GameManager::Update()
         bool keyRight = (CheckHitKey(KEY_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_D) != 0);
         bool isEnter  = (CheckHitKey(KEY_INPUT_RETURN) != 0);
         bool isSpace  = (CheckHitKey(KEY_INPUT_SPACE) != 0);
+        bool keyO     = (CheckHitKey(KEY_INPUT_O) != 0);
 
         bool triggerH     = keyH && !m_prevKeyH;
+        bool triggerO     = keyO && !m_prevKeyO;
         bool triggerTab   = keyTab && !m_prevKeyTab;
         bool triggerEsc   = keyEsc && !m_prevKeyEsc;
         bool triggerUp    = keyUp && !m_prevKeyUp;
@@ -583,6 +664,7 @@ void GameManager::Update()
         m_prevKeyRight = keyRight;
         m_prevKeyEnter = isEnter;
         m_prevKeySpace = isSpace;
+        m_prevKeyO     = keyO;
 
         // マウス入力
         int mx = 0, my = 0;
@@ -599,6 +681,13 @@ void GameManager::Update()
             {
                 StartGame();
             }
+            return;
+        }
+
+        // サウンド設定ダイアログ表示中
+        if (m_showSoundSettings)
+        {
+            UpdateTitleSoundSettings();
             return;
         }
 
@@ -621,6 +710,7 @@ void GameManager::Update()
             if (triggerEsc || triggerH || triggerTab || ((triggerEnter || triggerSpace) && !isMouseTrigger) || clickCloseBtn)
             {
                 m_showHowToPlay = false;
+                SoundManager::GetInstance().PlaySE(SeType::Cancel);
             }
             return;
         }
@@ -629,6 +719,7 @@ void GameManager::Update()
         if (triggerH || triggerTab)
         {
             m_showHowToPlay = true;
+            SoundManager::GetInstance().PlaySE(SeType::Decide);
             return;
         }
 
@@ -639,25 +730,28 @@ void GameManager::Update()
             return;
         }
 
-        // メニュー項目の上下移動 (0: START, 1: STAGE, 2: ゲーム説明)
-        if (triggerUp)   m_selectedMenuItem = (m_selectedMenuItem + 2) % 3;
-        if (triggerDown) m_selectedMenuItem = (m_selectedMenuItem + 1) % 3;
+        // メニュー項目の上下移動 (0: START, 1: STAGE, 2: ゲーム説明, 3: サウンド設定)
+        if (triggerUp)   { m_selectedMenuItem = (m_selectedMenuItem + 3) % 4; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+        if (triggerDown) { m_selectedMenuItem = (m_selectedMenuItem + 1) % 4; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
 
         // ボタンの当たり判定座標
         int btnW = 420;
-        int btnH = 52;
+        int btnH = 46;
         int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-        int startBtnY = 356;
-        int stageBtnY = 420;
-        int howBtnY   = 484;
+        int startBtnY = 338;
+        int stageBtnY = 390;
+        int howBtnY   = 442;
+        int soundBtnY = 494;
 
         bool hoverStart = (mx >= btnX && mx <= btnX + btnW && my >= startBtnY && my <= startBtnY + btnH);
         bool hoverStage = (mx >= btnX && mx <= btnX + btnW && my >= stageBtnY && my <= stageBtnY + btnH);
         bool hoverHow   = (mx >= btnX && mx <= btnX + btnW && my >= howBtnY && my <= howBtnY + btnH);
+        bool hoverSound = (mx >= btnX && mx <= btnX + btnW && my >= soundBtnY && my <= soundBtnY + btnH);
 
         if (hoverStart) m_selectedMenuItem = 0;
         if (hoverStage) m_selectedMenuItem = 1;
         if (hoverHow)   m_selectedMenuItem = 2;
+        if (hoverSound) m_selectedMenuItem = 3;
 
         // 左右キーによるマップ切り替え
         if (triggerLeft)
@@ -697,6 +791,7 @@ void GameManager::Update()
         // スタート実行判定
         if ((hoverStart && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_selectedMenuItem == 0))
         {
+            SoundManager::GetInstance().PlaySE(SeType::Decide);
             m_startTransitionTimer = 22; // 閃光トランジション開始
             return;
         }
@@ -705,6 +800,16 @@ void GameManager::Update()
         if ((hoverHow && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_selectedMenuItem == 2))
         {
             m_showHowToPlay = true;
+            SoundManager::GetInstance().PlaySE(SeType::Decide);
+            return;
+        }
+
+        // サウンド設定を開く判定 (Oキー または メニュー3選択)
+        if (triggerO || (hoverSound && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_selectedMenuItem == 3))
+        {
+            m_showSoundSettings = true;
+            m_titleSoundSettingItem = 0;
+            SoundManager::GetInstance().PlaySE(SeType::Decide);
             return;
         }
     }
@@ -727,6 +832,8 @@ void GameManager::Update()
         // プレイ中にESCが押されたらポーズ開始
         if (triggerEsc)
         {
+            SoundManager::GetInstance().PlaySE(SeType::Pause);
+            SoundManager::GetInstance().PauseBGM();
             m_isPaused = true;
             m_pauseStartTime = GetNowCount();
             m_pauseMenuItem = 0;
@@ -880,6 +987,14 @@ void GameManager::Update()
         float remainSec  = Config::TIME_LIMIT_SECONDS - elapsedSec;
         if (remainSec < 0.0f) remainSec = 0.0f;
 
+        // 残り時間10秒以下の毎秒カウントダウン警告ビープ
+        int prevSec = static_cast<int>(m_remainingTimeSeconds);
+        int curSec = static_cast<int>(remainSec);
+        if (curSec < prevSec && curSec >= 1 && curSec <= 10)
+        {
+            SoundManager::GetInstance().PlaySE(SeType::Countdown);
+        }
+
         if (m_objManager.GetRemainingMouseCount() == 0 || (Config::USE_TIME_LIMIT_MODE && remainSec <= 0.0f))
         {
             m_state = GameState::GameClear;
@@ -887,6 +1002,14 @@ void GameManager::Update()
             m_clearTimeSeconds = elapsedSec;
             m_remainingTimeSeconds = remainSec;
             m_isTimeUp = (Config::USE_TIME_LIMIT_MODE && m_objManager.GetRemainingMouseCount() > 0 && remainSec <= 0.0f);
+            if (m_isTimeUp)
+            {
+                SoundManager::GetInstance().PlayBGM(BgmType::TimeUp, false);
+            }
+            else
+            {
+                SoundManager::GetInstance().PlayBGM(BgmType::Clear, false);
+            }
             m_clearAnimTimer = 0;
             m_clearSelectedBtn = 0;
             m_clearCamStartPos = m_camera.GetCameraPos();
@@ -999,11 +1122,17 @@ void GameManager::Update()
         m_prevKeyT     = keyT;
         m_prevKeyM     = keyM;
 
+        // ズームイン演出完了の瞬間にスタンプ押印音を再生！
+        if (m_clearAnimTimer == CLEAR_ZOOM_DURATION)
+        {
+            SoundManager::GetInstance().PlaySE(SeType::Stamp);
+        }
+
         // ズームイン演出中（CLEAR_ZOOM_DURATION フレームまで）はリザルトUIのボタン操作を待機（エフェクト更新は止めない）
         if (m_clearAnimTimer > CLEAR_ZOOM_DURATION)
         {
-            if (triggerLeft)  m_clearSelectedBtn = 0;
-            if (triggerRight) m_clearSelectedBtn = 1;
+            if (triggerLeft)  { m_clearSelectedBtn = 0; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+            if (triggerRight) { m_clearSelectedBtn = 1; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
 
             // アクションボタン当たり判定座標
             int btnW = 340;
@@ -1023,6 +1152,7 @@ void GameManager::Update()
             // リトライ判定（[R]キー、または RETRY ボタンクリック / 選択決定）
             if (triggerR || (hoverRetry && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_clearSelectedBtn == 0))
             {
+                SoundManager::GetInstance().PlaySE(SeType::Decide);
                 StartGame();
                 return;
             }
@@ -1030,6 +1160,7 @@ void GameManager::Update()
             // メインメニュー（タイトル）判定（[M]/[T]キー、または MAIN MENU ボタンクリック / 選択決定）
             if (triggerM || triggerT || (hoverMenu && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_clearSelectedBtn == 1))
             {
+                SoundManager::GetInstance().PlaySE(SeType::Decide);
                 SetupTitle();
                 return;
             }
@@ -2549,14 +2680,15 @@ void GameManager::DrawTitleScreen()
     }
 
     // ------------------------------------------------------------------------
-    // 8. ふわふわカプセル・メニューボタン（3項目・ソフトピルデザイン＆浮遊感）
+    // 8. ふわふわカプセル・メニューボタン（4項目・ソフトピルデザイン＆浮遊感）
     // ------------------------------------------------------------------------
     int btnW = 420;
-    int btnH = 54;
+    int btnH = 46;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-    int startBtnY = 356;
-    int stageBtnY = 422;
-    int howBtnY   = 488;
+    int startBtnY = 338;
+    int stageBtnY = 390;
+    int howBtnY   = 442;
+    int soundBtnY = 494;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
@@ -2687,13 +2819,53 @@ void GameManager::DrawTitleScreen()
         }
     }
 
+    // --- ボタン4: サウンド設定 (BGM/SE音量・マウス感度) ---
+    bool isSoundSelected = (m_selectedMenuItem == 3);
+    {
+        float floatY = isSoundSelected ? (std::sin(GetNowCount() * 0.0055f) * 3.0f) : 0.0f;
+        int curY = soundBtnY + static_cast<int>(floatY);
+
+        if (isSoundSelected)
+        {
+            unsigned int neonColor = ((m_titleAnimTimer / 15) % 2 == 0) ? GetColor(160, 255, 120) : GetColor(80, 220, 100);
+            unsigned int bodyColor = GetColor(100, 225 + static_cast<int>(30 * btnPulse), 110);
+            SoftUI::DrawSoftCard(btnX, curY, btnW, btnH, 24, bodyColor, 255, neonColor, 2, true, neonColor);
+
+            SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
+            DrawRoundRect(btnX + 6, curY + 3, btnX + btnW - 6, curY + 16, 12, 12, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+            float glintX = btnX + std::fmod(m_titleAnimTimer * 5.0f, static_cast<float>(btnW + 80)) - 40.0f;
+            SetDrawBlendMode(DX_BLENDMODE_ADD, 90);
+            DrawRoundRect(static_cast<int>(glintX), curY + 3, static_cast<int>(glintX + 28), curY + btnH - 3, 10, 10, GetColor(255, 255, 255), TRUE);
+            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+            int bounceX = static_cast<int>(std::sin(GetNowCount() * 0.015f) * 5.0f);
+            DrawStringToHandle(btnX + 22 + bounceX, curY + 11, "▶", GetColor(25, 25, 30), font24);
+            DrawStringToHandle(btnX + btnW - 42 - bounceX, curY + 11, "◀", GetColor(25, 25, 30), font24);
+
+            const char* soundTxt = "🔊 サウンド設定 (O) !!";
+            int tW = GetDrawStringWidthToHandle(soundTxt, static_cast<int>(strlen(soundTxt)), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 12, soundTxt, GetColor(20, 20, 30), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 11, soundTxt, GetColor(0, 0, 0), font24);
+        }
+        else
+        {
+            SoftUI::DrawSoftCard(btnX, curY, btnW, btnH, 22, GetColor(30, 40, 62), 225, GetColor(60, 80, 120), 1);
+
+            const char* soundTxt = "🔊 サウンド設定 (O)";
+            int tW = GetDrawStringWidthToHandle(soundTxt, static_cast<int>(strlen(soundTxt)), font24);
+            DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, curY + 12, soundTxt, GetColor(210, 230, 255), font24);
+        }
+    }
+
     // ステージ切り替えガイドヒント（ふわっとした半透明角丸プレート）
     const char* stageHint = (m_selectedMap == ModelConfig::MapType::House)
         ? "★ [ ← / → ] またはクリックで MAP 2: NEW MAP に切替"
         : "★ [ ← / → ] またはクリックで MAP 1: 通常ハウス に切替";
     int hintW = GetDrawStringWidthToHandle(stageHint, static_cast<int>(strlen(stageHint)), font13);
     int hintX = (Config::SCREEN_WIDTH - hintW) / 2;
-    int hintY = 550;
+    int hintY = 552;
 
     SoftUI::DrawSoftCard(hintX - 18, hintY - 4, hintW + 36, 26, 13, GetColor(18, 24, 40), 200, GetColor(255, 215, 60), 1);
     DrawStringToHandle(hintX, hintY, stageHint, GetColor(255, 235, 120), font13);
@@ -2782,6 +2954,12 @@ void GameManager::DrawTitleScreen()
     if (m_showHowToPlay)
     {
         DrawHowToPlayModal();
+    }
+
+    // サウンド設定モーダルが開いていれば描画
+    if (m_showSoundSettings)
+    {
+        DrawSoundSettingsModal();
     }
 
     // ------------------------------------------------------------------------
@@ -2963,6 +3141,8 @@ void GameManager::UpdatePause(bool triggerEsc)
     // ESCキーでポーズ解除（ゲーム再開）
     if (triggerEsc)
     {
+        SoundManager::GetInstance().PlaySE(SeType::Cancel);
+        SoundManager::GetInstance().ResumeBGM();
         m_startCount += (GetNowCount() - m_pauseStartTime);
         m_isPaused = false;
         m_camera.ResetMouseToCenter();
@@ -2970,64 +3150,75 @@ void GameManager::UpdatePause(bool triggerEsc)
         return;
     }
 
-    // 上下キーで選択切り替え (0: リトライ, 1: タイトルに戻る, 2: マウス感度)
+    // 上下キーで選択切り替え (0: リトライ, 1: タイトル, 2: マウス感度, 3: BGM音量, 4: SE音量)
     if (triggerUp)
     {
-        m_pauseMenuItem = (m_pauseMenuItem + 2) % 3;
+        m_pauseMenuItem = (m_pauseMenuItem + 4) % 5;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
     }
     if (triggerDown)
     {
-        m_pauseMenuItem = (m_pauseMenuItem + 1) % 3;
+        m_pauseMenuItem = (m_pauseMenuItem + 1) % 5;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
     }
 
-    // ボタン・スライダー当たり判定座標
-    int modalW = 480;
-    int modalH = 400;
+    // モーダルレイアウト寸法
+    int modalW = 500;
+    int modalH = 550;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
-    int btnW = 360;
+    int btnW = 380;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
 
-    int retryBtnY = modalY + 68;
-    int retryBtnH = 50;
+    int retryBtnY = modalY + 58;
+    int retryBtnH = 44;
 
-    int titleBtnY = modalY + 126;
-    int titleBtnH = 50;
+    int titleBtnY = modalY + 108;
+    int titleBtnH = 44;
 
-    int sensRowY  = modalY + 184;
-    int sensRowH  = 74;
+    int sensRowY  = modalY + 158;
+    int sensRowH  = 66;
 
-    int sensBtnW   = 46;
-    int sensBtnH   = 28;
-    int sensBtnY   = sensRowY + 36;
-    int minusBtnX  = btnX + 10;
-    int sliderBarX = btnX + 64;
-    int sliderBarW = 232;
-    int sliderBarY = sensRowY + 44;
-    int sliderBarH = 12;
-    int plusBtnX   = btnX + 304;
+    int bgmRowY   = modalY + 230;
+    int bgmRowH   = 66;
 
-    int resumeBtnW = 260;
+    int seRowY    = modalY + 302;
+    int seRowH    = 66;
+
+    int resumeBtnW = 280;
     int resumeBtnH = 36;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 280;
+    int resumeBtnY = modalY + 376;
 
+    int minusBtnX  = btnX + 10;
+    int minusBtnW  = 46;
+    int minusBtnH  = 26;
+    int plusBtnX   = btnX + btnW - 56;
+    int plusBtnW   = 46;
+    int plusBtnH   = 26;
+    int sliderBarX = btnX + 64;
+    int sliderBarW = btnW - 128;
+    int sliderBarH = 12;
+
+    // ホバー判定
     bool hoverRetry  = (mx >= btnX && mx <= btnX + btnW && my >= retryBtnY && my <= retryBtnY + retryBtnH);
     bool hoverTitle  = (mx >= btnX && mx <= btnX + btnW && my >= titleBtnY && my <= titleBtnY + titleBtnH);
     bool hoverSens   = (mx >= btnX && mx <= btnX + btnW && my >= sensRowY && my <= sensRowY + sensRowH);
-    bool hoverMinus  = (mx >= minusBtnX && mx <= minusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
-    bool hoverPlus   = (mx >= plusBtnX && mx <= plusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
-    bool hoverSlider = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= sliderBarY - 8 && my <= sliderBarY + sliderBarH + 8);
+    bool hoverBgm    = (mx >= btnX && mx <= btnX + btnW && my >= bgmRowY && my <= bgmRowY + bgmRowH);
+    bool hoverSe     = (mx >= btnX && mx <= btnX + btnW && my >= seRowY && my <= seRowY + seRowH);
     bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW && my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
     if (hoverRetry) m_pauseMenuItem = 0;
     if (hoverTitle) m_pauseMenuItem = 1;
     if (hoverSens)  m_pauseMenuItem = 2;
+    if (hoverBgm)   m_pauseMenuItem = 3;
+    if (hoverSe)    m_pauseMenuItem = 4;
 
     // 1. リトライ判定（ボタンクリック / 選択中Enter/Space / Rキー）
     if ((hoverRetry && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_pauseMenuItem == 0) || triggerR)
     {
+        SoundManager::GetInstance().PlaySE(SeType::Decide);
         m_isPaused = false;
         StartGame();
         return;
@@ -3036,49 +3227,120 @@ void GameManager::UpdatePause(bool triggerEsc)
     // 2. タイトルに戻る判定（ボタンクリック / 選択中Enter/Space / Tキー）
     if ((hoverTitle && isMouseTrigger) || ((triggerEnter || triggerSpace) && m_pauseMenuItem == 1) || triggerT)
     {
+        SoundManager::GetInstance().PlaySE(SeType::Decide);
         m_isPaused = false;
         SetupTitle();
         return;
     }
 
-    // 3. マウス感度調整処理
-    // 左右キーまたは感度行選択中の左右操作
-    if (triggerLeft)
+    // 3. マウス感度操作 (Item 2)
+    int sensMinusY = sensRowY + 33;
+    bool hoverSensMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= sensMinusY && my <= sensMinusY + minusBtnH);
+    bool hoverSensPlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= sensMinusY && my <= sensMinusY + plusBtnH);
+    bool hoverSensBar   = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= sensRowY + 36 && my <= sensRowY + 54);
+
+    if (m_pauseMenuItem == 2 && triggerLeft)
     {
         m_camera.AdjustMouseSensitivity(-0.1f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f);
     }
-    if (triggerRight)
+    if (m_pauseMenuItem == 2 && triggerRight)
     {
         m_camera.AdjustMouseSensitivity(+0.1f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f);
     }
-
-    // 感度行が選択されている状態で Enter / Space が押されたら標準(1.0x)に戻す
-    if ((triggerEnter || triggerSpace) && m_pauseMenuItem == 2 && !hoverMinus && !hoverPlus && !hoverSlider)
-    {
-        m_camera.SetMouseSensitivity(1.0f);
-    }
-
-    // マウスクリック操作: [◀ -] ボタン
-    if (hoverMinus && isMouseTrigger)
+    if (hoverSensMinus && isMouseTrigger)
     {
         m_camera.AdjustMouseSensitivity(-0.1f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f);
     }
-    // マウスクリック操作: [+ ▶] ボタン
-    if (hoverPlus && isMouseTrigger)
+    if (hoverSensPlus && isMouseTrigger)
     {
         m_camera.AdjustMouseSensitivity(+0.1f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f);
     }
-    // スライダーバー クリック / ドラッグ操作
-    if (hoverSlider && isLeftClick)
+    if (hoverSensBar && isLeftClick)
     {
         float ratio = static_cast<float>(mx - sliderBarX) / static_cast<float>(sliderBarW);
-        float newSens = 0.2f + MathHelper::Clamp(ratio, 0.0f, 1.0f) * (3.0f - 0.2f);
-        m_camera.SetMouseSensitivity(newSens);
+        m_camera.SetMouseSensitivity(0.2f + MathHelper::Clamp(ratio, 0.0f, 1.0f) * (3.0f - 0.2f));
+    }
+    if ((triggerEnter || triggerSpace) && m_pauseMenuItem == 2 && !hoverSensMinus && !hoverSensPlus && !hoverSensBar)
+    {
+        m_camera.SetMouseSensitivity(1.0f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f);
     }
 
-    // 4. ゲームに戻る判定（再開ボタンクリック）
+    // 4. BGM音量操作 (Item 3)
+    int bgmMinusY = bgmRowY + 33;
+    bool hoverBgmMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= bgmMinusY && my <= bgmMinusY + minusBtnH);
+    bool hoverBgmPlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= bgmMinusY && my <= bgmMinusY + plusBtnH);
+    bool hoverBgmBar   = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= bgmRowY + 36 && my <= bgmRowY + 54);
+
+    if (m_pauseMenuItem == 3 && triggerLeft)
+    {
+        SoundManager::GetInstance().AdjustBGMVolume(-0.05f);
+    }
+    if (m_pauseMenuItem == 3 && triggerRight)
+    {
+        SoundManager::GetInstance().AdjustBGMVolume(+0.05f);
+    }
+    if (hoverBgmMinus && isMouseTrigger)
+    {
+        SoundManager::GetInstance().AdjustBGMVolume(-0.05f);
+    }
+    if (hoverBgmPlus && isMouseTrigger)
+    {
+        SoundManager::GetInstance().AdjustBGMVolume(+0.05f);
+    }
+    if (hoverBgmBar && isLeftClick)
+    {
+        float ratio = static_cast<float>(mx - sliderBarX) / static_cast<float>(sliderBarW);
+        SoundManager::GetInstance().SetBGMVolume(MathHelper::Clamp(ratio, 0.0f, 1.0f));
+        SoundManager::GetInstance().SaveSettings();
+    }
+
+    // 5. SE音量操作 (Item 4)
+    int seMinusY = seRowY + 33;
+    bool hoverSeMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= seMinusY && my <= seMinusY + minusBtnH);
+    bool hoverSePlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= seMinusY && my <= seMinusY + plusBtnH);
+    bool hoverSeBar   = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= seRowY + 36 && my <= seRowY + 54);
+
+    if (m_pauseMenuItem == 4 && triggerLeft)
+    {
+        SoundManager::GetInstance().AdjustSEVolume(-0.05f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+    if (m_pauseMenuItem == 4 && triggerRight)
+    {
+        SoundManager::GetInstance().AdjustSEVolume(+0.05f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+    if (hoverSeMinus && isMouseTrigger)
+    {
+        SoundManager::GetInstance().AdjustSEVolume(-0.05f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+    if (hoverSePlus && isMouseTrigger)
+    {
+        SoundManager::GetInstance().AdjustSEVolume(+0.05f);
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+    if (hoverSeBar && isLeftClick)
+    {
+        float ratio = static_cast<float>(mx - sliderBarX) / static_cast<float>(sliderBarW);
+        SoundManager::GetInstance().SetSEVolume(MathHelper::Clamp(ratio, 0.0f, 1.0f));
+        SoundManager::GetInstance().SaveSettings();
+        if (isMouseTrigger)
+        {
+            SoundManager::GetInstance().PlaySE(SeType::Cursor);
+        }
+    }
+
+    // 6. ゲームに戻る判定（再開ボタンクリック）
     if (hoverResume && isMouseTrigger)
     {
+        SoundManager::GetInstance().PlaySE(SeType::Cancel);
+        SoundManager::GetInstance().ResumeBGM();
         m_startCount += (GetNowCount() - m_pauseStartTime);
         m_isPaused = false;
         m_camera.ResetMouseToCenter();
@@ -3087,9 +3349,6 @@ void GameManager::UpdatePause(bool triggerEsc)
     }
 }
 
-// ============================================================================
-// ポーズモーダルダイアログ描画
-// ============================================================================
 void GameManager::DrawPauseModal()
 {
     auto& fm = FontManager::GetInstance();
@@ -3098,174 +3357,151 @@ void GameManager::DrawPauseModal()
     int font18 = fm.GetFont18();
     int font24 = fm.GetFont24();
 
-    // 1. 全画面暗転レイヤー（背面のゲーム画面が薄暗く透ける）
+    // 1. 全画面暗転レイヤー
     SetDrawBlendMode(DX_BLENDMODE_ALPHA, 195);
     DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 18), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // 2. モーダルウィンドウ外枠・本体（ふわっとした角丸カード）
-    int modalW = 480;
-    int modalH = 400;
+    // 2. モーダル本体
+    int modalW = 500;
+    int modalH = 550;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
-    SoftUI::DrawSoftCard(modalX, modalY, modalW, modalH, 22, GetColor(20, 24, 38), 235, GetColor(255, 125, 35), 2);
+    SoftUI::DrawSoftCard(modalX, modalY, modalW, modalH, 22, GetColor(20, 24, 38), 240, GetColor(255, 125, 35), 2);
 
-    // ヘッダーバー（角丸）
+    // ヘッダーバー
     SetDrawBlendMode(DX_BLENDMODE_ALPHA, 90);
-    DrawRoundRect(modalX + 3, modalY + 3, modalX + modalW - 3, modalY + 52, 20, 20, GetColor(32, 42, 68), TRUE);
+    DrawRoundRect(modalX + 3, modalY + 3, modalX + modalW - 3, modalY + 48, 20, 20, GetColor(32, 42, 68), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-    DrawLine(modalX + 20, modalY + 52, modalX + modalW - 20, modalY + 52, GetColor(255, 125, 35));
+    DrawLine(modalX + 20, modalY + 48, modalX + modalW - 20, modalY + 48, GetColor(255, 125, 35));
 
-    const char* pauseHeader = "⏸ PAUSE (一時停止)";
+    const char* pauseHeader = "⏸ PAUSE / 設定";
     int hW = GetDrawStringWidthToHandle(pauseHeader, static_cast<int>(strlen(pauseHeader)), font24);
-    DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 13, pauseHeader, GetColor(255, 220, 60), font24);
+    DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 11, pauseHeader, GetColor(255, 220, 60), font24);
 
-    // ボタン配置
-    int btnW = 360;
+    int btnW = 380;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-    int retryBtnY = modalY + 68;
-    int retryBtnH = 50;
-    int titleBtnY = modalY + 126;
-    int titleBtnH = 50;
-    int sensRowY  = modalY + 184;
-    int sensRowH  = 74;
+
+    int retryBtnY = modalY + 58;
+    int retryBtnH = 44;
+    int titleBtnY = modalY + 108;
+    int titleBtnH = 44;
+    int sensRowY  = modalY + 158;
+    int sensRowH  = 66;
+    int bgmRowY   = modalY + 230;
+    int bgmRowH   = 66;
+    int seRowY    = modalY + 302;
+    int seRowH    = 66;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
-    // --- ボタン1: リトライ（ふわっとした角丸ピルボタン） ---
+    // --- ボタン1: リトライ ---
     bool isRetrySelected = (m_pauseMenuItem == 0);
     if (isRetrySelected)
     {
         unsigned int col = GetColor(100, 230 + static_cast<int>(25 * btnPulse), 120);
-        SoftUI::DrawSoftCard(btnX, retryBtnY, btnW, retryBtnH, 25, col, 255, GetColor(160, 255, 180), 2, true, GetColor(100, 240, 130));
-
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
-        DrawRoundRect(btnX + 6, retryBtnY + 3, btnX + btnW - 6, retryBtnY + 16, 12, 12, GetColor(255, 255, 255), TRUE);
-        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-
-        DrawStringToHandle(btnX + 22, retryBtnY + 12, "🔄", GetColor(20, 20, 20), font24);
+        SoftUI::DrawSoftCard(btnX, retryBtnY, btnW, retryBtnH, 22, col, 255, GetColor(160, 255, 180), 2, true, GetColor(100, 240, 130));
+        DrawStringToHandle(btnX + 22, retryBtnY + 9, "🔄", GetColor(20, 20, 20), font24);
         const char* retryTxt = "リトライ (R)";
         int tW = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 13, retryTxt, GetColor(15, 25, 20), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 10, retryTxt, GetColor(15, 25, 20), font24);
     }
     else
     {
-        SoftUI::DrawSoftCard(btnX, retryBtnY, btnW, retryBtnH, 25, GetColor(32, 42, 65), 235, GetColor(60, 75, 110), 1);
-
-        DrawStringToHandle(btnX + 22, retryBtnY + 12, "🔄", GetColor(140, 170, 210), font24);
+        SoftUI::DrawSoftCard(btnX, retryBtnY, btnW, retryBtnH, 22, GetColor(32, 42, 65), 235, GetColor(60, 75, 110), 1);
+        DrawStringToHandle(btnX + 22, retryBtnY + 9, "🔄", GetColor(140, 170, 210), font24);
         const char* retryTxt = "リトライ";
         int tW = GetDrawStringWidthToHandle(retryTxt, static_cast<int>(strlen(retryTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 13, retryTxt, GetColor(210, 230, 255), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, retryBtnY + 10, retryTxt, GetColor(210, 230, 255), font24);
     }
 
-    // --- ボタン2: タイトルに戻る（ふわっとした角丸ピルボタン） ---
+    // --- ボタン2: タイトルに戻る ---
     bool isTitleSelected = (m_pauseMenuItem == 1);
     if (isTitleSelected)
     {
         unsigned int col = GetColor(70, 190 + static_cast<int>(35 * btnPulse), 255);
-        SoftUI::DrawSoftCard(btnX, titleBtnY, btnW, titleBtnH, 25, col, 255, GetColor(160, 230, 255), 2, true, GetColor(80, 200, 255));
-
-        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
-        DrawRoundRect(btnX + 6, titleBtnY + 3, btnX + btnW - 6, titleBtnY + 16, 12, 12, GetColor(255, 255, 255), TRUE);
-        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-
-        DrawStringToHandle(btnX + 22, titleBtnY + 12, "🏠", GetColor(20, 20, 20), font24);
+        SoftUI::DrawSoftCard(btnX, titleBtnY, btnW, titleBtnH, 22, col, 255, GetColor(160, 230, 255), 2, true, GetColor(80, 200, 255));
+        DrawStringToHandle(btnX + 22, titleBtnY + 9, "🏠", GetColor(20, 20, 20), font24);
         const char* titleTxt = "タイトルに戻る (T)";
         int tW = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 13, titleTxt, GetColor(15, 20, 30), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 10, titleTxt, GetColor(15, 20, 30), font24);
     }
     else
     {
-        SoftUI::DrawSoftCard(btnX, titleBtnY, btnW, titleBtnH, 25, GetColor(32, 42, 65), 235, GetColor(60, 75, 110), 1);
-
-        DrawStringToHandle(btnX + 22, titleBtnY + 12, "🏠", GetColor(140, 170, 210), font24);
+        SoftUI::DrawSoftCard(btnX, titleBtnY, btnW, titleBtnH, 22, GetColor(32, 42, 65), 235, GetColor(60, 75, 110), 1);
+        DrawStringToHandle(btnX + 22, titleBtnY + 9, "🏠", GetColor(140, 170, 210), font24);
         const char* titleTxt = "タイトルに戻る";
         int tW = GetDrawStringWidthToHandle(titleTxt, static_cast<int>(strlen(titleTxt)), font24);
-        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 13, titleTxt, GetColor(210, 230, 255), font24);
+        DrawStringToHandle((Config::SCREEN_WIDTH - tW) / 2, titleBtnY + 10, titleTxt, GetColor(210, 230, 255), font24);
     }
-
-    // --- コントロール3: マウス感度調整（ふわっとした角丸カード） ---
-    bool isSensSelected = (m_pauseMenuItem == 2);
-    int sensBtnW   = 46;
-    int sensBtnH   = 28;
-    int sensBtnY   = sensRowY + 36;
-    int minusBtnX  = btnX + 10;
-    int sliderBarX = btnX + 64;
-    int sliderBarW = 232;
-    int sliderBarY = sensRowY + 44;
-    int sliderBarH = 12;
-    int plusBtnX   = btnX + 304;
 
     int mx, my;
     GetMousePoint(&mx, &my);
-    bool hoverMinus = (mx >= minusBtnX && mx <= minusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
-    bool hoverPlus  = (mx >= plusBtnX && mx <= plusBtnX + sensBtnW && my >= sensBtnY && my <= sensBtnY + sensBtnH);
+    int minusBtnX  = btnX + 10;
+    int minusBtnW  = 46;
+    int minusBtnH  = 26;
+    int plusBtnX   = btnX + btnW - 56;
+    int plusBtnW   = 46;
+    int plusBtnH   = 26;
 
-    // 感度行の外枠・背景
-    SoftUI::DrawSoftCard(btnX, sensRowY, btnW, sensRowH, 16,
-                         isSensSelected ? GetColor(28, 38, 62) : GetColor(24, 30, 48), 235,
-                         isSensSelected ? GetColor(255, 180, 50) : GetColor(50, 65, 95),
-                         isSensSelected ? 2 : 1, isSensSelected, GetColor(255, 180, 50));
-
-    // 感度テキスト表示（上段）
+    // --- コントロール3: マウス感度 ---
+    bool isSensSelected = (m_pauseMenuItem == 2);
     float currentSens = m_camera.GetMouseSensitivity();
-    char sensTxt[64];
-    snprintf(sensTxt, sizeof(sensTxt), "🎯 マウス感度: %.1fx", currentSens);
-    DrawStringToHandle(btnX + 14, sensRowY + 9, sensTxt, isSensSelected ? GetColor(255, 230, 90) : GetColor(220, 235, 255), font16);
-
-    const char* sensHint = "[←/→ で変更]";
-    DrawStringToHandle(btnX + btnW - 110, sensRowY + 11, sensHint, GetColor(140, 165, 195), font13);
-
-    // [◀ -] ボタン描画
-    SoftUI::DrawSoftCard(minusBtnX, sensBtnY, sensBtnW, sensBtnH, 10,
-                         hoverMinus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), 235,
-                         hoverMinus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), 1,
-                         hoverMinus, GetColor(100, 220, 255));
-    DrawStringToHandle(minusBtnX + 11, sensBtnY + 5, "◀ -", hoverMinus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font16);
-
-    // スライダーバー背景（角丸溝）
-    DrawRoundRect(sliderBarX, sliderBarY, sliderBarX + sliderBarW, sliderBarY + sliderBarH, 6, 6, GetColor(12, 16, 26), TRUE);
-    DrawRoundRect(sliderBarX, sliderBarY, sliderBarX + sliderBarW, sliderBarY + sliderBarH, 6, 6, GetColor(60, 75, 105), FALSE);
-
-    // 1.0x（標準位置）の目盛りマーク
-    float standardRatio = (1.0f - 0.2f) / (3.0f - 0.2f);
-    int standardX = sliderBarX + static_cast<int>(sliderBarW * standardRatio);
-    DrawLine(standardX, sliderBarY - 3, standardX, sliderBarY + sliderBarH + 3, GetColor(180, 200, 220));
-
-    // 現在感度に応じた塗りつぶしプログレス（角丸）
+    char sensValStr[32];
+    snprintf(sensValStr, sizeof(sensValStr), "%.1fx", currentSens);
     float sensRatio = (currentSens - 0.2f) / (3.0f - 0.2f);
-    sensRatio = MathHelper::Clamp(sensRatio, 0.0f, 1.0f);
-    int fillW = static_cast<int>(sliderBarW * sensRatio);
-    if (fillW > 0)
-    {
-        unsigned int progColor = (currentSens >= 2.0f) ? GetColor(255, 120, 60) : ((currentSens >= 1.0f) ? GetColor(100, 220, 255) : GetColor(70, 180, 240));
-        int rVal = (fillW > 6) ? 5 : 2;
-        DrawRoundRect(sliderBarX + 1, sliderBarY + 1, sliderBarX + fillW, sliderBarY + sliderBarH - 1, rVal, rVal, progColor, TRUE);
-    }
+    int sensMinusY = sensRowY + 33;
+    bool hoverSensMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= sensMinusY && my <= sensMinusY + minusBtnH);
+    bool hoverSensPlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= sensMinusY && my <= sensMinusY + plusBtnH);
 
-    // スライダーつまみ（ノブ）
-    int knobX = sliderBarX + fillW;
-    int knobY = sliderBarY + sliderBarH / 2;
-    DrawCircle(knobX, knobY, 9, GetColor(0, 0, 0), TRUE);
-    DrawCircle(knobX, knobY, 8, isSensSelected ? GetColor(255, 230, 80) : GetColor(220, 240, 255), TRUE);
-    DrawCircle(knobX, knobY, 4, GetColor(30, 40, 60), TRUE);
+    DrawSettingSliderCard(
+        btnX, sensRowY, btnW, sensRowH,
+        isSensSelected, "🎯 マウス感度", sensValStr, sensRatio,
+        (currentSens >= 2.0f) ? GetColor(255, 120, 60) : ((currentSens >= 1.0f) ? GetColor(100, 220, 255) : GetColor(70, 180, 240)),
+        hoverSensMinus, hoverSensPlus, font16, font13
+    );
 
-    // [+ ▶] ボタン描画
-    SoftUI::DrawSoftCard(plusBtnX, sensBtnY, sensBtnW, sensBtnH, 10,
-                         hoverPlus ? GetColor(60, 90, 140) : GetColor(38, 48, 75), 235,
-                         hoverPlus ? GetColor(100, 220, 255) : GetColor(70, 85, 120), 1,
-                         hoverPlus, GetColor(100, 220, 255));
-    DrawStringToHandle(plusBtnX + 11, sensBtnY + 5, "+ ▶", hoverPlus ? GetColor(255, 255, 255) : GetColor(190, 215, 245), font16);
+    // --- コントロール4: BGM音量 ---
+    bool isBgmSelected = (m_pauseMenuItem == 3);
+    int bgmPercent = SoundManager::GetInstance().GetBGMVolumePercent();
+    char bgmValStr[32];
+    snprintf(bgmValStr, sizeof(bgmValStr), "%d%%", bgmPercent);
+    float bgmRatio = SoundManager::GetInstance().GetBGMVolume();
+    int bgmMinusY = bgmRowY + 33;
+    bool hoverBgmMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= bgmMinusY && my <= bgmMinusY + minusBtnH);
+    bool hoverBgmPlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= bgmMinusY && my <= bgmMinusY + plusBtnH);
 
-    // --- 下部: ゲームに戻る (ESC) ガイドボタン（角丸カプセル） ---
-    int resumeBtnW = 260;
+    DrawSettingSliderCard(
+        btnX, bgmRowY, btnW, bgmRowH,
+        isBgmSelected, "🎵 BGM音量", bgmValStr, bgmRatio,
+        GetColor(255, 170, 50),
+        hoverBgmMinus, hoverBgmPlus, font16, font13
+    );
+
+    // --- コントロール5: SE音量 ---
+    bool isSeSelected = (m_pauseMenuItem == 4);
+    int sePercent = SoundManager::GetInstance().GetSEVolumePercent();
+    char seValStr[32];
+    snprintf(seValStr, sizeof(seValStr), "%d%%", sePercent);
+    float seRatio = SoundManager::GetInstance().GetSEVolume();
+    int seMinusY = seRowY + 33;
+    bool hoverSeMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= seMinusY && my <= seMinusY + minusBtnH);
+    bool hoverSePlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= seMinusY && my <= seMinusY + plusBtnH);
+
+    DrawSettingSliderCard(
+        btnX, seRowY, btnW, seRowH,
+        isSeSelected, "🔊 SE音量 (効果音)", seValStr, seRatio,
+        GetColor(80, 220, 120),
+        hoverSeMinus, hoverSePlus, font16, font13
+    );
+
+    // --- 下部: ゲームに戻る (ESC) ボタン ---
+    int resumeBtnW = 280;
     int resumeBtnH = 36;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 280;
-
-    bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW &&
-                       my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
+    int resumeBtnY = modalY + 376;
+    bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW && my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
     SoftUI::DrawSoftCard(resumeBtnX, resumeBtnY, resumeBtnW, resumeBtnH, 18,
                          hoverResume ? GetColor(45, 60, 90) : GetColor(24, 30, 46), 235,
@@ -3277,15 +3513,275 @@ void GameManager::DrawPauseModal()
     DrawStringToHandle((Config::SCREEN_WIDTH - rW) / 2, resumeBtnY + 9, resumeTxt, hoverResume ? GetColor(255, 255, 255) : GetColor(180, 205, 235), font16);
 
     // 操作説明ガイド
-    const char* guideTxt1 = "選択: [↑/↓]  感度変更: [←/→] または クリック";
+    const char* guideTxt1 = "選択: [↑/↓]  感度・音量変更: [←/→] または クリック/ドラッグ";
     int gW1 = GetDrawStringWidthToHandle(guideTxt1, static_cast<int>(strlen(guideTxt1)), font13);
-    DrawStringToHandle((Config::SCREEN_WIDTH - gW1) / 2, modalY + 338, guideTxt1, GetColor(160, 185, 220), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW1) / 2, modalY + 430, guideTxt1, GetColor(160, 185, 220), font13);
 
     const char* guideTxt2 = "決定: [ENTER] / [SPACE]  |  閉じる: [ESC]";
     int gW2 = GetDrawStringWidthToHandle(guideTxt2, static_cast<int>(strlen(guideTxt2)), font13);
-    DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 360, guideTxt2, GetColor(130, 150, 180), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 454, guideTxt2, GetColor(130, 150, 180), font13);
 }
 
+// ============================================================================
+// タイトル画面：サウンド設定モーダル更新処理
+// ============================================================================
+void GameManager::UpdateTitleSoundSettings()
+{
+    int mx = 0, my = 0;
+    GetMousePoint(&mx, &my);
+    bool isLeftClick = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
+    bool isMouseTrigger = isLeftClick && !m_prevMouseLeft;
+    m_prevMouseLeft = isLeftClick;
+
+    bool keyEsc   = (CheckHitKey(KEY_INPUT_ESCAPE) != 0);
+    bool keyUp    = (CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
+    bool keyDown  = (CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
+    bool keyLeft  = (CheckHitKey(KEY_INPUT_LEFT) != 0 || CheckHitKey(KEY_INPUT_A) != 0 || CheckHitKey(KEY_INPUT_MINUS) != 0 || CheckHitKey(KEY_INPUT_SUBTRACT) != 0);
+    bool keyRight = (CheckHitKey(KEY_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_D) != 0 || CheckHitKey(KEY_INPUT_ADD) != 0);
+    bool isEnter  = (CheckHitKey(KEY_INPUT_RETURN) != 0);
+    bool isSpace  = (CheckHitKey(KEY_INPUT_SPACE) != 0);
+
+    bool triggerEsc   = keyEsc && !m_prevKeyEsc;
+    bool triggerUp    = keyUp && !m_prevKeyUp;
+    bool triggerDown  = keyDown && !m_prevKeyDown;
+    bool triggerLeft  = keyLeft && !m_prevKeyLeft;
+    bool triggerRight = keyRight && !m_prevKeyRight;
+
+    m_prevKeyEsc   = keyEsc;
+    m_prevKeyUp    = keyUp;
+    m_prevKeyDown  = keyDown;
+    m_prevKeyLeft  = keyLeft;
+    m_prevKeyRight = keyRight;
+    m_prevKeyEnter = isEnter;
+    m_prevKeySpace = isSpace;
+
+    int modalW = 500;
+    int modalH = 430;
+    int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
+    int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
+
+    int closeBtnW = 160;
+    int closeBtnH = 38;
+    int closeBtnX = (Config::SCREEN_WIDTH - closeBtnW) / 2;
+    int closeBtnY = modalY + modalH - 52;
+
+    bool hoverClose = (mx >= closeBtnX && mx <= closeBtnX + closeBtnW && my >= closeBtnY && my <= closeBtnY + closeBtnH);
+
+    // ESC または 閉じるボタンクリックで閉じる
+    if (triggerEsc || (hoverClose && isMouseTrigger))
+    {
+        m_showSoundSettings = false;
+        SoundManager::GetInstance().PlaySE(SeType::Cancel);
+        return;
+    }
+
+    // 上下キーで項目移動 (0: BGM, 1: SE, 2: 感度)
+    if (triggerUp)
+    {
+        m_titleSoundSettingItem = (m_titleSoundSettingItem + 2) % 3;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+    if (triggerDown)
+    {
+        m_titleSoundSettingItem = (m_titleSoundSettingItem + 1) % 3;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+
+    int btnW = 380;
+    int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
+    int bgmRowY  = modalY + 68;
+    int bgmRowH  = 66;
+    int seRowY   = modalY + 144;
+    int seRowH   = 66;
+    int sensRowY = modalY + 220;
+    int sensRowH = 66;
+
+    int minusBtnX  = btnX + 10;
+    int minusBtnW  = 46;
+    int minusBtnH  = 26;
+    int plusBtnX   = btnX + btnW - 56;
+    int plusBtnW   = 46;
+    int plusBtnH   = 26;
+    int sliderBarX = btnX + 64;
+    int sliderBarW = btnW - 128;
+
+    bool hoverBgm  = (mx >= btnX && mx <= btnX + btnW && my >= bgmRowY && my <= bgmRowY + bgmRowH);
+    bool hoverSe   = (mx >= btnX && mx <= btnX + btnW && my >= seRowY && my <= seRowY + seRowH);
+    bool hoverSens = (mx >= btnX && mx <= btnX + btnW && my >= sensRowY && my <= sensRowY + sensRowH);
+
+    if (hoverBgm)  m_titleSoundSettingItem = 0;
+    if (hoverSe)   m_titleSoundSettingItem = 1;
+    if (hoverSens) m_titleSoundSettingItem = 2;
+
+    // 1. BGM音量操作
+    int bgmMinusY = bgmRowY + 33;
+    bool hoverBgmMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= bgmMinusY && my <= bgmMinusY + minusBtnH);
+    bool hoverBgmPlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= bgmMinusY && my <= bgmMinusY + plusBtnH);
+    bool hoverBgmBar   = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= bgmRowY + 36 && my <= bgmRowY + 54);
+
+    if (m_titleSoundSettingItem == 0 && triggerLeft)  SoundManager::GetInstance().AdjustBGMVolume(-0.05f);
+    if (m_titleSoundSettingItem == 0 && triggerRight) SoundManager::GetInstance().AdjustBGMVolume(+0.05f);
+    if (hoverBgmMinus && isMouseTrigger) SoundManager::GetInstance().AdjustBGMVolume(-0.05f);
+    if (hoverBgmPlus && isMouseTrigger)  SoundManager::GetInstance().AdjustBGMVolume(+0.05f);
+    if (hoverBgmBar && isLeftClick)
+    {
+        float ratio = static_cast<float>(mx - sliderBarX) / static_cast<float>(sliderBarW);
+        SoundManager::GetInstance().SetBGMVolume(MathHelper::Clamp(ratio, 0.0f, 1.0f));
+        SoundManager::GetInstance().SaveSettings();
+    }
+
+    // 2. SE音量操作
+    int seMinusY = seRowY + 33;
+    bool hoverSeMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= seMinusY && my <= seMinusY + minusBtnH);
+    bool hoverSePlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= seMinusY && my <= seMinusY + plusBtnH);
+    bool hoverSeBar   = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= seRowY + 36 && my <= seRowY + 54);
+
+    if (m_titleSoundSettingItem == 1 && triggerLeft)  { SoundManager::GetInstance().AdjustSEVolume(-0.05f); SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+    if (m_titleSoundSettingItem == 1 && triggerRight) { SoundManager::GetInstance().AdjustSEVolume(+0.05f); SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+    if (hoverSeMinus && isMouseTrigger) { SoundManager::GetInstance().AdjustSEVolume(-0.05f); SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+    if (hoverSePlus && isMouseTrigger)  { SoundManager::GetInstance().AdjustSEVolume(+0.05f); SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+    if (hoverSeBar && isLeftClick)
+    {
+        float ratio = static_cast<float>(mx - sliderBarX) / static_cast<float>(sliderBarW);
+        SoundManager::GetInstance().SetSEVolume(MathHelper::Clamp(ratio, 0.0f, 1.0f));
+        SoundManager::GetInstance().SaveSettings();
+        if (isMouseTrigger) SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+
+    // 3. マウス感度操作
+    int sensMinusY = sensRowY + 33;
+    bool hoverSensMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= sensMinusY && my <= sensMinusY + minusBtnH);
+    bool hoverSensPlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= sensMinusY && my <= sensMinusY + plusBtnH);
+    bool hoverSensBar   = (mx >= sliderBarX - 4 && mx <= sliderBarX + sliderBarW + 4 && my >= sensRowY + 36 && my <= sensRowY + 54);
+
+    if (m_titleSoundSettingItem == 2 && triggerLeft)  { m_camera.AdjustMouseSensitivity(-0.1f); SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f); }
+    if (m_titleSoundSettingItem == 2 && triggerRight) { m_camera.AdjustMouseSensitivity(+0.1f); SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f); }
+    if (hoverSensMinus && isMouseTrigger) { m_camera.AdjustMouseSensitivity(-0.1f); SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f); }
+    if (hoverSensPlus && isMouseTrigger)  { m_camera.AdjustMouseSensitivity(+0.1f); SoundManager::GetInstance().PlaySE(SeType::Cursor, 0.7f); }
+    if (hoverSensBar && isLeftClick)
+    {
+        float ratio = static_cast<float>(mx - sliderBarX) / static_cast<float>(sliderBarW);
+        m_camera.SetMouseSensitivity(0.2f + MathHelper::Clamp(ratio, 0.0f, 1.0f) * (3.0f - 0.2f));
+    }
+}
+
+// ============================================================================
+// タイトル画面：サウンド設定モーダル描画
+// ============================================================================
+void GameManager::DrawSoundSettingsModal()
+{
+    auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
+    int font16 = fm.GetFont16();
+    int font24 = fm.GetFont24();
+
+    // 1. 全画面暗転レイヤー
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 210);
+    DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 18), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+    // 2. モーダル本体
+    int modalW = 500;
+    int modalH = 430;
+    int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
+    int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
+
+    SoftUI::DrawSoftCard(modalX, modalY, modalW, modalH, 22, GetColor(20, 24, 38), 245, GetColor(80, 220, 100), 2);
+
+    // ヘッダーバー
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 90);
+    DrawRoundRect(modalX + 3, modalY + 3, modalX + modalW - 3, modalY + 48, 20, 20, GetColor(32, 48, 68), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+    DrawLine(modalX + 20, modalY + 48, modalX + modalW - 20, modalY + 48, GetColor(80, 220, 100));
+
+    const char* headerTxt = "🔊 サウンド＆操作設定";
+    int hW = GetDrawStringWidthToHandle(headerTxt, static_cast<int>(strlen(headerTxt)), font24);
+    DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 11, headerTxt, GetColor(255, 230, 90), font24);
+
+    int btnW = 380;
+    int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
+    int bgmRowY  = modalY + 68;
+    int bgmRowH  = 66;
+    int seRowY   = modalY + 144;
+    int seRowH   = 66;
+    int sensRowY = modalY + 220;
+    int sensRowH = 66;
+
+    int mx, my;
+    GetMousePoint(&mx, &my);
+    int minusBtnX  = btnX + 10;
+    int minusBtnW  = 46;
+    int minusBtnH  = 26;
+    int plusBtnX   = btnX + btnW - 56;
+    int plusBtnW   = 46;
+    int plusBtnH   = 26;
+
+    // --- 1. BGM音量 ---
+    bool isBgmSelected = (m_titleSoundSettingItem == 0);
+    int bgmPercent = SoundManager::GetInstance().GetBGMVolumePercent();
+    char bgmValStr[32];
+    snprintf(bgmValStr, sizeof(bgmValStr), "%d%%", bgmPercent);
+    int bgmMinusY = bgmRowY + 33;
+    bool hoverBgmMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= bgmMinusY && my <= bgmMinusY + minusBtnH);
+    bool hoverBgmPlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= bgmMinusY && my <= bgmMinusY + plusBtnH);
+
+    DrawSettingSliderCard(
+        btnX, bgmRowY, btnW, bgmRowH,
+        isBgmSelected, "🎵 BGM音量", bgmValStr, SoundManager::GetInstance().GetBGMVolume(),
+        GetColor(255, 170, 50),
+        hoverBgmMinus, hoverBgmPlus, font16, font13
+    );
+
+    // --- 2. SE音量 ---
+    bool isSeSelected = (m_titleSoundSettingItem == 1);
+    int sePercent = SoundManager::GetInstance().GetSEVolumePercent();
+    char seValStr[32];
+    snprintf(seValStr, sizeof(seValStr), "%d%%", sePercent);
+    int seMinusY = seRowY + 33;
+    bool hoverSeMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= seMinusY && my <= seMinusY + minusBtnH);
+    bool hoverSePlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= seMinusY && my <= seMinusY + plusBtnH);
+
+    DrawSettingSliderCard(
+        btnX, seRowY, btnW, seRowH,
+        isSeSelected, "🔊 SE音量 (効果音)", seValStr, SoundManager::GetInstance().GetSEVolume(),
+        GetColor(80, 220, 120),
+        hoverSeMinus, hoverSePlus, font16, font13
+    );
+
+    // --- 3. マウス感度 ---
+    bool isSensSelected = (m_titleSoundSettingItem == 2);
+    float currentSens = m_camera.GetMouseSensitivity();
+    char sensValStr[32];
+    snprintf(sensValStr, sizeof(sensValStr), "%.1fx", currentSens);
+    float sensRatio = (currentSens - 0.2f) / (3.0f - 0.2f);
+    int sensMinusY = sensRowY + 33;
+    bool hoverSensMinus = (mx >= minusBtnX && mx <= minusBtnX + minusBtnW && my >= sensMinusY && my <= sensMinusY + minusBtnH);
+    bool hoverSensPlus  = (mx >= plusBtnX && mx <= plusBtnX + plusBtnW && my >= sensMinusY && my <= sensMinusY + plusBtnH);
+
+    DrawSettingSliderCard(
+        btnX, sensRowY, btnW, sensRowH,
+        isSensSelected, "🎯 マウス感度", sensValStr, sensRatio,
+        (currentSens >= 2.0f) ? GetColor(255, 120, 60) : ((currentSens >= 1.0f) ? GetColor(100, 220, 255) : GetColor(70, 180, 240)),
+        hoverSensMinus, hoverSensPlus, font16, font13
+    );
+
+    // 閉じるボタン
+    int closeBtnW = 160;
+    int closeBtnH = 38;
+    int closeBtnX = (Config::SCREEN_WIDTH - closeBtnW) / 2;
+    int closeBtnY = modalY + modalH - 52;
+    bool hoverClose = (mx >= closeBtnX && mx <= closeBtnX + closeBtnW && my >= closeBtnY && my <= closeBtnY + closeBtnH);
+
+    SoftUI::DrawSoftCard(closeBtnX, closeBtnY, closeBtnW, closeBtnH, 19,
+                         hoverClose ? GetColor(45, 60, 90) : GetColor(28, 36, 56), 235,
+                         hoverClose ? GetColor(100, 220, 255) : GetColor(70, 85, 120), 1,
+                         hoverClose, GetColor(80, 200, 255));
+    DrawStringToHandle(closeBtnX + 24, closeBtnY + 10, "閉じる (ESC)", hoverClose ? GetColor(255, 255, 255) : GetColor(200, 225, 255), font16);
+
+    const char* hintTxt = "項目選択: [↑/↓]  音量変更: [←/→] または クリック/ドラッグ";
+    int hintW = GetDrawStringWidthToHandle(hintTxt, static_cast<int>(strlen(hintTxt)), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - hintW) / 2, modalY + 312, hintTxt, GetColor(160, 185, 220), font13);
+}
 void GameManager::DrawDebug3DOverlay()
 {
     auto player = m_objManager.GetPlayer();

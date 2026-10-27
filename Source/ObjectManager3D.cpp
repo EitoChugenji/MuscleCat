@@ -3,6 +3,7 @@
 // @brief  ObjectManager3D クラスの実装（更新・描画・捕獲コンボ判定・壁/床衝突解決）
 // ============================================================================
 #include "ObjectManager3D.h"
+#include "SoundManager.h"
 #include "GameObject3D.h"
 #include "Player3D.h"
 #include "Mouse3D.h"
@@ -428,6 +429,7 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     {
                         int stunDuration = m_player->GetMouseStunDuration();
                         mouse->ApplyStun(stunDuration);
+                        SoundManager::GetInstance().PlaySE(SeType::RatSqueak);
                     }
                 }
                 
@@ -446,6 +448,8 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     obj->SetAlive(false);
                     m_caughtCount++;
                     ApplyMouseSpeedBonus();
+                    float catchVol = 1.0f + static_cast<float>((std::min)(m_comboCount, 5)) * 0.05f;
+                    SoundManager::GetInstance().PlaySE(SeType::Catch, catchVol);
 
                     // コンボ判定（約3.5秒以内に次のネズミを捕まえればコンボ加算！）
                     if (m_comboTimer > 0)

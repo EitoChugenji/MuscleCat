@@ -9,6 +9,7 @@
 #include "EffectManager.h"
 #include "CustomEffectManager.h"
 #include "CsvManager.h"
+#include "SoundManager.h"
 #include "GameManager.h"
 #include <ctime>
 #include <cstdlib>
@@ -49,6 +50,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     ModelManager::GetInstance().Init();         // 3Dモデル管理テーブルの初期化
     EffectManager::GetInstance().Init();        // Effekseerエフェクトの初期化・リソース読み込み
     CustomEffectManager::GetInstance().Init();  // 3Dプロシージャル炎・煙・雷撃・地面えぐりエフェクトの初期化
+    SoundManager::GetInstance().Init();         // 全BGM・SEリソースの初期化
 
     GameManager game;
     game.Init();                                // ステージ構築・タイトル画面の初期セットアップ
@@ -79,6 +81,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     // ------------------------------------------------------------------------
     // 4. 終了時のリソース一括解放（初期化の逆順で安全に破棄）
     // ------------------------------------------------------------------------
+    SoundManager::GetInstance().Release();
     CustomEffectManager::GetInstance().Release();
     EffectManager::GetInstance().Release();
     ModelManager::GetInstance().Release();

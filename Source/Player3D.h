@@ -64,6 +64,7 @@ private:
     VECTOR               m_prevPos        = VGet(0.0f, 0.0f, 0.0f);      // 前フレームの座標（崖落ち防止・実速度計測用）
     ModelConfig::MapType m_mapType        = ModelConfig::MapType::SlopeHills; // 現在プレイ中のマップ種別
     int                  m_animFrame      = 0;                           // 累積フレームカウンタ
+    int                  m_footstepTimer  = 0;                           // 猫の走行足音インターバルタイマー
     float                m_animTime       = 0.0f;                        // 累積経過秒数（オーラ・湯気周期用）
 
     // ------------------------------------------------------------------------

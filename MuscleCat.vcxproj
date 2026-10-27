@@ -162,6 +162,7 @@
     <ClInclude Include="Source\ObjectManager3D.h" />
     <ClInclude Include="Source\Obstacle3D.h" />
     <ClInclude Include="Source\Player3D.h" />
+    <ClInclude Include="Source\SoundManager.h" />
     <ClInclude Include="Source\Stage3D.h" />
   </ItemGroup>
   <ItemGroup>
@@ -177,6 +178,7 @@
     <ClCompile Include="Source\ObjectManager3D.cpp" />
     <ClCompile Include="Source\Obstacle3D.cpp" />
     <ClCompile Include="Source\Player3D.cpp" />
+    <ClCompile Include="Source\SoundManager.cpp" />
     <ClCompile Include="Source\Stage3D.cpp" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
