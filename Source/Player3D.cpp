@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // @file   Player3D.cpp
 // @brief  Player3D クラスの実装（移動・筋トレQTE・飛びつき・スタン攻撃・3D描画）
 // ============================================================================
@@ -67,19 +67,23 @@ void Player3D::InitModel()
     // ベースモデルを読み込み、アニメーション個別制御用に複製
     int baseHandle = ModelManager::GetInstance().LoadModelHandle(ModelConfig::CAT_MODEL_PATH);
 
+    // 筋肉痛（06_MuscleSoreness）およびタックル（05_Push）アニメーションを含む補助モデルをロード
+    m_sorenessModelHandle = ModelManager::GetInstance().LoadModelHandle("Resource/Models/CatModel/cat_soreness.mv1");
+
     if (baseHandle != -1)
     {
         m_modelHandle = MV1DuplicateModel(baseHandle);
 
         if (m_modelHandle != -1)
         {
-            // モデル内のアニメーション名から各インデックスを自動検出（大文字小文字問わず柔軟に検索）
-            auto findAnimEx = [this](const std::vector<std::string>& keywords, const std::vector<std::string>& excludeKeywords, int fallbackIndex) -> int
+            // 指定したモデルハンドル内のアニメーション名からインデックスを自動検出するラムダ
+            auto findAnimInHandle = [](int targetHandle, const std::vector<std::string>& keywords, const std::vector<std::string>& excludeKeywords, int fallbackIndex) -> int
             {
-                int num = MV1GetAnimNum(m_modelHandle);
+                if (targetHandle == -1) return -1;
+                int num = MV1GetAnimNum(targetHandle);
                 for (int i = 0; i < num; ++i)
                 {
-                    const char* name = MV1GetAnimName(m_modelHandle, i);
+                    const char* name = MV1GetAnimName(targetHandle, i);
                     if (!name) continue;
                     std::string s(name);
                     for (auto& c : s) c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
@@ -101,16 +105,22 @@ void Player3D::InitModel()
                         }
                     }
                 }
-                if (fallbackIndex >= num)
+                if (fallbackIndex < 0 || fallbackIndex >= num)
                 {
-                    return (num > 0) ? 0 : -1;
+                    return -1;
                 }
                 return fallbackIndex;
             };
 
-            auto findAnim = [&findAnimEx](const std::vector<std::string>& keywords, int fallbackIndex) -> int
+            auto findAnim = [this, &findAnimInHandle](const std::vector<std::string>& keywords, int fallbackIndex) -> int
             {
-                return findAnimEx(keywords, {}, fallbackIndex);
+                int idx = findAnimInHandle(m_modelHandle, keywords, {}, fallbackIndex);
+                if (idx == -1)
+                {
+                    int num = MV1GetAnimNum(m_modelHandle);
+                    return (num > 0) ? 0 : -1;
+                }
+                return idx;
             };
 
             m_animIndexRun      = findAnim({ "01_run", "run" }, 0);
@@ -118,22 +128,46 @@ void Player3D::InitModel()
             m_animIndexSquat    = findAnim({ "03_squat", "squat" }, 2);
             m_animIndexIdol     = findAnim({ "04_idol", "idol", "idle" }, 3);
             m_animIndexPushUp   = findAnim({ "05_pushup", "pushup", "push_up" }, 4);
-            // タックル（スタン攻撃）用：pushup以外の独立したパンチ/プッシュがあれば使用。無ければAttackを使用
-            m_animIndexPush     = findAnimEx({ "punch", "05_push", "push" }, { "pushup", "push_up" }, -1);
+
+            // タックル（スタン攻撃）用：pushup以外の独立したパンチ/プッシュがあれば使用。無ければ補助モデルまたはAttackを使用
+            m_pushFromSubModel  = false;
+            m_animIndexPush     = findAnimInHandle(m_modelHandle, { "punch", "05_push", "push" }, { "pushup", "push_up" }, -1);
+            if (m_animIndexPush == -1 && m_sorenessModelHandle != -1)
+            {
+                int subPush = findAnimInHandle(m_sorenessModelHandle, { "05_push", "push" }, { "pushup", "push_up" }, -1);
+                if (subPush != -1)
+                {
+                    m_animIndexPush    = subPush;
+                    m_pushFromSubModel = true;
+                }
+            }
             if (m_animIndexPush == -1)
             {
                 m_animIndexPush = m_animIndexAttack;
             }
-            m_animIndexSoreness = findAnim({ "06_musclesoreness", "musclesorena", "soreness", "sore" }, -1);
+
+            // 筋肉痛（06_MuscleSoreness）用：メインモデルにあれば使用し、無ければ補助モデル（cat_soreness.mv1）から取得
+            m_sorenessFromSubModel = false;
+            m_animIndexSoreness    = findAnimInHandle(m_modelHandle, { "06_musclesoreness", "musclesoreness", "musclesorena", "soreness", "sore" }, {}, -1);
+            if (m_animIndexSoreness == -1 && m_sorenessModelHandle != -1)
+            {
+                int subSoreness = findAnimInHandle(m_sorenessModelHandle, { "06_musclesoreness", "musclesoreness", "musclesorena", "soreness", "sore" }, {}, -1);
+                if (subSoreness != -1)
+                {
+                    m_animIndexSoreness    = subSoreness;
+                    m_sorenessFromSubModel = true;
+                }
+            }
             if (m_animIndexSoreness == -1)
             {
                 m_animIndexSoreness = m_animIndexIdol;
             }
 
             // 初期状態はアイドルアニメーション
-            m_currentAnimIndex = m_animIndexIdol;
-            m_attachAnimIndex = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, -1, FALSE);
-            m_animPlayTime = 0.0f;
+            m_currentAnimIndex     = m_animIndexIdol;
+            m_currentAnimSrcHandle = -1;
+            m_attachAnimIndex      = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, m_currentAnimSrcHandle, FALSE);
+            m_animPlayTime         = 0.0f;
 
             // バーベル配置用の両手ボーンフレームを検索・キャッシュ
             m_lHandFrame = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHand");
@@ -191,11 +225,13 @@ void Player3D::UpdateAnimation(bool isMoving)
     // 優先度5: 走り（移動中: Runアニメーション）
     // 優先度6: 待機（アイドル: Idolアニメーション）
     int targetAnim = m_animIndexIdol;
+    int targetSrcHandle = -1;
     float playSpeed = 0.5f;
 
     if (m_isTackling)
     {
         targetAnim = m_animIndexPush;      // Armature|05_Push (パンチ・突き出しモーション)
+        targetSrcHandle = m_pushFromSubModel ? m_sorenessModelHandle : -1;
         playSpeed = 2.2f + static_cast<float>(GetEffectiveRep()) * 0.06f;
     }
     else if (m_isPouncing)
@@ -206,7 +242,8 @@ void Player3D::UpdateAnimation(bool isMoving)
     else if (m_state == MuscleState::Soreness)
     {
         targetAnim = m_animIndexSoreness;  // Armature|06_MuscleSoreness
-        playSpeed = 0.6f;
+        targetSrcHandle = m_sorenessFromSubModel ? m_sorenessModelHandle : -1;
+        playSpeed = 0.75f;
     }
     else if (m_isSkillChecking || m_isTitleSquat)
     {
@@ -224,8 +261,8 @@ void Player3D::UpdateAnimation(bool isMoving)
         playSpeed = 0.7f + (m_speed / SPEED_INITIAL) * 0.4f;
     }
 
-    // アニメーションの切り替え判定
-    if (m_currentAnimIndex != targetAnim)
+    // アニメーションの切り替え判定（インデックスまたは参照元モデルが変わった場合も再アタッチ）
+    if (m_currentAnimIndex != targetAnim || m_currentAnimSrcHandle != targetSrcHandle)
     {
         if (m_attachAnimIndex != -1)
         {
@@ -234,14 +271,16 @@ void Player3D::UpdateAnimation(bool isMoving)
         }
 
         m_currentAnimIndex = targetAnim;
-        m_attachAnimIndex = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, -1, FALSE);
+        m_currentAnimSrcHandle = targetSrcHandle;
+        m_attachAnimIndex = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, m_currentAnimSrcHandle, FALSE);
         m_animPlayTime = 0.0f;
     }
 
     // アニメーション再生時間の進行
     if (m_attachAnimIndex != -1)
     {
-        float totalTime = MV1GetAnimTotalTime(m_modelHandle, m_currentAnimIndex);
+        int animOwnerHandle = (m_currentAnimSrcHandle != -1) ? m_currentAnimSrcHandle : m_modelHandle;
+        float totalTime = MV1GetAnimTotalTime(animOwnerHandle, m_currentAnimIndex);
         m_animPlayTime += playSpeed;
 
         if (totalTime > 0.0f)
@@ -790,6 +829,9 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         m_lastResultSuccess = false;
                         m_resultShowTimer = 90;
                         m_scStoppedTimer = 22;
+                        m_state = MuscleState::Soreness;
+                        m_sorenessTimer = 300;
+                        m_repCount = 0;
                         camera.TriggerShake(8.0f, 8);
                     }
                     // タイミングよくキーを離した瞬間にバーをピタッと止めて判定！
@@ -823,10 +865,13 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         
                         else
                         {
-                            // 【失敗】針を止めて位置を確認させてから筋肉痛へ
+                            // 【失敗】即座に筋肉痛モーションへ切り替えつつ針を止めて失敗位置を表示
                             m_lastResultSuccess = false;
                             m_resultShowTimer = 90;
                             m_scStoppedTimer = 22; // 約0.36秒間針を止めて失敗位置を表示
+                            m_state = MuscleState::Soreness;
+                            m_sorenessTimer = 300; // 5秒
+                            m_repCount = 0;
                             camera.TriggerShake(8.0f, 8);
                         }
                     }
@@ -963,8 +1008,8 @@ void Player3D::Draw3D()
         );
     }
 
-    // スクワット中（筋トレQTE中またはスクワットアニメーション中）に両手でバーベルを保持・描画（腕立て伏せ中は持たない）
-    if ((m_isSkillChecking || m_currentAnimIndex == m_animIndexSquat) && !m_isTitlePushUp && m_currentAnimIndex != m_animIndexPushUp)
+    // スクワット中（筋トレQTE中またはスクワットアニメーション中）に両手でバーベルを保持・描画（腕立て伏せ中および筋肉痛時は持たない）
+    if (!isSoreness && (m_isSkillChecking || m_currentAnimIndex == m_animIndexSquat) && !m_isTitlePushUp && m_currentAnimIndex != m_animIndexPushUp)
     {
         DrawBarbell(scale);
     }
