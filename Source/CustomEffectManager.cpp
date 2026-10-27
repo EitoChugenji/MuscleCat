@@ -1,3 +1,7 @@
+// ============================================================================
+// @file   CustomEffectManager.cpp
+// @brief  CustomEffectManager クラスの実装（炎・煙・地面えぐり・雷撃・捕獲祝祭）
+// ============================================================================
 #include "CustomEffectManager.h"
 #include "Common.h"
 #include "ModelConfig.h"

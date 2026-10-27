@@ -1,9 +1,16 @@
+// ============================================================================
+// @file   Obstacle3D.cpp
+// @brief  Obstacle3D クラスの実装（描画およびAABB対円の押し出し衝突解決）
+// ============================================================================
 #include "Obstacle3D.h"
 #include "ModelManager.h"
 #include "FontManager.h"
 #include "Common.h"
 #include <algorithm>
 
+// ============================================================================
+// コンストラクタ
+// ============================================================================
 Obstacle3D::Obstacle3D(
     const VECTOR& pos,
     float width,
@@ -31,9 +38,11 @@ Obstacle3D::Obstacle3D(
     m_rotY = rotY;
 }
 
+// ============================================================================
+// 3D空間での障害物描画（モデルが存在すればモデル描画、無ければプリミティブ描画）
+// ============================================================================
 void Obstacle3D::Draw3D()
 {
-    // 3Dモデルがあれば描画、無ければフォールバック直方体描画
     VECTOR drawPos = VAdd(m_pos, m_modelOffset);
     if (!ModelManager::GetInstance().DrawModelIfLoaded(m_modelPath, drawPos, m_rotY, m_scale))
     {
@@ -41,19 +50,21 @@ void Obstacle3D::Draw3D()
     }
 }
 
+// ============================================================================
+// 2D頭上ネームラベル描画（3D座標からスクリーン座標へ投影）
+// ============================================================================
 void Obstacle3D::Draw2D()
 {
-    // 名前が空の場合は頭上UIを表示しない
+    // 名前が設定されていない場合は描画しない
     if (m_name.empty())
     {
         return;
     }
 
-    // 器具の頭上に3D->2D投影で器具名を表示
     VECTOR headPos = VGet(m_pos.x, m_pos.y + m_height + 14.0f, m_pos.z);
     VECTOR screenPos = ConvWorldPosToScreenPos(headPos);
 
-    // 画面内かつ前方にある場合のみ描画
+    // カメラの前方（0.0 < z < 1.0）にある場合のみ描画
     if (screenPos.z > 0.0f && screenPos.z < 1.0f)
     {
         int font13 = FontManager::GetInstance().GetFont13();
@@ -69,6 +80,9 @@ void Obstacle3D::Draw2D()
     }
 }
 
+// ============================================================================
+// 水平面（XZ平面）における直方体（AABB）と円（半径 radius）の押し出し衝突判定
+// ============================================================================
 bool Obstacle3D::ResolveCollision(VECTOR& outPos, float radius) const
 {
     float minX = m_pos.x - m_width * 0.5f;
@@ -76,7 +90,7 @@ bool Obstacle3D::ResolveCollision(VECTOR& outPos, float radius) const
     float minZ = m_pos.z - m_depth * 0.5f;
     float maxZ = m_pos.z + m_depth * 0.5f;
 
-    // 最近接点クランプ
+    // 対象座標からAABB上の最近接点を求める
     float closestX = MathHelper::Clamp(outPos.x, minX, maxX);
     float closestZ = MathHelper::Clamp(outPos.z, minZ, maxZ);
 
@@ -84,6 +98,7 @@ bool Obstacle3D::ResolveCollision(VECTOR& outPos, float radius) const
     float dz = outPos.z - closestZ;
     float distSq = dx * dx + dz * dz;
 
+    // 最近接点までの距離が半径未満なら重なっているため押し出す
     if (distSq < radius * radius)
     {
         float dist = std::sqrt(distSq);
@@ -96,30 +111,18 @@ bool Obstacle3D::ResolveCollision(VECTOR& outPos, float radius) const
         }
         else
         {
-            // 中心に入り込んでしまった場合の脱出押し出し
+            // 万一中心まで完全に入り込んでいた場合は、最も近い辺の方向へ脱出させる
             float pushLeft  = std::abs(outPos.x - (minX - radius));
             float pushRight = std::abs((maxX + radius) - outPos.x);
             float pushBack  = std::abs(outPos.z - (minZ - radius));
             float pushFront = std::abs((maxZ + radius) - outPos.z);
 
-            float minPush = (std::min)({pushLeft, pushRight, pushBack, pushFront});
+            float minPush = (std::min)({ pushLeft, pushRight, pushBack, pushFront });
 
-            if (minPush == pushLeft)
-            {
-                outPos.x = minX - radius;
-            }
-            else if (minPush == pushRight)
-            {
-                outPos.x = maxX + radius;
-            }
-            else if (minPush == pushBack)
-            {
-                outPos.z = minZ - radius;
-            }
-            else
-            {
-                outPos.z = maxZ + radius;
-            }
+            if (minPush == pushLeft)       outPos.x = minX - radius;
+            else if (minPush == pushRight) outPos.x = maxX + radius;
+            else if (minPush == pushBack)  outPos.z = minZ - radius;
+            else                           outPos.z = maxZ + radius;
         }
 
         return true;

@@ -1,3 +1,7 @@
+// ============================================================================
+// @file   CsvManager.cpp
+// @brief  CsvManager クラスの実装（Statu.csv / Position.csv の解析・座標管理）
+// ============================================================================
 #include "CsvManager.h"
 #include "Config.h"
 #include <fstream>

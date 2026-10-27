@@ -1,66 +1,80 @@
+// ============================================================================
+// @file   Camera3D.cpp
+// @brief  Camera3D クラスの実装（マウス視点操作、正面回り込み、壁遮蔽回避）
+// ============================================================================
 #include "Camera3D.h"
 #include "Config.h"
 #include "Common.h"
 #include <cmath>
-#include <algorithm>
 
+// ============================================================================
+// コンストラクタ：初期カメラ位置・注視点の設定
+// ============================================================================
 Camera3D::Camera3D()
-    : m_targetPos(VGet(0.0f, Config::CAMERA_TARGET_OFFSET_Y, 0.0f))
-    , m_currentPos(VGet(0.0f, Config::CAMERA_HEIGHT, -Config::CAMERA_DISTANCE))
+    : m_cameraPos(VGet(0.0f, 120.0f, -200.0f))
+    , m_targetPos(VGet(0.0f, 20.0f, 0.0f))
     , m_angleH(0.0f)
-    , m_angleV(38.0f * MathHelper::DEG_TO_RAD)
-    , m_distance(Config::CAMERA_DISTANCE)
-    , m_height(Config::CAMERA_HEIGHT)
-    , m_prevMouseX(0)
-    , m_prevMouseY(0)
-    , m_isFirstFrame(true)
-    , m_prevPlayerPos(VGet(0.0f, 0.0f, 0.0f))
-    , m_manualControlTimer(0)
+    , m_angleV(0.35f)
 {
 }
 
-void Camera3D::Init(const VECTOR& initialTargetPos, float initialAngleH)
+// ============================================================================
+// カメラの初期化処理
+// プレイヤーの初期位置と背後の向きに合わせてカメラ座標を配置し、
+// マウスカーソルを画面中央にセットする
+// ============================================================================
+void Camera3D::Init(const VECTOR& targetPos, float targetRotY)
 {
-    m_distance = Config::CAMERA_DISTANCE;
-    m_height   = Config::CAMERA_HEIGHT;
-    m_angleH   = initialAngleH;
-    m_angleV   = 38.0f * MathHelper::DEG_TO_RAD;
-    m_isFirstFrame = true;
-    m_prevPlayerPos = initialTargetPos;
-    m_manualControlTimer = 0;
+    m_angleH = targetRotY;
+    m_angleV = 0.28f; // 少し見下ろす快適なTPS視点角度
+    m_frontViewBlend = 0.0f;
+    m_targetPos = VGet(targetPos.x, targetPos.y + m_heightOffset, targetPos.z);
 
-    m_targetPos = VGet(initialTargetPos.x, initialTargetPos.y + Config::CAMERA_TARGET_OFFSET_Y, initialTargetPos.z);
+    // 初期の背後カメラ座標を算出
+    float horizontalDist = m_distance * std::cos(m_angleV);
+    float verticalDist   = m_distance * std::sin(m_angleV);
+    m_cameraPos.x = m_targetPos.x - std::sin(m_angleH) * horizontalDist;
+    m_cameraPos.z = m_targetPos.z - std::cos(m_angleH) * horizontalDist;
+    m_cameraPos.y = m_targetPos.y + verticalDist;
 
-    float desiredCamX = m_targetPos.x - std::sin(m_angleH) * (m_distance * std::cos(m_angleV));
-    float desiredCamY = m_targetPos.y + (m_distance * std::sin(m_angleV));
-    float desiredCamZ = m_targetPos.z - std::cos(m_angleH) * (m_distance * std::cos(m_angleV));
+    // クリップ距離（Near=5.0f, Far=90000.0f）を設定し、大型ステージの遠景切れを防ぐ
+    SetCameraNearFar(5.0f, 90000.0f);
 
-    m_currentPos = VGet(desiredCamX, desiredCamY, desiredCamZ);
-
-    m_shakeIntensity = 0.0f;
-    m_shakeFrames = 0;
-    m_shakeMaxFrames = 0;
-    m_shakeOffset = VGet(0.0f, 0.0f, 0.0f);
-
-    ResetMouseToCenter();
+    // マウスカーソルを画面中心に初期化
+    SetMousePoint(Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
 }
 
-void Camera3D::ResetMouseToCenter()
+// ============================================================================
+// マウス感度の設定（0.2倍 〜 3.0倍 の範囲にクランプ）
+// ============================================================================
+void Camera3D::SetMouseSensitivity(float sens)
 {
-    int centerX = Config::SCREEN_WIDTH / 2;
-    int centerY = Config::SCREEN_HEIGHT / 2;
-    m_prevMouseX = centerX;
-    m_prevMouseY = centerY;
-    m_resetMouseNextFrame = true;
-    if (GetActiveFlag() != FALSE)
-    {
-        SetMousePoint(centerX, centerY);
-    }
+    m_mouseSensitivity = MathHelper::Clamp(sens, 0.2f, 3.0f);
 }
 
+// ============================================================================
+// マウス感度の増減調整（0.1刻みで丸めて誤差を防止）
+// ============================================================================
+void Camera3D::AdjustMouseSensitivity(float delta)
+{
+    float next = std::round((m_mouseSensitivity + delta) * 10.0f) / 10.0f;
+    SetMouseSensitivity(next);
+}
+
+// ============================================================================
+// マウスカーソルを画面中央へリセットする
+// ============================================================================
+void Camera3D::ResetMouseToCenter() const
+{
+    SetMousePoint(Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+}
+
+// ============================================================================
+// 毎フレームのカメラ更新処理
+// ============================================================================
 void Camera3D::Update(
-    const VECTOR& targetPlayerPos,
-    float playerFacingAngle,
+    const VECTOR& targetPos,
+    float targetRotY,
     bool enableMouseLook,
     bool isFrontView,
     int stageModelHandle,
@@ -69,299 +83,192 @@ void Camera3D::Update(
 )
 {
     // ------------------------------------------------------------------------
-    // 1. キーボードによるカメラ操作（矢印キー、Q/Rキー、Fキーで視点リセット）
+    // 1. 視点操作入力（マウス移動 + 矢印キー）
     // ------------------------------------------------------------------------
-    const float rotSpeedH = 0.045f; // 水平旋回スピード（キビキビ動いて酔いにくい）
-    const float rotSpeedV = 0.030f; // 垂直仰角スピード
+    const float keyRotSpeed  = 0.040f;
+    const float baseMouseSens = 0.0028f;
+    const float mouseRotSpeed = baseMouseSens * m_mouseSensitivity;
 
-    // [←] または [Q] : カメラ左旋回
-    if (CheckHitKey(KEY_INPUT_LEFT) || CheckHitKey(KEY_INPUT_Q))
+    // ウィンドウがアクティブな場合のみマウス移動量を読み取って画面中央へ戻す
+    if (enableMouseLook && GetWindowActiveFlag() == TRUE)
     {
-        m_angleH -= rotSpeedH;
-    }
-
-    // [→] または [R] : カメラ右旋回
-    if (CheckHitKey(KEY_INPUT_RIGHT) || CheckHitKey(KEY_INPUT_R))
-    {
-        m_angleH += rotSpeedH;
-    }
-
-    // [↑] : 見下ろし角度を上げる（上空からの俯瞰へ）
-    if (CheckHitKey(KEY_INPUT_UP))
-    {
-        m_angleV += rotSpeedV;
-    }
-
-    // [↓] : 見下ろし角度を下げる（水平近くへ）
-    if (CheckHitKey(KEY_INPUT_DOWN))
-    {
-        m_angleV -= rotSpeedV;
-    }
-
-    // [F] キー : 視点リセット（猫の背後へスッと戻す）
-    if (CheckHitKey(KEY_INPUT_F))
-    {
-        m_angleH = MathHelper::LerpAngle(m_angleH, playerFacingAngle, 0.25f);
-    }
-
-    // ------------------------------------------------------------------------
-    // マウスによる視点移動（TPS標準：マウスを動かすだけで直感的にカメラ旋回）
-    // ------------------------------------------------------------------------
-    if (enableMouseLook)
-    {
-        int mouseX = 0, mouseY = 0;
-        GetMousePoint(&mouseX, &mouseY);
-
         int centerX = Config::SCREEN_WIDTH / 2;
         int centerY = Config::SCREEN_HEIGHT / 2;
+        int mx = centerX;
+        int my = centerY;
+        GetMousePoint(&mx, &my);
 
-        if (m_resetMouseNextFrame)
+        int dx = mx - centerX;
+        int dy = my - centerY;
+
+        if (dx != 0 || dy != 0)
         {
-            m_prevMouseX = centerX;
-            m_prevMouseY = centerY;
-            m_resetMouseNextFrame = false;
-            if (GetActiveFlag() != FALSE)
-            {
-                SetMousePoint(centerX, centerY);
-            }
-        }
-        else
-        {
-            // マウス移動量（デルタ）を計算
-            int dx = mouseX - m_prevMouseX;
-            int dy = mouseY - m_prevMouseY;
-
-            if (GetActiveFlag() != FALSE)
-            {
-                if (dx != 0 || dy != 0)
-                {
-                    // ウィンドウ切り替え時等の極端なジャンプを制限
-                    float clampedDx = MathHelper::Clamp(static_cast<float>(dx), -150.0f, 150.0f);
-                    float clampedDy = MathHelper::Clamp(static_cast<float>(dy), -150.0f, 150.0f);
-
-                    // 滑らかで素直・軽快な視点旋回感度（感度倍率を反映）
-                    const float mouseSensitivityH = 0.0055f * m_mouseSensitivityScale;
-                    const float mouseSensitivityV = 0.0040f * m_mouseSensitivityScale;
-
-                    m_angleH += clampedDx * mouseSensitivityH;
-                    m_angleV += clampedDy * mouseSensitivityV;
-                }
-
-                // 画面端への突き当たりを防止するため中央にリセット
-                SetMousePoint(centerX, centerY);
-                m_prevMouseX = centerX;
-                m_prevMouseY = centerY;
-            }
-            else
-            {
-                m_prevMouseX = mouseX;
-                m_prevMouseY = mouseY;
-            }
+            m_angleH += static_cast<float>(dx) * mouseRotSpeed;
+            m_angleV += static_cast<float>(dy) * mouseRotSpeed;
+            SetMousePoint(centerX, centerY);
         }
     }
 
-    // マウスホイールでのカメラ距離（ズーム）調整
-    int wheelRot = GetMouseWheelRotVol();
-    if (wheelRot != 0)
+    // 矢印キーによるカメラ回転補助
+    if (CheckHitKey(KEY_INPUT_LEFT))  m_angleH -= keyRotSpeed;
+    if (CheckHitKey(KEY_INPUT_RIGHT)) m_angleH += keyRotSpeed;
+    if (CheckHitKey(KEY_INPUT_UP))    m_angleV += keyRotSpeed * 0.7f;
+    if (CheckHitKey(KEY_INPUT_DOWN))  m_angleV -= keyRotSpeed * 0.7f;
+
+    // 垂直角度（ピッチ）を制限し、地面下への潜り込みや真上でのジンバルロックを防止
+    m_angleV = MathHelper::Clamp(m_angleV, 0.08f, 1.15f);
+
+    // [F]キーが押された瞬間、プレイヤーの向いている正面方向へカメラを即座にリセット
+    bool resetKey = (CheckHitKey(KEY_INPUT_F) != 0);
+    if (resetKey && !m_prevResetKey)
     {
-        m_distance -= static_cast<float>(wheelRot) * 15.0f;
-        m_distance = MathHelper::Clamp(m_distance, 110.0f, 340.0f);
+        m_angleH = targetRotY;
+    }
+    m_prevResetKey = resetKey;
+
+    // ------------------------------------------------------------------------
+    // 2. 筋トレQTE中の正面アングルへの滑らかな回り込み補間
+    // ------------------------------------------------------------------------
+    float targetBlend = isFrontView ? 1.0f : 0.0f;
+    m_frontViewBlend = MathHelper::Lerp(m_frontViewBlend, targetBlend, 0.14f);
+
+    // 通常時の背後アングル(m_angleH)と、筋トレ中の正面アングル(targetRotY + π)を補間
+    float frontAngleH = targetRotY + MathHelper::PI;
+    float renderAngleH = MathHelper::LerpAngle(m_angleH, frontAngleH, m_frontViewBlend);
+    float renderAngleV = MathHelper::Lerp(m_angleV, 0.22f, m_frontViewBlend);
+    float renderDist   = MathHelper::Lerp(m_distance, 145.0f, m_frontViewBlend);
+
+    // ------------------------------------------------------------------------
+    // 3. 注視点のスムーズ追従および理想カメラ座標の算出
+    // ------------------------------------------------------------------------
+    VECTOR desiredTarget = VGet(targetPos.x, targetPos.y + m_heightOffset, targetPos.z);
+    m_targetPos.x = MathHelper::Lerp(m_targetPos.x, desiredTarget.x, 0.25f);
+    m_targetPos.y = MathHelper::Lerp(m_targetPos.y, desiredTarget.y, 0.25f);
+    m_targetPos.z = MathHelper::Lerp(m_targetPos.z, desiredTarget.z, 0.25f);
+
+    float horizontalDist = renderDist * std::cos(renderAngleV);
+    float verticalDist   = renderDist * std::sin(renderAngleV);
+
+    VECTOR desiredCamPos;
+    desiredCamPos.x = m_targetPos.x - std::sin(renderAngleH) * horizontalDist;
+    desiredCamPos.z = m_targetPos.z - std::cos(renderAngleH) * horizontalDist;
+    desiredCamPos.y = m_targetPos.y + verticalDist;
+
+    // ------------------------------------------------------------------------
+    // 4. ステージ境界および壁ポリゴンとの衝突回避（カメラが壁の裏へ抜けるのを防止）
+    // ------------------------------------------------------------------------
+    const float camWallMargin = 12.0f;
+
+    // ステージ外周バウンディングボックス内に制限
+    if (minBounds && maxBounds)
+    {
+        desiredCamPos.x = MathHelper::Clamp(desiredCamPos.x, minBounds->x + camWallMargin, maxBounds->x - camWallMargin);
+        desiredCamPos.z = MathHelper::Clamp(desiredCamPos.z, minBounds->z + camWallMargin, maxBounds->z - camWallMargin);
+        if (desiredCamPos.y < targetPos.y + 8.0f)
+        {
+            desiredCamPos.y = targetPos.y + 8.0f;
+        }
     }
 
-    // ------------------------------------------------------------------------
-    // 2. 視点角度の制限（移動時の遅延自動旋回は酔い防止のため完全停止）
-    // ------------------------------------------------------------------------
-    // 垂直角度の制限（地面へのめり込み防止〜急角度見下ろしまで）
-    m_angleV = MathHelper::Clamp(m_angleV, 12.0f * MathHelper::DEG_TO_RAD, 65.0f * MathHelper::DEG_TO_RAD);
-
-    if (m_isFirstFrame)
-    {
-        m_angleH = playerFacingAngle;
-    }
-
-    float currentTargetDist = m_distance;
-
-    if (isFrontView)
-    {
-        // 筋トレ（SPACE）中: 視点を急旋回させず安定を保ちつつ、少し寄ってスクワットを映す
-        float targetAngleV = 24.0f * MathHelper::DEG_TO_RAD;
-        m_angleV = MathHelper::Lerp(m_angleV, targetAngleV, 0.08f);
-        currentTargetDist = MathHelper::Lerp(currentTargetDist, 160.0f, 0.08f);
-    }
-
-    // ------------------------------------------------------------------------
-    // 3. 注視点の滑らかな追従（猫の体・頭付近）
-    // ------------------------------------------------------------------------
-    float targetOffsetY = isFrontView ? (Config::CAMERA_TARGET_OFFSET_Y + 2.0f) : Config::CAMERA_TARGET_OFFSET_Y;
-    VECTOR desiredTarget = VGet(targetPlayerPos.x, targetPlayerPos.y + targetOffsetY, targetPlayerPos.z);
-    if (m_isFirstFrame)
-    {
-        m_targetPos = desiredTarget;
-    }
-    else
-    {
-        // キビキビと追従させて遅延揺れ・フワフワ酔いを防止
-        m_targetPos.x = MathHelper::Lerp(m_targetPos.x, desiredTarget.x, 0.35f);
-        m_targetPos.y = MathHelper::Lerp(m_targetPos.y, desiredTarget.y, 0.35f);
-        m_targetPos.z = MathHelper::Lerp(m_targetPos.z, desiredTarget.z, 0.35f);
-    }
-
-    // ------------------------------------------------------------------------
-    // 4. カメラ位置の計算と外壁めり込み防止（スマートズーム）
-    // ------------------------------------------------------------------------
-    float camDirX = -std::sin(m_angleH) * std::cos(m_angleV);
-    float camDirY =  std::sin(m_angleV);
-    float camDirZ = -std::cos(m_angleH) * std::cos(m_angleV);
-
-    float currentDist = currentTargetDist;
-
-    // 4-A. ステージモデルのメッシュ壁レイキャスト判定（カメラと猫の間の遮蔽壁を検知）
+    // 注視点から理想カメラ位置へ向けてレイキャストし、途中に壁があれば手前に寄せる
     if (stageModelHandle != -1)
     {
-        VECTOR startRay = m_targetPos;
-        VECTOR endRay = VGet(
-            m_targetPos.x + camDirX * (m_distance + 8.0f),
-            m_targetPos.y + camDirY * (m_distance + 8.0f),
-            m_targetPos.z + camDirZ * (m_distance + 8.0f)
-        );
-
-        MV1_COLL_RESULT_POLY hitLine = MV1CollCheck_Line(stageModelHandle, -1, startRay, endRay);
-        if (hitLine.HitFlag == 1 && std::abs(hitLine.Normal.y) < 0.85f)
+        VECTOR rayVec = VSub(desiredCamPos, m_targetPos);
+        float rayLen = VSize(rayVec);
+        if (rayLen > 0.001f)
         {
-            float hdx = hitLine.HitPosition.x - m_targetPos.x;
-            float hdy = hitLine.HitPosition.y - m_targetPos.y;
-            float hdz = hitLine.HitPosition.z - m_targetPos.z;
-            float distToHit = std::sqrt(hdx * hdx + hdy * hdy + hdz * hdz);
+            VECTOR rayDir = VScale(rayVec, 1.0f / rayLen);
+            VECTOR rayEnd = VAdd(desiredCamPos, VScale(rayDir, camWallMargin));
 
-            float safeDist = distToHit - 8.0f;
-            if (safeDist < currentDist)
+            MV1_COLL_RESULT_POLY hit = MV1CollCheck_Line(stageModelHandle, -1, m_targetPos, rayEnd);
+            if (hit.HitFlag == 1)
             {
-                currentDist = safeDist;
+                // 床面以外の壁・障害物にヒットした場合、ヒット位置の手前へカメラを引き寄せる
+                if (std::abs(hit.Normal.y) < 0.85f || hit.HitPosition.y > targetPos.y + 10.0f)
+                {
+                    VECTOR hitVec = VSub(hit.HitPosition, m_targetPos);
+                    float hitDist = VSize(hitVec);
+                    float safeDist = hitDist - camWallMargin;
+                    if (safeDist < 28.0f)
+                    {
+                        safeDist = 28.0f; // キャラクターにめり込まない最小距離
+                    }
+                    if (safeDist < rayLen)
+                    {
+                        desiredCamPos = VAdd(m_targetPos, VScale(rayDir, safeDist));
+                    }
+                }
             }
         }
     }
 
-    // 4-B. 外壁境界ボックス判定（セーフティネット）
-    float wallMargin = 15.0f;
-    float minX = minBounds ? (minBounds->x + wallMargin) : (-Config::STAGE_HALF_WIDTH + wallMargin);
-    float maxX = maxBounds ? (maxBounds->x - wallMargin) : ( Config::STAGE_HALF_WIDTH - wallMargin);
-    float minZ = minBounds ? (minBounds->z + wallMargin) : (-Config::STAGE_HALF_DEPTH + wallMargin);
-    float maxZ = maxBounds ? (maxBounds->z - wallMargin) : ( Config::STAGE_HALF_DEPTH - wallMargin);
+    // 算出された目標カメラ位置へ滑らかに追従
+    m_cameraPos.x = MathHelper::Lerp(m_cameraPos.x, desiredCamPos.x, 0.35f);
+    m_cameraPos.y = MathHelper::Lerp(m_cameraPos.y, desiredCamPos.y, 0.35f);
+    m_cameraPos.z = MathHelper::Lerp(m_cameraPos.z, desiredCamPos.z, 0.35f);
 
-    if (std::abs(camDirX) > 0.0001f)
+    // ------------------------------------------------------------------------
+    // 5. カメラシェイクタイマーの減衰更新
+    // ------------------------------------------------------------------------
+    if (m_shakeTimer > 0)
     {
-        if (camDirX > 0.0f && m_targetPos.x < maxX)
+        m_shakeTimer--;
+        m_shakeIntensity *= 0.88f;
+        if (m_shakeTimer == 0)
         {
-            float distToWall = (maxX - m_targetPos.x) / camDirX;
-            if (distToWall > 0.0f && distToWall < currentDist) currentDist = distToWall;
+            m_shakeIntensity = 0.0f;
         }
-        else if (camDirX < 0.0f && m_targetPos.x > minX)
-        {
-            float distToWall = (minX - m_targetPos.x) / camDirX;
-            if (distToWall > 0.0f && distToWall < currentDist) currentDist = distToWall;
-        }
-    }
-
-    if (std::abs(camDirZ) > 0.0001f)
-    {
-        if (camDirZ > 0.0f && m_targetPos.z < maxZ)
-        {
-            float distToWall = (maxZ - m_targetPos.z) / camDirZ;
-            if (distToWall > 0.0f && distToWall < currentDist) currentDist = distToWall;
-        }
-        else if (camDirZ < 0.0f && m_targetPos.z > minZ)
-        {
-            float distToWall = (minZ - m_targetPos.z) / camDirZ;
-            if (distToWall > 0.0f && distToWall < currentDist) currentDist = distToWall;
-        }
-    }
-
-    // 最短距離リミット（近すぎ防止）
-    if (currentDist < 30.0f) currentDist = 30.0f;
-
-    float desiredCamX = m_targetPos.x + camDirX * currentDist;
-    float desiredCamY = m_targetPos.y + camDirY * currentDist;
-    float desiredCamZ = m_targetPos.z + camDirZ * currentDist;
-
-    // 壁境界内クランプ & 地面潜り込み防止
-    desiredCamX = MathHelper::Clamp(desiredCamX, minX, maxX);
-    desiredCamZ = MathHelper::Clamp(desiredCamZ, minZ, maxZ);
-    if (desiredCamY < 14.0f) desiredCamY = 14.0f;
-
-    if (m_isFirstFrame)
-    {
-        m_currentPos = VGet(desiredCamX, desiredCamY, desiredCamZ);
-        m_isFirstFrame = false;
-    }
-    else
-    {
-        // カメラ追従の遅延を抑えて安定した視界を維持
-        m_currentPos.x = MathHelper::Lerp(m_currentPos.x, desiredCamX, 0.35f);
-        m_currentPos.y = MathHelper::Lerp(m_currentPos.y, desiredCamY, 0.35f);
-        m_currentPos.z = MathHelper::Lerp(m_currentPos.z, desiredCamZ, 0.35f);
-    }
-
-    // カメラシェイク更新（時間経過で減衰しながら振動）
-    if (m_shakeFrames > 0 && m_shakeMaxFrames > 0)
-    {
-        float ratio = static_cast<float>(m_shakeFrames) / static_cast<float>(m_shakeMaxFrames);
-        float curIntensity = m_shakeIntensity * ratio;
-
-        float rx = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f) * curIntensity;
-        float ry = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f) * (curIntensity * 0.8f);
-        float rz = (static_cast<float>(rand()) / static_cast<float>(RAND_MAX) * 2.0f - 1.0f) * curIntensity;
-
-        m_shakeOffset = VGet(rx, ry, rz);
-        m_shakeFrames--;
-    }
-    else
-    {
-        m_shakeOffset = VGet(0.0f, 0.0f, 0.0f);
-        m_shakeFrames = 0;
     }
 }
 
-void Camera3D::Apply() const
-{
-    SetCameraNearFar(5.0f, 90000.0f);
-    VECTOR camPos = VAdd(m_currentPos, m_shakeOffset);
-    VECTOR targetPos = VAdd(m_targetPos, VScale(m_shakeOffset, 0.4f));
-    SetCameraPositionAndTarget_UpVecY(camPos, targetPos);
-}
-
+// ============================================================================
+// カメラシェイクの発動
+// ============================================================================
 void Camera3D::TriggerShake(float intensity, int frames)
 {
-    if (frames <= 0) return;
-    if (intensity >= m_shakeIntensity || m_shakeFrames <= 0)
+    if (intensity > m_shakeIntensity)
     {
         m_shakeIntensity = intensity;
-        m_shakeFrames = frames;
-        m_shakeMaxFrames = frames;
+    }
+    if (frames > m_shakeTimer)
+    {
+        m_shakeTimer = frames;
     }
 }
 
+// ============================================================================
+// DxLibの3Dカメラへ現在の視点・注視点を適用する
+// ============================================================================
+void Camera3D::Apply() const
+{
+    VECTOR finalCamPos = m_cameraPos;
+    VECTOR finalTarget = m_targetPos;
+
+    // シェイク中はカメラ位置と注視点にランダムな揺れオフセットを加算
+    if (m_shakeTimer > 0 && m_shakeIntensity > 0.1f)
+    {
+        float rx = (static_cast<float>(rand() % 200 - 100) / 100.0f) * m_shakeIntensity;
+        float ry = (static_cast<float>(rand() % 200 - 100) / 100.0f) * m_shakeIntensity;
+        float rz = (static_cast<float>(rand() % 200 - 100) / 100.0f) * m_shakeIntensity;
+        finalCamPos = VAdd(finalCamPos, VGet(rx, ry, rz));
+        finalTarget = VAdd(finalTarget, VGet(rx * 0.5f, ry * 0.5f, rz * 0.5f));
+    }
+
+    SetCameraPositionAndTarget_UpVecY(finalCamPos, finalTarget);
+}
+
+// ============================================================================
+// カメラの前方水平ベクトル（XZ平面上の単位ベクトル）を取得
+// ============================================================================
 VECTOR Camera3D::GetForwardXZ() const
 {
-    float sinH = std::sin(m_angleH);
-    float cosH = std::cos(m_angleH);
-    return VGet(sinH, 0.0f, cosH);
+    return VGet(std::sin(m_angleH), 0.0f, std::cos(m_angleH));
 }
 
+// ============================================================================
+// カメラの右方水平ベクトル（XZ平面上の単位ベクトル）を取得
+// ============================================================================
 VECTOR Camera3D::GetRightXZ() const
 {
-    float sinH = std::sin(m_angleH);
-    float cosH = std::cos(m_angleH);
-    return VGet(cosH, 0.0f, -sinH);
-}
-
-void Camera3D::SetMouseSensitivity(float scale)
-{
-    // 0.2x ~ 3.0x にクランプし、0.1刻みで丸める
-    float clamped = MathHelper::Clamp(scale, 0.2f, 3.0f);
-    m_mouseSensitivityScale = std::round(clamped * 10.0f) / 10.0f;
-}
-
-void Camera3D::AdjustMouseSensitivity(float delta)
-{
-    SetMouseSensitivity(m_mouseSensitivityScale + delta);
+    return VGet(std::cos(m_angleH), 0.0f, -std::sin(m_angleH));
 }

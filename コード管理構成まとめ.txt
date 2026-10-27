@@ -1,337 +1,151 @@
 ================================================================================
-  MuscleCat 3D - 全マネージャー・管理システム構成 完全リファレンス
+                        『マッスルねこ』 コード管理・構成まとめ
 ================================================================================
 
-本ドキュメントは、MuscleCat 3D プロジェクト内の「すべての管理系クラス（Manager）」
-および「各種オブジェクト・設定管理ファイル」が、どこで・何を・どのように管理して
-いるかを網羅的にまとめた技術仕様書です。
+【1. 全体アーキテクチャ・依存関係図】
 
-================================================================================
-1. システム全体の管理階層（アーキテクチャ図）
-================================================================================
+  [Main.cpp] (WinMain: エントリーポイント / DxLib & Direct3D11 初期化 / 60FPSメインループ)
+      │
+      ├── [CsvManager]          (シングルトン: Statu.csv / Position.csv の解析・座標管理)
+      ├── [FontManager]         (シングルトン: 13pt〜96pt のフォントハンドル一括管理)
+      ├── [ModelManager]        (シングルトン: .mv1 3Dモデルキャッシュ & プロシージャル代替描画)
+      ├── [EffectManager]       (シングルトン: Effekseer 3Dパーティクル管理)
+      ├── [CustomEffectManager] (シングルトン: 3Dポリゴンによる炎・湯気・地面えぐり・雷撃・捕獲祝祭)
+      │
+      └── [GameManager]         (ゲーム全体の進行・シーン遷移・UI描画・デバッグ制御)
+              │
+              ├── [Camera3D]        (TPS三人称視点カメラ・マウス回転・正面回り込み・壁遮蔽回避)
+              │
+              └── [ObjectManager3D] (全3Dオブジェクトの更新・描画・衝突解決・捕獲コンボ管理)
+                      │
+                      ├── [Stage3D]    (ステージ床・壁ポリゴン抽出・マップ別押し戻し・坂道接地)
+                      │
+                      └── [GameObject3D] (全3Dオブジェクトの抽象基底クラス)
+                              ├── [Player3D]      (プレイヤー操作猫・筋トレQTE・飛びつき・スタン攻撃)
+                              ├── [Obstacle3D]    (室内の家具・トレーニング器具等の静的障害物)
+                              └── [MouseBase3D]   (ネズミ共通基底：巡回AI・逃走AI・スタン・伸縮アニメ)
+                                    ├── [NormalMouse3D] (通常ネズミ)
+                                    └── [FastMouse3D]   (高速逃走ネズミ)
 
-  [Main.cpp (WinMain)]
-     │
-     ├─【グローバル・シングルトン管理系（アプリ起動〜終了まで常駐）】
-     │   ├─ 1. CsvManager    : CSVデータ管理（Statu.csv 速度 / Position.csv 座標）
-     │   ├─ 2. FontManager   : フォントハンドル事前生成・サイズ別キャッシュ管理
-     │   ├─ 3. ModelManager  : 3Dモデル(.mv1)ハンドルキャッシュ＆代替プリミティブ描画管理
-     │   └─ 4. EffectManager : Effekseer / 3Dパーティクル演出の読込・再生・追従管理
-     │
-     └─【ゲーム進行・空間管理系（GameManager が統括）】
-          └─ 5. GameManager  : シーン状態（タイトル/プレイ中/ポーズ/クリア）・UI・F1デバッグ統括
-               ├─ 6. Camera3D        : 三人称視点(TPS)カメラ追従・壁めり込み防止・マウス感度管理
-               └─ 7. ObjectManager3D : 3D空間内の全オブジェクト更新・当たり判定・捕獲管理
-                    ├─ 8. Stage3D    : ステージ3Dモデル＆マップ1/マップ2別当たり判定・接地管理
-                    ├─ 9. Player3D   : プレイヤー(猫)の移動・筋トレ成長・スキル・アニメ管理
-                    ├─ 10. Mouse3D   : ネズミAI（通常巡回 / 高速逃走 / スタン / 速度成長）管理
-                    └─ 11. Obstacle3D: 家具・障害物の3D配置および円柱押し出し判定管理
-
-================================================================================
-2. シングルトン管理系クラス（4大マネージャー）の詳細
-================================================================================
-
---------------------------------------------------------------------------------
-【1】CsvManager（Source/CsvManager.h, Source/CsvManager.cpp）
---------------------------------------------------------------------------------
-■ 設計パターン : シングルトン (`CsvManager::GetInstance()`)
-■ 管理対象     : 外部CSVファイルによるゲームバランス（速度）とマップ配置座標の一元管理
-■ 参照ファイル :
-  ・優先パス   : `Resource/CSV/Statu.csv`, `Resource/CSV/Position.csv`
-  ・予備パス   : `CSV元ファイル/Statu.csv`, `CSV元ファイル/Position.csv`
-■ 主な保持データ（メンバ変数）:
-  ・`m_catStatus`           : 猫の初期速度(`baseSpeed`=4.00)、1Lv成長量(`speedGrowthPerUnit`=0.10)、上限(`maxSpeed`=5.50)
-  ・`m_mouseStatus`         : ネズミの初期速度(4.20)、1匹捕獲ごとの成長量(0.05)、上限(4.70)
-  ・`m_fastMouseStatus`     : 高速ネズミ用ステータス
-  ・`m_catPositions`        : Position.csv の `Cat` 行から読み込んだ初期スポーン座標リスト
-  ・`m_mousePositions`      : Position.csv の `Mouse` 行から読み込んだ Pos1〜Pos8 座標リスト
-  ・`m_catPositionsHouse` / `m_mousePositionsHouse` : マップ1（House）用の室内座標リスト
-■ 主要メソッドと処理内容 :
-  ・`Init()` / `ReloadAll()`
-      起動時およびゲーム開始時(`GameManager::StartGame`)に呼ばれ、CSVを再読込して即時反映する。
-  ・`LoadStatusCsv(primaryPath, fallbackPath)`
-      `Statu.csv` をパースし、Role(`Cat` / `Mouse`)ごとの速度パラメータを更新する。
-  ・`LoadPositionCsv(primaryPath, fallbackPath)`
-      `Position.csv` の `X:Y:Z` 形式セル(`ParseVectorCell`)をパースして3D座標リストを構築する。
-  ・`GetCatPositionsForMap(mapType)` / `GetMousePositionsForMap(mapType)`
-      現在選択中のマップ（`MapType::House` または `MapType::NewMap`）に対応した座標配列を返す。
+  ※ 共通ヘッダ群:
+     - [Common.h]      : ObjectType 列挙型、MathHelper 数学補助関数群 (Clamp, Lerp, DistanceXZ, LerpAngle)
+     - [Config.h]      : 画面解像度(1280x720)、タイトル名「マッスルねこ」、制限時間(120秒)、距離換算定数
+     - [ModelConfig.h] : 3Dモデルパス、スケール、回転補正値、マップ種別(MapType::House / NewMap)
 
 --------------------------------------------------------------------------------
-【2】ModelManager（Source/ModelManager.h, Source/ModelManager.cpp）
---------------------------------------------------------------------------------
-■ 設計パターン : シングルトン (`ModelManager::GetInstance()`)
-■ 管理対象     : 3Dモデルファイル（`.mv1`）の重複ロード防止キャッシュ管理、および
-                 モデル未配置時のプロシージャル3Dプリミティブ代替描画管理
-■ 主な保持データ（メンバ変数）:
-  ・`m_modelHandles` (`std::unordered_map<std::string, int>`)
-      ファイルパスをキー、DxLibの `MV1LoadModel` ハンドルを値とするキャッシュ辞書。
-■ 主要メソッドと処理内容 :
-  ・`Init()`
-      主要3Dモデル（猫・バーベル・ネズミ・ステージ・家具）を事前ロードしてキャッシュに登録。
-  ・`LoadModelHandle(path)`
-      未ロードなら `MV1LoadModel` で読み込んで辞書に登録し、既読ならキャッシュ済みハンドルを返す。
-      （`Player3D` や `Stage3D` はこのベースハンドルから `MV1DuplicateModel` で複製して使用する）
-  ・`DrawModelIfLoaded(path, pos, rotY, scale, rotX, rotZ)`
-      指定パスのモデルに座標・回転・スケールを適用して `MV1DrawModel` で描画する。
-  ・`DrawFallbackCat()` / `DrawFallbackNormalMouse()` / `DrawFallbackFastMouse()` /
-    `DrawFallbackObstacle()` / `DrawFallbackStage()`
-      万が一 `.mv1` ファイルが存在しない環境でもゲームが動作するよう、球やカプセル等の
-      3Dプリミティブを組み合わせてキャラクターやステージを描画するセーフティネット関数群。
-  ・`Release()`
-      終了時に全キャッシュモデルハンドルを `MV1DeleteModel` で一括解放する。
 
---------------------------------------------------------------------------------
-【3】EffectManager（Source/EffectManager.h, Source/EffectManager.cpp）
---------------------------------------------------------------------------------
-■ 設計パターン : シングルトン (`EffectManager::GetInstance()`)
-■ 管理対象     : Effekseer 3DエフェクトおよびDxLib 3Dパーティクル演出の生成・追従・ON/OFF管理
-■ 主な保持データ（メンバ変数）:
-  ・`m_tackleResHandle`      : タックル突進エフェクトのリソースハンドル
-  ・`m_pumpSuccessResHandle` : 筋トレ成功時エフェクトのリソースハンドル
-  ・`m_muscleAuraResHandle`  : パンプアップ中マッスルオーラのリソースハンドル
-  ・`m_activeAuraHandle`     : 現在再生中のオーラ追従用ハンドル
-  ・`m_effectEnabled`        : エフェクト表示ON/OFFフラグ（デバッグ `[6]` キーで切替可能）
-■ 主要メソッドと処理内容 :
-  ・`Init()` / `Release()`
-      Effekseer初期化および `.efkefc` エフェクトリソースの読み込み・解放。
-  ・`Update()` / `SyncCamera()` / `Draw3D()`
-      毎フレームのEffekseer更新、DxLibカメラ行列との同期、3D空間へのエフェクト描画。
-  ・`PlayTackleEffect(pos, dir)`
-      猫が右クリック（またはEキー）でタックルを発動した瞬間の衝撃エフェクト再生。
-  ・`PlayPumpSuccessEffect(pos, repCount)`
-      筋トレで1レップ達成した瞬間の発光エフェクト再生。
-  ・`UpdateMuscleAura(pos, isActive, repCount)` / `StopMuscleAura()`
-      猫の現在位置・筋トレレベルに連動して黄金マッスルオーラを追従再生・停止する。
-  ・`SetEffectEnabled()` / `ToggleEffectEnabled()`
-      F1デバッグメニューの `[6] エフェクト表示` ON/OFF切替を管理。
+【2. 各ファイル・クラスの役割と詳細構成】
 
---------------------------------------------------------------------------------
-【4】FontManager（Source/FontManager.h, Source/FontManager.cpp）
---------------------------------------------------------------------------------
-■ 設計パターン : シングルトン (`FontManager::GetInstance()`)
-■ 管理対象     : UI・HUD・デバッグ文字列描画用のフォントハンドル事前生成・キャッシュ管理
-                 （毎フレーム `SetFontSize` を呼ぶことによる描画負荷・カクつきを防止）
-■ 主な保持データ（メンバ変数）:
-  ・`m_font13` (13px) : デバッグ詳細数値、ミニマップピン番号、ガイド補足用
-  ・`m_font16` (16px) : HUDラベル、デバッグ見出し、操作パネル用
-  ・`m_font18` (18px) : メニュー項目、サブタイトル、中サイズUI用
-  ・`m_font24` (24px) : スコア、レベル表示、ボタン文字用
-  ・`m_font36` (36px) : 画面見出し、カウント表示用
-  ・`m_font48` (48px) : タイトル・リザルト大見出し用
-  ・`m_font60` (60px) : メインタイトルロゴ・クリア演出用
-■ 主要メソッドと処理内容 :
-  ・`Init()`    : アンチエイリアス・エッジ付きフォント（`DX_FONTTYPE_ANTIALIASING_EDGE_8X8`）を全サイズ生成。
-  ・`Release()` : `DeleteFontToHandle` で全フォントハンドルを解放。
-  ・`GetFont13()` 〜 `GetFont60()` : 各サイズのフォントハンドルを取得。
+■ 1. Main.cpp
+  - 役割: アプリケーションの起動、初期化、メインループ、終了解放。
+  - 主な処理:
+    1) DxLib初期設定 (UTF-8文字コード、1280x720ウィンドウ、タイトル「マッスルねこ」、Direct3D 11)。
+    2) シングルトン群 (`CsvManager`, `FontManager`, `ModelManager`, `EffectManager`, `CustomEffectManager`) の `Init()`。
+    3) `GameManager` の初期化と `while (ProcessMessage() == 0 && !game.ShouldQuit())` ループの実行。
+    4) `GetNowHiPerformanceCount()` による1フレームあたりのCPU処理時間(ms)計測。
+    5) 終了時に逆順で全リソースを安全に `Release()`。
 
-================================================================================
-3. ゲーム進行・空間・カメラ管理系クラスの詳細
-================================================================================
+■ 2. Common.h / Config.h / ModelConfig.h
+  - Common.h:
+    - `enum class ObjectType { Player, NormalMouse, FastMouse, Obstacle }`
+    - `namespace MathHelper` : `PI`, `DEG_TO_RAD`, `RAD_TO_DEG`, `Clamp()`, `Lerp()`, `DistanceXZ()`, `LerpAngle()`
+  - Config.h:
+    - 解像度 (`1280 x 720`, `32bit`)、ウィンドウタイトル (`TITLE = "マッスルねこ"`)
+    - 猫の基本身長基準 (`CAT_BASE_HEIGHT_UNITS = 104.496f` = `1.8m`、`1m = 58.0533 units`)
+    - ネズミ初期出現数 (`NORMAL_MOUSE_COUNT = 5`, `FAST_MOUSE_COUNT = 3`)
+    - 制限時間モード設定 (`USE_TIME_LIMIT_MODE = true`, `TIME_LIMIT_SECONDS = 120.0f`)
+  - ModelConfig.h:
+    - プレイヤーモデル (`cat.mv1`)、バーベルモデル (`Barbell.mv1`)、ネズミモデル (`ネズミ.mv1`) のパス・スケール設定
+    - ステージモデル (`MapType::House` = `firstmap.mv1`, `MapType::NewMap` = `newmap.mv1`) のパス・スケール設定
 
---------------------------------------------------------------------------------
-【5】GameManager（Source/GameManager.h, Source/GameManager.cpp）
---------------------------------------------------------------------------------
-■ 管理対象 : ゲーム全体のステートマシン（状態遷移）、画面UI、入力分岐、F1統合デバッグ管理
-■ 管理しているゲーム状態 (`enum class GameState`) :
-  ・`Title`       : タイトル画面（ステージ1/2切替、ゲーム開始、遊び方モーダル、猫演出）
-  ・`Playing`     : 本編プレイ中（TPSカメラ操作、筋トレ・捕獲アクション、ポーズ、F1デバッグ）
-  ・`StageClear`  : 全ネズミ捕獲時のステージクリア演出
-  ・`AllClear`    : 完全クリア画面（クリアタイム計測・ランク評価・リトライ/タイトル帰還）
-■ 主な保持データ（メンバ変数）:
-  ・`m_objManager`      : `ObjectManager3D` インスタンス（全3Dオブジェクトとステージを保持）
-  ・`m_camera`          : `Camera3D` インスタンス（TPSカメラ管理）
-  ・`m_selectedMap`     : 現在選択中のステージ（`MapType::House` または `MapType::NewMap`）
-  ・`m_isPaused`        : ポーズ画面の開閉状態と選択項目インデックス (`m_pauseMenuItem`)
-  ・`m_cheatEnabled`    : `[F1]` デバッグ＆チートオーバーレイの有効フラグ
-  ・`m_debugCubeMode`   : `[7]` キーで切り替える10m×10m×10m目測キューブ表示モード (0〜3)
-  ・`m_debugWideCamera` : `[8]` キーで切り替える10m全体俯瞰カメラモード
-■ 主要メソッドと処理内容 :
-  ・`Init()`
-      ステージ初期化と `SetupTitle()` の呼び出し。
-  ・`SwitchSelectedMap(newMap)`
-      タイトル画面での左右キー・クリックによるステージ切替管理。
-      - マップ1 (`House`)  : 室内床面 `(0.0f, 5.0f, 0.0f)` に猫を配置
-      - マップ2 (`NewMap`) : マップ中央の円柱台座上面 `(0.0f, 200.0f, 0.0f)` に猫を配置
-  ・`SetupTitle()`
-      タイトル画面の初期化、Lv.6マッチョ猫の生成と円柱/床への配置。
-  ・`StartGame()`
-      CSV再読込 (`CsvManager::ReloadAll`)、ステージ読込、プレイヤー生成、
-      `Position.csv` のスポーン候補点への通常ネズミ(3匹)・高速ネズミ(2匹)の接地配置。
-  ・`Update()`
-      状態別の毎フレーム更新、ポーズ画面でのマウス感度変更、F1デバッグ中の `[1]`〜`[8]` ショートカット管理。
-  ・`DrawDebug3DOverlay()`
-      `[F1]` ON時の3Dデバッグ描画（10mグリッド、10m×10m×10mワイヤーフレーム立方体、
-      身長1.8m物差し、攻撃範囲リング、Pos1〜8ピン、壁当たり判定ワイヤーフレーム）。
-  ・`DrawDebug2DOverlay()`
-      `[F1]` ON時の2Dデバッグパネル描画（猫の速度u/f・m/s・km/h、ネズミ個体別速度と距離、
-      右上2Dトップダウン・ミニマップ＆10mレーダー、チート操作一覧）。
+■ 3. CsvManager.h / CsvManager.cpp (シングルトン)
+  - 役割: 外部CSVファイル (`Statu.csv`, `Position.csv`) の読み込みとマップ別座標フィルタリング。
+  - 主な機能:
+    - `LoadStatusCsv()`   : 猫・通常ネズミ・高速ネズミの初速(`base_speed`)、成長率(`speed_growth_per_unit`)、最大速度(`max_speed`)を読み込み。
+    - `LoadPositionCsv()` : 猫の初期位置およびネズミのスポーン・巡回ウェイポイント座標リストを読み込み。
+    - `ResolveCsvFilePath()` : `Resource/CSV/` と `Source/CSV/` の更新日時を比較し、新しい方を自動採用。
 
---------------------------------------------------------------------------------
-【6】ObjectManager3D（Source/ObjectManager3D.h, Source/ObjectManager3D.cpp）
---------------------------------------------------------------------------------
-■ 管理対象 : プレイ空間内の全動的オブジェクト（猫・ネズミ・障害物）のライフサイクルと衝突解決
-■ 主な保持データ（メンバ変数）:
-  ・`m_stage`          : `Stage3D` インスタンス（現在のマップモデルと壁・床当たり判定）
-  ・`m_player`         : `std::shared_ptr<Player3D>`（プレイヤー猫）
-  ・`m_objects`        : `std::vector<std::shared_ptr<GameObject3D>>`（生存中の全ネズミリスト）
-  ・`m_obstacles`      : `std::vector<std::shared_ptr<Obstacle3D>>`（配置された家具・障害物リスト）
-  ・`m_caughtCount`    : 捕獲したネズミの累計数
-  ・`m_isTimeFrozen`   : デバッグ `[4]` キーによるネズミ時間停止フラグ
-■ 主要メソッドと処理内容 :
-  ・`InitStage(mapType)` / `LoadStage(mapType)`
-      `m_stage` に対して指定マップの読み込み・コリジョン構築を実行させる。
-  ・`SpawnNormalMouse()` / `SpawnFastMouse()`
-      `CsvManager` から現在マップの `Pos1〜Pos8` を取得し、`m_stage.GetGroundHeight` で確実に
-      床面高さを合わせた上で通常ネズミ・高速ネズミを追加スポーンさせる。
-  ・`ApplyMouseSpeedBonus()`
-      ネズミが1匹捕まるごとに、残りの生存ネズミ全員へ `caughtCount * speedGrowthPerUnit` の
-      速度ボーナス（`Statu.csv` 準拠）を再計算して適用する。
-  ・`Update(camera)`
-      1. プレイヤーの移動・スキル更新 (`UpdateWithCamera`)
-      2. 全ネズミのAI移動更新（`m_isTimeFrozen` が OFF のとき）
-      3. 壁・床・障害物との物理押し出し解決 (`CheckObstacleAndStageCollisions`)
-      4. 猫とネズミの捕獲・タックル気絶判定 (`CheckCollisions`)
-      5. 捕獲されたネズミ (`!IsAlive()`) のリスト削除
-  ・`CheckObstacleAndStageCollisions()`
-      - 猫と壁ポリゴンの押し戻し (`m_stage.ResolveWallCollision`)
-      - タックル中に壁へ衝突した場合、猫自身に90フレーム（1.5秒）の気絶スタンを付与
-      - 猫・ネズミの床・坂道接地追従 (`m_stage.GetGroundHeight`) と、床のない領域への落下防止スライド処理
-      - ネズミが壁に当たった際の反射ベクトル通知 (`mouse->OnWallCollision`)
+■ 4. FontManager.h / FontManager.cpp (シングルトン)
+  - 役割: フォントハンドルの事前生成・一元管理。
+  - 管理サイズ:
+    - `m_font13`, `m_font16`, `m_font18`, `m_font24`, `m_font36`, `m_font48` (`DX_FONTTYPE_NORMAL`)
+    - `m_font60`, `m_font96` (`DX_FONTTYPE_ANTIALIASING_8X8`: タイトルロゴおよびリザルト特大ランク文字用)
 
---------------------------------------------------------------------------------
-【7】Stage3D（Source/Stage3D.h, Source/Stage3D.cpp）
---------------------------------------------------------------------------------
-■ 管理対象 : 3Dステージモデル（`.mv1`）の描画と、「マップ1 / マップ2 完全分離型」の壁・床・境界コリジョン管理
-■ 主な保持データ（メンバ変数）:
-  ・共通設定 : `m_mapType`, `m_modelPath`, `m_scale`, `m_modelHandle`, `m_hasCollision`
-  ・マップ1 (`House`: `firstmap.mv1`) 専用データ :
-      - `m_houseWallPolygons` : マップ1の垂直壁ポリゴン配列
-      - `m_houseMinBounds` / `m_houseMaxBounds` : マップ1の外周AABB境界
-  ・マップ2 (`NewMap`: `newmap.mv1`) 専用データ :
-      - `m_newMapWallPolygons` : マップ2のガードレール壁・部屋外壁ポリゴン配列
-      - `m_newMapMinBounds` / `m_newMapMaxBounds` : マップ2の外周AABB境界
-■ 主要メソッドと処理内容 :
-  ・`LoadStage(mapType)`
-      前モデルの破棄・両ポリゴン配列クリア後、モデルを複製して `m_mapType` に応じて
-      `BuildHouseCollision()` または `BuildNewMapCollision()` を呼び出す。
-  ・`BuildHouseCollision()` 【マップ1専用】
-      - 全高35未満の床メッシュ (`Mesh[2]`) および不要な原点デフォルトキューブ (`Mesh[10]: pCube55`) を除外・非表示化。
-      - 高さ35以上・上端Y>=30・`|normal.y| < 0.35` の垂直壁ポリゴンのみを `m_houseWallPolygons` に構築。
-  ・`BuildNewMapCollision()` 【マップ2専用】
-      - 原点床下の不要キューブ (`polyMinY < -20.0f`) を除外。
-      - 通路の側壁ガードレール（高さ20）および各部屋外壁（高さ200）を `m_newMapWallPolygons` に構築。
-  ・`ResolveWallCollision(outPos, radius, outPushNormal)`
-      `m_mapType` に応じて `ResolveHouseWallCollision()` または `ResolveNewMapWallCollision()` に分岐し、
-      Ericsonの三角形最近接点アルゴリズム (`ClosestPointOnTriangle`) による最大4回反復の壁押し戻しを実行。
-  ・`GetGroundHeight(pos, outGroundY, outGroundNormal)`
-      - マップ1 (`GetHouseGroundHeight`)  : `Y = 30.0f 〜 -30.0f` の範囲で室内床面 (`Y ≈ 5.0f`) のみを検出。
-      - マップ2 (`GetNewMapGroundHeight`) : 足元付近 (`pos.y + 120.0f 〜 pos.y - 180.0f`) の坂道・床面を優先検出し、
-        セーフティネットとして上空からのレイキャストも備える。
-  ・`ClampToBounds(outPos, radius)`
-      `ClampToHouseBounds()` / `ClampToNewMapBounds()` によりマップ別の外周境界内に座標を制限。
+■ 5. ModelManager.h / ModelManager.cpp (シングルトン)
+  - 役割: 3Dモデル(`.mv1`)の重複読み込み防止キャッシュと、モデル未配置時のプロシージャル代替描画。
+  - 主な機能:
+    - `LoadModelHandle()`        : パスをキーに `m_modelHandles` でハンドルをキャッシュ管理（テクスチャ自動復旧付き）。
+    - `DrawModelIfLoaded()`      : 位置・回転・等方スケールを指定して3Dモデルを描画。
+    - `DrawModelWithTransform()` : ローカルピッチ・ロール・3軸非一様スケール行列を合成して描画。
+    - `DrawFallbackCat / Mouse / Obstacle / Stage()` : 3Dプリミティブによる代替描画。
 
---------------------------------------------------------------------------------
-【8】Camera3D（Source/Camera3D.h, Source/Camera3D.cpp）
---------------------------------------------------------------------------------
-■ 管理対象 : 三人称視点（TPS）カメラの座標補間、マウス・キーボード視点回転、壁めり込み防止、感度管理
-■ 主な保持データ（メンバ変数）:
-  ・`m_targetPos` / `m_currentPos` : 注視点およびカメラ座標（スムーズ補間後）
-  ・`m_angleH` / `m_angleV`        : 水平回転角・垂直仰俯角（ラジアン）
-  ・`m_distance` / `m_height`      : 猫からの基準距離(220.0f)・基準高さ(140.0f)
-  ・`m_mouseSensitivityScale`      : マウス視点感度倍率（0.2x 〜 3.0x、デフォルト 1.0x）
-■ 主要メソッドと処理内容 :
-  ・`Init(initialTargetPos, initialAngleH)`
-      ゲーム開始時に猫の背後へカメラを初期配置し、マウスカーソルを画面中央へリセット。
-  ・`Update(...)`
-      1. マウス移動量（または矢印キー）に `m_mouseSensitivityScale` を掛けて水平・垂直アングルを更新。
-      2. 画面端でマウスが止まらないよう毎フレーム画面中央へカーソルを再センタリング。
-      3. ステージモデルに対してレイキャストを行い、壁の裏にカメラが隠れる場合は壁の手前へ距離を寄せる。
-  ・`Apply()`
-      DxLibの `SetCameraPositionAndTarget_UpVecY` に計算済みカメラ座標と注視点を反映。
-  ・`SetMouseSensitivity(scale)` / `AdjustMouseSensitivity(delta)`
-      プレイ中の `[-]`/`[+]` キーやポーズ画面スライダーからのマウス感度変更を管理（リトライ時も維持）。
+■ 6. EffectManager.h / EffectManager.cpp (シングルトン)
+  - 役割: Effekseer for DXLib を用いた3Dエフェクト再生管理。
+  - 主な機能:
+    - タックル突進衝撃波 (`PlayTackleEffect`)、ネズミ捕獲閃光 (`PlayCatchEffect`)、筋トレ成功発光 (`PlayPumpSuccessEffect`)、常駐マッスルオーラ (`UpdateMuscleAura`) の再生・追従制御。
 
-================================================================================
-4. キャラクター・オブジェクト管理クラスの詳細
-================================================================================
+■ 7. CustomEffectManager.h / CustomEffectManager.cpp (シングルトン)
+  - 役割: 外部画像に依存しないプロシージャル生成テクスチャと3Dポリゴンを用いた独自エフェクト演出。
+  - 主な機能:
+    - 筋トレ中の燃焼炎＆火柱（Lvに応じて黄橙→紅蓮→深紅業火へ変化）、Lv.10以上の体から立ち昇る白い湯気。
+    - 飛びつき攻撃（Pounce）時の地面えぐり爪痕・3D隆起岩塊・重力バウンド破片・土煙スプラッシュ。
+    - スタン攻撃（Tackle）時の電撃ソニックブーム・3Dスピードライン・全身を纏う3D稲妻アーク。
+    - ネズミ捕獲時の3D星＆ダイヤ噴水・ゴールド衝撃波リング・放射サンバースト光線・昇天ソウル演出。
 
---------------------------------------------------------------------------------
-【9】GameObject3D（Source/GameObject3D.h）
---------------------------------------------------------------------------------
-■ 管理対象 : 3D空間に存在する全オブジェクト（猫・通常ネズミ・高速ネズミ・障害物）の共通抽象基底クラス
-■ 管理プロパティ :
-  ・`m_pos` (3D座標)、`m_rotY` (Y軸向き)、`m_radius` (当たり判定半径)、`m_isAlive` (生存フラグ)、`m_type` (`ObjectType`)
-■ 共通インターフェース :
-  ・`Update()` / `Draw3D()` / `Draw2D()`
+■ 8. Camera3D.h / Camera3D.cpp
+  - 役割: プレイヤー追従TPSカメラの制御。
+  - 主な機能:
+    - マウス移動（感度 0.2x〜3.0x 調整可能）および矢印キーによる水平・垂直回転、[F]キーでの正面リセット。
+    - 筋トレQTE中 (`isFrontView == true`) に猫の背後から正面アングルへ滑らかに回り込むブレンド補間。
+    - `MV1CollCheck_Line` レイキャストによるステージ壁面の遮蔽検知とカメラ手前引き寄せ回避。
+    - 捕獲・衝撃時の減衰付きカメラシェイク (`TriggerShake`)。
 
---------------------------------------------------------------------------------
-【10】Player3D（Source/Player3D.h, Source/Player3D.cpp）
---------------------------------------------------------------------------------
-■ 管理対象 : プレイヤー（マッスルキャット）の移動・筋トレQTE・パンプアップ成長・攻撃スキル・3Dアニメ管理
-■ 主な管理要素 :
-  1. **移動スピード管理 (`CalculateSpeedForRep`)**
-     - `CsvManager::GetCatStatus()` の `baseSpeed`(4.00), `speedGrowthPerUnit`(0.10), `maxSpeed`(5.50) を参照し、
-       現在の筋トレ回数 (`m_repCount`, 上限Lv.15) に応じた移動速度をリアルタイム算出。
-  2. **筋トレ（SPACE長押し）＆パンプアップ管理**
-     - SPACEキー押下中にバーベルスクワットを行い、レップ数 (`m_repCount`) を加算。
-     - レップ数に応じて猫の3Dモデルスケールと身長（基準 `1.80m = 104.5u` から最大約 `2.7m`）が拡大。
-     - 15秒間 (`PUMP_DECAY_FRAMES = 900`) 筋トレしないと徐々にパンプがしぼむ減衰タイマー管理。
-  3. **攻撃スキル管理（Lv.4 / 4 Rep 以上で解放）**
-     - **左クリック：飛びつき捕獲 (`Pounce`)**
-       前方のネズミを自動ホーミング補間しながら高速ジャンプ突進し、拡大した捕獲半径で一気に捕まえる。
-     - **右クリック（またはEキー）：肉弾タックル (`Tackle`)**
-       前方へ猛突進し、接触したネズミを気絶（スタン）させる。ただし壁に激突すると猫自身が1.5秒スタンする。
-  4. **3Dモデル＆ボーンアタッチ管理 (`InitModel`, `UpdateAnimation`, `DrawBarbell`)**
-     - `cat.mv1` の6種のアニメーション（Run / Attack / Squat / Idol / Push / Soreness）のブレンド再生。
-     - 猫の両手ボーンフレーム（`m_lHandFrame`, `m_rHandFrame`）のワールド座標を取得し、筋トレ中に
-       `Barbell.mv1`（バーベルモデル）を両手の位置・角度・スケールに完全同期させて描画。
+■ 9. Stage3D.h / Stage3D.cpp
+  - 役割: 3Dステージモデルの管理、壁ポリゴン抽出、押し戻し衝突判定、床・坂道の高さ取得。
+  - 主な機能:
+    - `BuildHouseCollision()` / `BuildNewMapCollision()` : マップ1(`firstmap.mv1`)とマップ2(`newmap.mv1`)それぞれのメッシュ構造に合わせて垂直壁ポリゴン(`WallPolygon`)を抽出。
+    - `ResolveWallCollision()` : 三角形上の最近接点(`ClosestPointOnTriangle`)を用いた最大4回反復の滑らかな壁押し戻し。
+    - `GetGroundHeight()`      : レイキャストにより床・スロープの正確なY座標を取得し、壁上への誤ワープを防止。
 
---------------------------------------------------------------------------------
-【11】MouseBase3D / NormalMouse3D / FastMouse3D（Source/Mouse3D.h, Source/Mouse3D.cpp）
---------------------------------------------------------------------------------
-■ 管理対象 : ネズミAIの巡回・逃走アルゴリズム、壁反射、スタン状態、捕獲数に応じた速度成長管理
-■ クラス構成と管理内容 :
-  ・**`MouseBase3D`（ネズミ共通基底クラス）**
-      - `ChooseNewPatrolTarget()` : `CsvManager` から現在マップの `Pos1〜Pos8` を取得し、現在地から一定距離以上
-        離れた別の部屋・通路ポイントを次の巡回目標 (`m_targetWaypoint`) に選択する。
-      - `UpdateWanderMovement()`  : 目標ウェイポイントへ向けて滑らかに向きを補間しながら移動。
-      - `UpdateFleeMovement()`    : 猫が近づいた際、猫と反対方向へ逃走ベクトルを計算。
-      - `OnWallCollision(normal)` : 壁や境界にぶつかった際、壁の法線ベクトルに沿って反射・スライドし、
-        スタックしないよう新しい巡回目標を再選択する。
-      - `ApplyStun(frames)`       : 猫のタックルを受けた際の気絶タイマー管理と頭上ピヨピヨ星エフェクト描画。
-  ・**`NormalMouse3D`（通常ネズミ）**
-      - 基本はウェイポイント間を巡回し、猫が至近距離に来たときのみ回避行動をとる。
-  ・**`FastMouse3D`（高速逃走ネズミ）**
-      - 猫が感知距離 (`160.0f` ≒ 2.76m) 以内に入ると即座にパニック汗漫符を出して高速逃走する。
+■ 10. GameObject3D.h / Obstacle3D.h / Obstacle3D.cpp
+  - `GameObject3D` : 全3Dオブジェクト共通の座標(`m_pos`)、向き(`m_rotY`)、半径(`m_radius`)、生存フラグ(`m_isAlive`)を持つ抽象基底クラス。
+  - `Obstacle3D`   : 室内の家具・器具を表し、AABB対円の水平押し出し判定 (`ResolveCollision`) を実装。
 
---------------------------------------------------------------------------------
-【12】Obstacle3D（Source/Obstacle3D.h, Source/Obstacle3D.cpp）
---------------------------------------------------------------------------------
-■ 管理対象 : ステージ内に配置される家具・障害物（キッチン・冷蔵庫・テーブル・テレビ等）の描画と押し出し判定
-■ 主要メソッド :
-  ・`Draw3D()`           : `ModelManager` を通じて家具3Dモデルを描画。
-  ・`ResolveCollision()` : 直方体AABBとキャラクター円柱半径の交差を判定し、最短軸方向へ押し出す。
+■ 11. Mouse3D.h / Mouse3D.cpp
+  - 役割: 捕獲ターゲットであるネズミ（`NormalMouse3D` / `FastMouse3D`）のAIとアニメーション。
+  - 主な機能:
+    - パトロール巡回AI (`ChooseNewPatrolTarget`, `UpdateWanderMovement`) とプレイヤー接近時の逃走AI (`UpdateFleeMovement`)。
+    - 仲間が捕まるごとに移動速度が上昇する動的難易度調整 (`m_speedBonus`)。
+    - プレイヤーのスタン攻撃を受けた際の気絶状態 (`ApplyStun`) と3D頭上ピヨピヨ星演出 (`DrawStunEffect`)。
+    - ホッピング跳躍・ロール揺れ・前傾・Squash & Stretch・スタン横倒し痙攣を計算する `GetAnimTransform()`。
 
-================================================================================
-5. 設定・共通ヘッダファイル群の管理内容
-================================================================================
+■ 12. Player3D.h / Player3D.cpp
+  - 役割: プレイヤーキャラクター「マッスルねこ」のアクション・成長・アニメーション制御。
+  - 主な機能:
+    - カメラの水平向きを基準としたWASD移動と、レベルに応じた速度上昇 (`CalculateSpeedForRep`)・体格巨大化。
+    - [SPACE]長押しによる筋トレQTEゲージ（成功で +1 Rep & 15秒維持タイマーリセット、失敗で5秒間筋肉痛停止）。
+    - 15秒間筋トレまたは捕獲がない場合に -3 Rep されるパンプ減衰システム。
+    - Lv.4 (4 Rep) 以上で解放される2大アクション:
+      1) 飛びつき (`Pounce`: 左クリック / SHIFT) : 前方のネズミへ緩やかにホーミングしながら放物線跳躍して捕獲。
+      2) スタン攻撃 (`Tackle`: 右クリック / E)   : 電撃を纏って超高速突進し、接触したネズミを長時間スタンさせる（壁に激突すると猫自身が1.5秒スタン）。
+    - Mixamoボーンフレーム (`LeftHand`, `RightHand`) のワールド座標から変換行列を構築し、スクワット中に両手でバーベル (`Barbell.mv1`) を保持する `DrawBarbell()`。
 
-■ `Source/Config.h`
-  ・画面解像度 (`SCREEN_WIDTH = 1280`, `SCREEN_HEIGHT = 720`)
-  ・初期スポーン数 (`NORMAL_MOUSE_COUNT = 3`, `FAST_MOUSE_COUNT = 2`)
-  ・TPSカメラ基準パラメータ (`CAMERA_DISTANCE = 220.0f`, `CAMERA_HEIGHT = 140.0f`)
-  ・CSVファイルパス定数 (`Resource/CSV/Statu.csv`, `Resource/CSV/Position.csv`)
-  ・距離目測スケール基準定数 :
-    - `CAT_BASE_HEIGHT_METERS = 1.8f`（猫の基準身長 1.8m）
-    - `CAT_BASE_HEIGHT_UNITS  = 104.496f`（ワールド単位での猫基準身長）
-    - `WORLD_UNITS_PER_METER  = 58.0533f`（1mあたりのワールド座標単位）
-    - `CUBE_10M_SIZE_UNITS    = 580.5333f`（F1デバッグの10m×10m×10mキューブ1辺の長さ）
+■ 13. ObjectManager3D.h / ObjectManager3D.cpp
+  - 役割: ステージ内の全オブジェクトの一括管理、衝突解決、捕獲コンボ演出。
+  - 主な機能:
+    - プレイヤー・ネズミ群・障害物・ステージの更新と描画順序制御。
+    - 壁・障害物との押し出し判定および床のない領域（崖・マップ外）への落下を防止する壁沿いスライディング処理。
+    - ネズミ捕獲判定、約3.5秒以内の連続捕獲によるコンボラッシュ集計、ヒットストップ、3D座標から浮かび上がるコミック風ポップアップ描画。
 
-■ `Source/ModelConfig.h`
-  ・各3Dモデル（猫・バーベル・ネズミ・マップ1・マップ2・家具）のファイルパスとスケール定数
-  ・マップ種別列挙型 `ModelConfig::MapType` (`House = 0`, `NewMap = 1`)
-
-■ `Source/Common.h`
-  ・オブジェクト種別列挙型 `ObjectType` (`Player`, `NormalMouse`, `FastMouse`, `Obstacle`)
-  ・数学ヘルパー `MathHelper`（`Clamp`, `Lerp`, `DistanceXZ`, `LerpAngle`）
+■ 14. GameManager.h / GameManager.cpp
+  - 役割: シーン遷移 (`Title` / `Playing` / `GameClear`)、ポーズ制御、2D UI描画、F1デバッグ機能。
+  - 主な機能:
+    - タイトル画面 (`DrawTitleScreen`, `DrawTitle3DScene`):
+      3D空間でスクワットと腕立て伏せを交互に行う猫の周囲をカメラが旋回し、「マッスルねこ」の立体カートゥーンロゴ、48種類以上のボディビル掛け声吹き出し、ステージ選択UIを描画。
+    - プレイ中HUD & ポーズ画面 (`Draw`, `UpdatePause`, `DrawPauseModal`):
+      左上ステータスバッジ（レベル・維持ゲージ・残りネズミ数・120秒制限時間タイマー）、右下操作ガイド、ESCポーズメニュー（リトライ・タイトル・マウス感度スライダー）。
+    - リザルト画面 (`DrawGameClearScreen`):
+      クリア/タイムアップ時にまず筋トレする猫へカメラがズームイン（75フレーム）し、背景で猫がスクワットし続ける状態でアメコミ風S/A/B/Cランクスタンプ、クリア統計、報酬ボーナス（ダンベル・猫缶・スター）を表示。
+    - F1デバッグオーバーレイ (`DrawDebug3DOverlay`, `DrawDebug2DOverlay`):
+      猫の身長1.8mを基準とした10m×10m×10m目測ワイヤーフレームキューブ、身長物差し、壁ポリゴン可視化、2Dミニマップレーダー、各種デバッグチート機能（[1]〜[8]キー）。
 ================================================================================

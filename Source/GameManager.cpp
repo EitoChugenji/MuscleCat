@@ -1,3 +1,7 @@
+// ============================================================================
+// @file   GameManager.cpp
+// @brief  GameManager クラスの実装（タイトル・ゲーム本編・リザルト・ポーズ・デバッグ）
+// ============================================================================
 #include "GameManager.h"
 #include "Player3D.h"
 #include "Mouse3D.h"
@@ -327,7 +331,7 @@ void GameManager::SwitchSelectedMap(ModelConfig::MapType newMap)
         if (player)
         {
             player->SetMapType(m_selectedMap);
-            float groundY = 0.0f;
+            // Map1は床(Y≈5)、Map2は中央の円柱台座上(Y=200)に配置
             float gy = (m_selectedMap == ModelConfig::MapType::House) ? 5.0f : 200.0f;
             if (m_selectedMap == ModelConfig::MapType::House) m_objManager.GetStage().GetGroundHeight(VGet(0.0f, 0.0f, 0.0f), gy);
             player->SetPos(VGet(0.0f, gy, 0.0f));
@@ -2307,15 +2311,17 @@ void GameManager::DrawTitleScreen()
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
     // ------------------------------------------------------------------------
-    // 6. 元気で弾む「MUSCLE CAT 3D」カートゥーンロゴ（ボヨヨンバウンス＋極太ブラックアウトライン＋ビビッドカラー）
+    // ------------------------------------------------------------------------
+    // 6. 元気で弾む「マッスルねこ」カートゥーンロゴ（ボヨヨンバウンス＋極太ブラックアウトライン＋ビビッドカラー）
+    // ------------------------------------------------------------------------
     // ------------------------------------------------------------------------
     float t = GetNowCount() * 0.005f;
     float bounceOffset = std::abs(std::sin(t)) * -12.0f; // ポンポン弾むバウンス
     int logoBaseY = static_cast<int>(88.0f + bounceOffset);
 
-    const char* txtMuscle = "MUSCLE ";
-    const char* txtCat    = "CAT ";
-    const char* txt3D     = "3D";
+    const char* txtMuscle = "マッスル";
+    const char* txtCat    = "ねこ";
+    const char* txt3D     = "";
     int wMuscle = GetDrawStringWidthToHandle(txtMuscle, static_cast<int>(strlen(txtMuscle)), font60);
     int wCat    = GetDrawStringWidthToHandle(txtCat, static_cast<int>(strlen(txtCat)), font60);
     int w3D     = GetDrawStringWidthToHandle(txt3D, static_cast<int>(strlen(txt3D)), font60);
@@ -2396,7 +2402,7 @@ void GameManager::DrawTitleScreen()
         int rBadgeX = logoStartX + totalLogoW + 15;
         int rBadgeY = logoBaseY + 14 - static_cast<int>(badgePulse);
         SoftUI::DrawSoftCard(rBadgeX, rBadgeY, 92, 30, 15, GetColor(240, 40, 120), 245, GetColor(255, 180, 230), 1);
-        DrawStringToHandle(rBadgeX + 7, lBadgeY + 6, "★ BULK ★", GetColor(255, 255, 255), font16);
+        DrawStringToHandle(rBadgeX + 7, rBadgeY + 6, "★ BULK ★", GetColor(255, 255, 255), font16);
     }
 
     // F. サブタイトル（アメコミバナー風）

@@ -1,3 +1,7 @@
+// ============================================================================
+// @file   Mouse3D.cpp
+// @brief  MouseBase3D / NormalMouse3D / FastMouse3D クラスの実装
+// ============================================================================
 #include "Mouse3D.h"
 #include "Player3D.h"
 #include "FontManager.h"

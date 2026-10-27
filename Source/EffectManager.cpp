@@ -1,115 +1,91 @@
+// ============================================================================
+// @file   EffectManager.cpp
+// @brief  EffectManager クラスの実装（Effekseerの初期化・リソース管理・再生制御）
+// ============================================================================
 #include "EffectManager.h"
 #include <EffekseerForDXLib.h>
 #include <cmath>
 
+// ============================================================================
+// Effekseerの初期化および各エフェクトファイル(.efk / .efkefc)の読み込み
+// ============================================================================
 void EffectManager::Init()
 {
-    // Effekseerの初期化（最大パーティクル数8000）
+    // Effekseerランタイムの初期化（同時最大パーティクル数: 8000）
     if (Effekseer_Init(8000) == -1)
     {
         return;
     }
 
-    // 画面モード変更時のグラフィックシステムリセット防止
+    // フルスクリーン/ウィンドウ切り替え時のグラフィックシステムリセットを防止
     SetChangeScreenModeGraphicsSystemResetFlag(FALSE);
 
-    // デバイスロスト時のコールバック設定
+    // DirectXデバイスロスト時のコールバック関数を設定
     Effekseer_SetGraphicsDeviceLostCallbackFunctions();
 
-    // 歪みエフェクトの初期化
+    // 空間歪み（ディストーション）エフェクトの初期化
     Effekseer_InitDistortion();
 
-    // 1. タックル突進エフェクト（進行方向に射出されるアタックエフェクト）
+    // 1. タックル突進エフェクト（進行方向へ射出されるアタック衝撃波）
     m_tackleResHandle = LoadEffekseerEffect("Resource/Effects/Attack/01_NextSoft01/RightAttack.efk", 6.5f);
 
     // 2. ネズミ捕獲エフェクト
-    // ① 捕獲ヒット閃光（LightAttackEffect: 捕獲瞬間のクッキリしたヒットフラッシュ）
+    // ① 捕獲瞬間のヒットフラッシュ（LightAttackEffect）
     m_catchHitResHandle = LoadEffekseerEffect("Resource/Effects/Attack/01_NextSoft01/LightAttackEffect.efk", 4.0f);
 
-    // ② ユーザー自作捕獲エフェクト用スロット（Resource/Effects/Custom/Catch.efkefc または Catch.efk があれば最優先再生）
+    // ② ユーザー自作捕獲エフェクト用スロット（配置されていれば最優先で重ねて再生）
     m_customCatchResHandle = LoadEffekseerEffect("Resource/Effects/Custom/Catch.efkefc", 4.0f);
     if (m_customCatchResHandle == -1)
     {
         m_customCatchResHandle = LoadEffekseerEffect("Resource/Effects/Custom/Catch.efk", 4.0f);
     }
 
-    // 筋トレ成功エフェクト＆マッスルオーラエフェクトのロードを追加
+    // 3. 筋トレ成功エフェクトおよび常駐マッスルオーラエフェクトの読み込み
     m_pumpSuccessResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Barrior01.efkefc", 6.0f);
-    m_muscleAuraResHandle = LoadEffekseerEffect("Resource/Effects/Shadow/Aura01.efkefc", 1.2f);
+    m_muscleAuraResHandle  = LoadEffekseerEffect("Resource/Effects/Shadow/Aura01.efkefc", 1.2f);
 }
 
+// ============================================================================
+// 全エフェクトリソースの解放およびEffekseerの終了処理
+// ============================================================================
 void EffectManager::Release()
 {
-    // 再生中オーラの停止
+    // 再生中の常駐オーラがあれば先に停止する
     StopMuscleAura();
 
-    // エフェクトリソースの解放
-    if (m_tackleResHandle != -1)
-    {
-        DeleteEffekseerEffect(m_tackleResHandle);
-        m_tackleResHandle = -1;
-    }
+    // 読み込み済みエフェクトリソースを個別に解放
+    if (m_tackleResHandle != -1)        { DeleteEffekseerEffect(m_tackleResHandle);        m_tackleResHandle = -1; }
+    if (m_catchHitResHandle != -1)      { DeleteEffekseerEffect(m_catchHitResHandle);      m_catchHitResHandle = -1; }
+    if (m_customCatchResHandle != -1)   { DeleteEffekseerEffect(m_customCatchResHandle);   m_customCatchResHandle = -1; }
+    if (m_pumpSuccessResHandle != -1)   { DeleteEffekseerEffect(m_pumpSuccessResHandle);   m_pumpSuccessResHandle = -1; }
+    if (m_pumpRingResHandle != -1)      { DeleteEffekseerEffect(m_pumpRingResHandle);      m_pumpRingResHandle = -1; }
+    if (m_pumpSparkResHandle != -1)     { DeleteEffekseerEffect(m_pumpSparkResHandle);     m_pumpSparkResHandle = -1; }
+    if (m_customLevelUpResHandle != -1) { DeleteEffekseerEffect(m_customLevelUpResHandle); m_customLevelUpResHandle = -1; }
+    if (m_muscleAuraResHandle != -1)    { DeleteEffekseerEffect(m_muscleAuraResHandle);    m_muscleAuraResHandle = -1; }
 
-    if (m_catchHitResHandle != -1)
-    {
-        DeleteEffekseerEffect(m_catchHitResHandle);
-        m_catchHitResHandle = -1;
-    }
-
-
-
-    if (m_customCatchResHandle != -1)
-    {
-        DeleteEffekseerEffect(m_customCatchResHandle);
-        m_customCatchResHandle = -1;
-    }
-
-    if (m_pumpSuccessResHandle != -1)
-    {
-        DeleteEffekseerEffect(m_pumpSuccessResHandle);
-        m_pumpSuccessResHandle = -1;
-    }
-
-    if (m_pumpRingResHandle != -1)
-    {
-        DeleteEffekseerEffect(m_pumpRingResHandle);
-        m_pumpRingResHandle = -1;
-    }
-
-    if (m_pumpSparkResHandle != -1)
-    {
-        DeleteEffekseerEffect(m_pumpSparkResHandle);
-        m_pumpSparkResHandle = -1;
-    }
-
-    if (m_customLevelUpResHandle != -1)
-    {
-        DeleteEffekseerEffect(m_customLevelUpResHandle);
-        m_customLevelUpResHandle = -1;
-    }
-
-    if (m_muscleAuraResHandle != -1)
-    {
-        DeleteEffekseerEffect(m_muscleAuraResHandle);
-        m_muscleAuraResHandle = -1;
-    }
-
-    // Effekseer終了処理
+    // Effekseerランタイムの終了処理
     Effkseer_End();
 }
 
+// ============================================================================
+// 毎フレームのEffekseer時間進行更新
+// ============================================================================
 void EffectManager::Update()
 {
-    // Effekseerエフェクトの内部時間更新
     UpdateEffekseer3D();
 }
 
+// ============================================================================
+// DxLibの3Dカメラ行列（ビュー・プロジェクション）をEffekseerへ同期する
+// ============================================================================
 void EffectManager::SyncCamera()
 {
-    // DxLibの3Dカメラ設定とEffekseerのカメラ設定を同期
     Effekseer_Sync3DSetting();
 }
 
+// ============================================================================
+// エフェクト表示の有効・無効切り替え
+// ============================================================================
 void EffectManager::SetEffectEnabled(bool enabled)
 {
     m_effectEnabled = enabled;
@@ -130,6 +106,9 @@ void EffectManager::ToggleEffectEnabled()
     SetEffectEnabled(!m_effectEnabled);
 }
 
+// ============================================================================
+// 3D空間上のEffekseerエフェクト一括描画
+// ============================================================================
 void EffectManager::Draw3D()
 {
     if (!m_effectEnabled)
@@ -137,10 +116,13 @@ void EffectManager::Draw3D()
         return;
     }
 
-    // 3Dエフェクトの描画
     DrawEffekseer3D();
 }
 
+// ============================================================================
+// タックル突進エフェクトの再生
+// 猫の突進モーションが隠れないよう、進行方向の前方（+14.0f）にオフセットして発生させる
+// ============================================================================
 void EffectManager::PlayTackleEffect(const VECTOR& pos, const VECTOR& dir)
 {
     if (!m_effectEnabled || m_tackleResHandle == -1)
@@ -148,12 +130,10 @@ void EffectManager::PlayTackleEffect(const VECTOR& pos, const VECTOR& dir)
         return;
     }
 
-    // タックル突進方向に合わせた角度を計算
+    // 進行方向ベクトルからY軸回転角（ラジアン）を算出
     float rotY = std::atan2(dir.x, dir.z);
 
-    // 猫自身（Pushモーション）を覆い隠さないよう、猫の手の前方（突進方向）に少し離して再生
     int playHandle = PlayEffekseer3DEffect(m_tackleResHandle);
-
     if (playHandle != -1)
     {
         float frontX = pos.x + dir.x * 14.0f;
@@ -163,6 +143,10 @@ void EffectManager::PlayTackleEffect(const VECTOR& pos, const VECTOR& dir)
     }
 }
 
+// ============================================================================
+// ネズミ捕獲時のヒットフラッシュエフェクト再生
+// 高速ネズミ（isFast == true）捕獲時はスケールを1.35倍に拡大して達成感を強調する
+// ============================================================================
 void EffectManager::PlayCatchEffect(const VECTOR& pos, bool isFast)
 {
     if (!m_effectEnabled)
@@ -170,10 +154,9 @@ void EffectManager::PlayCatchEffect(const VECTOR& pos, bool isFast)
         return;
     }
 
-    // 高速ネズミ捕獲時は少しエフェクトを大きめにしてメリハリをつける
     float fastMultiplier = isFast ? 1.35f : 1.0f;
 
-    // 自作捕獲エフェクトがある場合はそれを最優先再生
+    // ユーザー自作捕獲エフェクトが存在する場合は同時に再生
     if (m_customCatchResHandle != -1)
     {
         int customPlay = PlayEffekseer3DEffect(m_customCatchResHandle);
@@ -185,7 +168,7 @@ void EffectManager::PlayCatchEffect(const VECTOR& pos, bool isFast)
         }
     }
 
-    // ① 捕獲ヒット閃光（ネズミの体中心でバシュッと光る）
+    // 捕獲瞬間のヒット閃光をネズミの中心高さ（pos.y + 8.0f）で再生
     if (m_catchHitResHandle != -1)
     {
         int hitPlay = PlayEffekseer3DEffect(m_catchHitResHandle);
@@ -198,12 +181,16 @@ void EffectManager::PlayCatchEffect(const VECTOR& pos, bool isFast)
     }
 }
 
+// ============================================================================
+// 筋トレ成功時の発光バリアエフェクト再生（筋トレレベルに応じて拡大）
+// ============================================================================
 void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
 {
     if (!m_effectEnabled || m_pumpSuccessResHandle == -1)
     {
         return;
     }
+
     int playHandle = PlayEffekseer3DEffect(m_pumpSuccessResHandle);
     if (playHandle != -1)
     {
@@ -213,6 +200,9 @@ void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
     }
 }
 
+// ============================================================================
+// 筋トレ中・パンプアップ状態中に纏うマッスルオーラの追従更新
+// ============================================================================
 void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCount)
 {
     if (!m_effectEnabled || !isActive || m_muscleAuraResHandle == -1)
@@ -220,10 +210,14 @@ void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCo
         StopMuscleAura();
         return;
     }
+
+    // 未再生または再生終了していたらループ再生し直す
     if (m_activeAuraHandle == -1 || IsEffekseer3DEffectPlaying(m_activeAuraHandle) == -1)
     {
         m_activeAuraHandle = PlayEffekseer3DEffect(m_muscleAuraResHandle);
     }
+
+    // プレイヤーの足元座標および現在の筋トレレベルに合わせたスケールを反映
     if (m_activeAuraHandle != -1)
     {
         float auraScale = 1.0f + static_cast<float>(repCount) * 0.1f;
@@ -232,6 +226,9 @@ void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCo
     }
 }
 
+// ============================================================================
+// 再生中のマッスルオーラを強制停止する
+// ============================================================================
 void EffectManager::StopMuscleAura()
 {
     if (m_activeAuraHandle != -1)
