@@ -1053,135 +1053,158 @@ void Player3D::Draw3D()
 void Player3D::Draw2D()
 {
     const auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
     int font16 = fm.GetFont16();
     int font18 = fm.GetFont18();
     int font24 = fm.GetFont24();
 
-    // スキルチェックQTEバー（画面中央下部に表示）
+    unsigned int colYellow  = GetColor(255, 230, 0);
+    unsigned int colOrange  = GetColor(255, 135, 0);
+    unsigned int colBlack   = GetColor(0, 0, 0);
+    unsigned int colWhite   = GetColor(255, 255, 255);
+    unsigned int colGold    = GetColor(255, 205, 0);
+    unsigned int colNeonRed = GetColor(245, 25, 65);
+    unsigned int colDarkBg  = GetColor(18, 21, 32);
+
+    // 斜め平行四辺形プレート描画ラムダ
+    auto DrawSlantedPlate = [&](int x, int y, int w, int h, int skew, int shadowOff, unsigned int fillCol, unsigned int borderCol, int borderThick)
+    {
+        auto FillQuad = [](int x1, int y1, int x2, int y2, int x3, int y3, int x4, int y4, unsigned int col)
+        {
+            DrawTriangle(x1, y1, x2, y2, x3, y3, col, TRUE);
+            DrawTriangle(x1, y1, x3, y3, x4, y4, col, TRUE);
+        };
+        if (shadowOff > 0)
+        {
+            FillQuad(x + skew + shadowOff, y + shadowOff,
+                     x + w + skew + shadowOff, y + shadowOff,
+                     x + w + shadowOff, y + h + shadowOff,
+                     x + shadowOff, y + h + shadowOff, colBlack);
+        }
+        if (borderThick > 0)
+        {
+            int b = borderThick;
+            FillQuad(x + skew - b, y - b,
+                     x + w + skew + b, y - b,
+                     x + w + b, y + h + b,
+                     x - b, y + h + b, colBlack);
+        }
+        if (borderCol != colBlack)
+        {
+            FillQuad(x + skew - 2, y - 2,
+                     x + w + skew + 2, y - 2,
+                     x + w + 2, y + h + 2,
+                     x - 2, y + h + 2, borderCol);
+        }
+        FillQuad(x + skew, y,
+                 x + w + skew, y,
+                 x + w, y + h,
+                 x, y + h, fillCol);
+    };
+
+    // 斜めカットのコミックコールアウトバナー
+    auto DrawComicCallout = [&](int centerY, const char* text, int fontHandle, unsigned int textCol, unsigned int fillCol, unsigned int borderCol)
+    {
+        int tw = GetDrawStringWidthToHandle(text, static_cast<int>(strlen(text)), fontHandle);
+        int fh = (fontHandle == font24) ? 24 : ((fontHandle == font18) ? 18 : 16);
+        int boxW = tw + 44;
+        int boxH = fh + 16;
+        int boxX = (Config::SCREEN_WIDTH - boxW) / 2;
+        int boxY = centerY - boxH / 2;
+
+        DrawSlantedPlate(boxX, boxY, boxW, boxH, 12, 6, fillCol, borderCol, 4);
+
+        int tx = boxX + 6 + (boxW - tw) / 2;
+        int ty = boxY + (boxH - fh) / 2;
+        DrawStringToHandle(tx + 2, ty + 2, text, colBlack, fontHandle);
+        DrawStringToHandle(tx,     ty,     text, textCol,  fontHandle);
+    };
+
+    // スキルチェックQTEバー（画面中央下部にシャープなコミックゲージで表示）
     if (m_isSkillChecking)
     {
-        int barW = 340;
-        int barH = 30;
+        int barW = 350;
+        int barH = 26;
         int barX = (Config::SCREEN_WIDTH - barW) / 2;
-        int barY = Config::SCREEN_HEIGHT - 125;
+        int barY = Config::SCREEN_HEIGHT - 128;
 
-        // 輪郭付きテキスト描画ラムダ（白いステージでもクッキリ目立つ黒縁取り）
-        auto DrawOutlinedText = [](int x, int y, const char* str, unsigned int textColor, int fontHandle)
-        {
-            unsigned int black = GetColor(0, 0, 0);
-            for (int ox = -2; ox <= 2; ++ox)
-            {
-                for (int oy = -2; oy <= 2; ++oy)
-                {
-                    if (ox != 0 || oy != 0)
-                    {
-                        DrawStringToHandle(x + ox, y + oy, str, black, fontHandle);
-                    }
-                }
-            }
-            DrawStringToHandle(x, y, str, textColor, fontHandle);
-        };
-
-        // ポップな極太枠付きバー背景（バカゲー風：白い床でも締まるバーニングオレンジ枠）
-        DrawBox(barX - 6, barY - 6, barX + barW + 6, barY + barH + 6, GetColor(0, 0, 0), TRUE);
-        DrawBox(barX - 3, barY - 3, barX + barW + 3, barY + barH + 3, GetColor(255, 110, 30), TRUE);
-        DrawBox(barX, barY, barX + barW, barY + barH, GetColor(40, 40, 50), TRUE);
-
-        // 成功ゾーン（ビビッドグリーン）
-        int zoneX1 = barX + static_cast<int>(m_scZoneStart * barW);
-        int zoneX2 = barX + static_cast<int>(m_scZoneEnd * barW);
-        DrawBox(zoneX1, barY, zoneX2, barY + barH, GetColor(40, 240, 100), TRUE);
-        DrawBox(zoneX1, barY, zoneX2, barY + barH, GetColor(255, 255, 255), FALSE);
-
-        // 針（通常時はビビッドレッド、停止確定時は判定結果色）
-        int cursorX = barX + static_cast<int>(m_scCursor * barW);
-        unsigned int needleColor = GetColor(255, 40, 40);
-        if (m_scStoppedTimer > 0)
-        {
-            needleColor = m_lastResultSuccess ? GetColor(255, 120, 30) : GetColor(255, 30, 30);
-        }
-        DrawBox(cursorX - 5, barY - 10, cursorX + 5, barY + barH + 10, GetColor(0, 0, 0), TRUE);
-        DrawBox(cursorX - 3, barY - 8, cursorX + 3, barY + barH + 8, needleColor, TRUE);
-
-        // ガイドテキスト（白い床でも視認性抜群の黒縁取り＋燃えるマッスルオレンジ）
+        // 上部コールアウトテキスト
         if (m_scStoppedTimer > 0)
         {
             if (m_lastResultSuccess)
             {
-                DrawOutlinedText(barX + 85, barY - 34, "★ NICE PUMP!! ★", GetColor(255, 110, 25), font24);
+                DrawComicCallout(barY - 26, "NICE PUMP!", font24, colBlack, colYellow, colWhite);
             }
-            
             else
             {
-                DrawOutlinedText(barX + 115, barY - 34, "× MISS! ×", GetColor(255, 60, 60), font24);
+                DrawComicCallout(barY - 26, "MISS...", font24, colWhite, colNeonRed, colWhite);
             }
         }
-        
         else
         {
-            DrawOutlinedText(barX + 12, barY - 32, "長押し→緑のゾーンで [SPACE] を離せ！", GetColor(255, 130, 35), font18);
+            DrawComicCallout(barY - 24, "黄色ゾーンで [SPACE] を離せ!", font16, colYellow, colDarkBg, colYellow);
         }
+
+        // ゲージ外枠（ハードシャドウ＋極太ブラック枠）
+        DrawBox(barX + 6, barY + 6, barX + barW + 6, barY + barH + 6, colBlack, TRUE);
+        DrawBox(barX - 4, barY - 4, barX + barW + 4, barY + barH + 4, colBlack, TRUE);
+        DrawBox(barX - 2, barY - 2, barX + barW + 2, barY + barH + 2, colWhite, TRUE);
+        DrawBox(barX,     barY,     barX + barW,     barY + barH,     colDarkBg, TRUE);
+
+        // 成功ゾーン（ビビッドイエロー）
+        int zoneX1 = barX + static_cast<int>(m_scZoneStart * barW);
+        int zoneX2 = barX + static_cast<int>(m_scZoneEnd * barW);
+        DrawBox(zoneX1 - 2, barY, zoneX2 + 2, barY + barH, colBlack, TRUE);
+        DrawBox(zoneX1,     barY, zoneX2,     barY + barH, colYellow, TRUE);
+        DrawBox(zoneX1,     barY, zoneX2,     barY + 6,    colWhite, TRUE);
+
+        // 針（立体マーカー）
+        int cursorX = barX + static_cast<int>(m_scCursor * barW);
+        unsigned int needleColor = colNeonRed;
+        if (m_scStoppedTimer > 0)
+        {
+            needleColor = m_lastResultSuccess ? colGold : colNeonRed;
+        }
+        DrawBox(cursorX - 5, barY - 9, cursorX + 5, barY + barH + 9, colBlack, TRUE);
+        DrawBox(cursorX - 3, barY - 7, cursorX + 3, barY + barH + 7, needleColor, TRUE);
+        DrawBox(cursorX - 1, barY - 5, cursorX + 1, barY + barH + 5, colWhite, TRUE);
     }
 
-    // スキルチェック結果・筋肉痛・減衰通知テキスト（バカゲー風ポップ装飾：黒縁取りで白床でも鮮明）
+    // スキルチェック結果・筋肉痛・減衰通知テキスト
     if (m_resultShowTimer > 0)
     {
         int alpha = (m_resultShowTimer > 20) ? 255 : (m_resultShowTimer * 255 / 20);
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
 
-        auto DrawOutlinedTextCenter = [](int x, int y, const char* str, unsigned int textColor, int fontHandle)
-        {
-            unsigned int black = GetColor(0, 0, 0);
-            for (int ox = -2; ox <= 2; ++ox)
-            {
-                for (int oy = -2; oy <= 2; ++oy)
-                {
-                    if (ox != 0 || oy != 0)
-                    {
-                        DrawStringToHandle(x + ox, y + oy, str, black, fontHandle);
-                    }
-                }
-            }
-            DrawStringToHandle(x, y, str, textColor, fontHandle);
-        };
-
         if (m_wasDecayed)
         {
-            char decayBuf[64];
+            char decayBuf[80];
             if (m_repCount > 0)
             {
-                snprintf(decayBuf, sizeof(decayBuf), "15秒放置: 筋肉減衰! (-3 Rep / 現在 Lv.%d)", m_repCount);
+                snprintf(decayBuf, sizeof(decayBuf), "筋肉減衰! -3 Lv (現在 Lv.%d)", m_repCount);
             }
             else
             {
-                snprintf(decayBuf, sizeof(decayBuf), "15秒放置: 筋肉が完全に減衰した! (0 Rep)");
+                snprintf(decayBuf, sizeof(decayBuf), "筋肉が完全に減衰した! (Lv.0)");
             }
-            DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 160, Config::SCREEN_HEIGHT / 2 - 45,
-                                   decayBuf, GetColor(180, 200, 255), font18);
+            DrawComicCallout(Config::SCREEN_HEIGHT / 2 - 42, decayBuf, font18, colYellow, colDarkBg, colOrange);
         }
-        
         else if (m_state == MuscleState::Soreness)
         {
-            DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 160, Config::SCREEN_HEIGHT / 2 - 45,
-                                   "FAIL! 筋肉痛で5秒間動けない！", GetColor(255, 70, 70), font24);
+            DrawComicCallout(Config::SCREEN_HEIGHT / 2 - 42, "筋肉痛! 5秒間動けない!", font24, colWhite, colNeonRed, colYellow);
         }
-        
         else if (m_lastResultSuccess)
         {
             char resultBuf[128];
-
             if (m_repCount >= MAX_EFFECTIVE_REP)
             {
-                snprintf(resultBuf, sizeof(resultBuf), "★ GOD MUSCLE MAX!! ★ +1 REP (Lv.%d)", m_repCount);
-                DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 180, Config::SCREEN_HEIGHT / 2 - 45,
-                                       resultBuf, GetColor(255, 60, 40), font24);
+                snprintf(resultBuf, sizeof(resultBuf), "MAX MUSCLE!  Lv.%d", m_repCount);
+                DrawComicCallout(Config::SCREEN_HEIGHT / 2 - 42, resultBuf, font24, colYellow, colNeonRed, colWhite);
             }
-            
             else
             {
-                snprintf(resultBuf, sizeof(resultBuf), "PUMP UP!! +1 REP (Lv.%d)", m_repCount);
-                DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 45,
-                                       resultBuf, GetColor(255, 115, 30), font24);
+                snprintf(resultBuf, sizeof(resultBuf), "PUMP UP!  +1 REP (Lv.%d)", m_repCount);
+                DrawComicCallout(Config::SCREEN_HEIGHT / 2 - 42, resultBuf, font24, colBlack, colYellow, colWhite);
             }
         }
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
@@ -1190,38 +1213,23 @@ void Player3D::Draw2D()
     // 猫の激突スタン通知テキスト
     if (m_stunTimer > 0)
     {
-        int alpha = (m_stunTimer % 10 < 5) ? 255 : 180;
+        int alpha = (m_stunTimer % 10 < 5) ? 255 : 200;
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
-        DrawFormatStringToHandle(Config::SCREEN_WIDTH / 2 - 140, Config::SCREEN_HEIGHT / 2 - 70, GetColor(255, 230, 40), font24, "★ STUNNED!! 残り%.1fs ★", GetCatStunRemainingSeconds());
-        DrawStringToHandle(Config::SCREEN_WIDTH / 2 - 120, Config::SCREEN_HEIGHT / 2 - 40, "壁・家具に激突して気絶中！", GetColor(255, 240, 120), font16);
+        char stunBuf[80];
+        snprintf(stunBuf, sizeof(stunBuf), "STUNNED! 気絶中 (残り%.1fs)", GetCatStunRemainingSeconds());
+        DrawComicCallout(Config::SCREEN_HEIGHT / 2 - 58, stunBuf, font18, colWhite, colNeonRed, colYellow);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 
-    // 攻撃スキル解放に必要なRep不足案内（4 Rep未満で攻撃キー/マウスクリック時に通知）
+    // 攻撃スキル解放に必要なRep不足案内
     if (m_needRepNoticeTimer > 0 && m_repCount < REQUIRED_ATTACK_REP && !m_isSkillChecking)
     {
         int alpha = (m_needRepNoticeTimer > 20) ? 255 : (m_needRepNoticeTimer * 255 / 20);
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
 
-        auto DrawOutlinedTextCenter = [](int x, int y, const char* str, unsigned int textColor, int fontHandle)
-        {
-            unsigned int black = GetColor(0, 0, 0);
-            for (int ox = -2; ox <= 2; ++ox)
-            {
-                for (int oy = -2; oy <= 2; ++oy)
-                {
-                    if (ox != 0 || oy != 0)
-                    {
-                        DrawStringToHandle(x + ox, y + oy, str, black, fontHandle);
-                    }
-                }
-            }
-            DrawStringToHandle(x, y, str, textColor, fontHandle);
-        };
-
         char noticeBuf[128];
-        snprintf(noticeBuf, sizeof(noticeBuf), "★ 飛びつき・スタン攻撃は Lv.%d (4 Rep) で解放！ [SPACE] で筋トレ！ ★", REQUIRED_ATTACK_REP);
-        DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 250, Config::SCREEN_HEIGHT / 2 + 25, noticeBuf, GetColor(255, 210, 60), font18);
+        snprintf(noticeBuf, sizeof(noticeBuf), "必殺スキルは Lv.%d から使用可能! (SPACEで筋トレ)", REQUIRED_ATTACK_REP);
+        DrawComicCallout(Config::SCREEN_HEIGHT / 2 + 36, noticeBuf, font16, colYellow, colDarkBg, colOrange);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
 }
