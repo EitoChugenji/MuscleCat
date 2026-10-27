@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // @file   ObjectManager3D.cpp
 // @brief  ObjectManager3D クラスの実装（更新・描画・捕獲コンボ判定・壁/床衝突解決）
 // ============================================================================
@@ -726,7 +726,7 @@ void ObjectManager3D::CheckObstacleAndStageCollisions(Camera3D& camera)
 
 int ObjectManager3D::GetRemainingMouseCount() const
 {
-    int count = 0;
+	int count = 0;//gicNumber of alive mice
     for (const auto& obj : m_objects)
     {
         if (obj->IsAlive() && obj->IsMouse())

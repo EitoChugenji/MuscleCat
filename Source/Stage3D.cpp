@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // @file   Stage3D.cpp
 // @brief  Stage3D クラスの実装（マップ別メッシュ解析・壁押し戻し・坂道接地判定）
 // ============================================================================
@@ -750,3 +750,4 @@ bool Stage3D::GetGroundHeight(const VECTOR& pos, float& outGroundY, VECTOR* outG
         return GetNewMapGroundHeight(pos, outGroundY, outGroundNormal);
     }
 }
+

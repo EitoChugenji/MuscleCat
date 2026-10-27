@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // @file   Player3D.h
 // @brief  プレイヤー操作キャラクター（マッスルねこ）の制御・アクション・描画クラス定義
 // ============================================================================
@@ -116,21 +116,25 @@ private:
     bool m_cheatNoCooldown     = false;
 
     // ------------------------------------------------------------------------
-    // 3Dモデル・ボーンアニメーション制御メンバ（cat.mv1 & Barbell.mv1）
+    // 3Dモデル・ボーンアニメーション制御メンバ（cat.mv1 & cat_soreness.mv1 & Barbell.mv1）
     // ------------------------------------------------------------------------
-    int   m_modelHandle        = -1;    // プレイヤー3Dモデル複製ハンドル
-    int   m_attachAnimIndex    = -1;    // 現在アタッチ中のアニメーション番号
-    int   m_currentAnimIndex   = -1;    // 現在再生中のアニメーション種別インデックス
-    float m_animPlayTime       = 0.0f;  // 現在のアニメーション再生時刻
+    int   m_modelHandle          = -1;    // プレイヤー3Dモデル複製ハンドル
+    int   m_sorenessModelHandle  = -1;    // 筋肉痛（06_MuscleSoreness）モーション保持用補助モデルハンドル
+    int   m_attachAnimIndex      = -1;    // 現在アタッチ中のアニメーション番号
+    int   m_currentAnimIndex     = -1;    // 現在再生中のアニメーション種別インデックス
+    int   m_currentAnimSrcHandle = -1;    // 現在アタッチ元のモデルハンドル（-1: 自身のモデル）
+    float m_animPlayTime         = 0.0f;  // 現在のアニメーション再生時刻
 
-    // cat.mv1 内の各モーションインデックス（InitModel で名前検索して自動取得）
-    int   m_animIndexRun       = 0;     // 01_Run: 走行モーション
-    int   m_animIndexAttack    = 1;     // 02_Attack: 飛びつき跳躍モーション
-    int   m_animIndexSquat     = 2;     // 03_squat: スクワット（筋トレQTE）モーション
-    int   m_animIndexIdol      = 3;     // 04_Idol: 待機モーション
-    int   m_animIndexPush      = 4;     // 05_Push / Attack: タックル突進モーション
-    int   m_animIndexPushUp    = 4;     // 05_PushUp: 腕立て伏せモーション（タイトル演出用）
-    int   m_animIndexSoreness  = 5;     // 06_MuscleSoreness: 筋肉痛モーション
+    // cat.mv1 / cat_soreness.mv1 内の各モーションインデックス（InitModel で名前検索して自動取得）
+    int   m_animIndexRun         = 0;     // 01_Run: 走行モーション
+    int   m_animIndexAttack      = 1;     // 02_Attack: 飛びつき跳躍モーション
+    int   m_animIndexSquat       = 2;     // 03_squat: スクワット（筋トレQTE）モーション
+    int   m_animIndexIdol        = 3;     // 04_Idol: 待機モーション
+    int   m_animIndexPush        = 4;     // 05_Push / Attack: タックル突進モーション
+    int   m_animIndexPushUp      = 4;     // 05_PushUp: 腕立て伏せモーション（タイトル演出用）
+    int   m_animIndexSoreness    = 5;     // 06_MuscleSoreness: 筋肉痛モーション
+    bool  m_pushFromSubModel     = false; // Pushアニメーションを補助モデルから参照するか
+    bool  m_sorenessFromSubModel = false; // 筋肉痛アニメーションを補助モデルから参照するか
 
     // バーベルを両手に追従させるためのMixamoボーンフレーム番号キャッシュ
     int   m_lHandFrame         = -1;    // 左手首ボーン (mixamorig:LeftHand)
