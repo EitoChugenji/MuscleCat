@@ -875,7 +875,8 @@ void GameManager::Update()
             m_sensitivityNoticeTimer--;
         }
 
-        // デバッグチート入力処理（F1でON/OFF切り替え）
+#ifdef _DEBUG
+        // デバッグチート入力処理（Debugビルド時のみ：F1でON/OFF切り替え）
         bool keyF1 = (CheckHitKey(KEY_INPUT_F1) != 0);
 
         if (keyF1 && !m_prevKeyF1)
@@ -966,9 +967,11 @@ void GameManager::Update()
             }
             m_prevKey8 = key8;
         }
+#endif
 
         m_objManager.Update(m_camera);
 
+#ifdef _DEBUG
         // F1デバッグ広角カメラがONの場合は、10m×10m×10mの■全体と猫の1.8m身長が一目で比較できる俯瞰視点にセット
         if (m_cheatEnabled && m_debugWideCamera && player)
         {
@@ -981,6 +984,7 @@ void GameManager::Update()
             SetCameraNearFar(10.0f, 30000.0f);
             SetCameraPositionAndTarget_UpVecY(camPos, target);
         }
+#endif
 
         // クリア判定・制限時間（120秒）タイムアップ判定
         float elapsedSec = (GetNowCount() - m_startCount) / 1000.0f;
@@ -1189,11 +1193,13 @@ void GameManager::Draw()
         DrawTitle3DScene();
     }
 
-    // F1デバッグモード時の3Dオーバーレイ描画（10m×10m×10m目測キューブ・1.8m身長バー・スポーン位置・当たり判定リング）
+#ifdef _DEBUG
+    // F1デバッグモード時の3Dオーバーレイ描画（Debugビルド時のみ：10m×10m×10m目測キューブ・1.8m身長バー・スポーン位置・当たり判定リング）
     if (m_state == GameState::Playing && m_cheatEnabled)
     {
         DrawDebug3DOverlay();
     }
+#endif
 
     // Effekseer 3Dエフェクトおよびカスタム燃焼エフェクト描画（タイトル画面では非表示）
     if (m_state != GameState::Title)
@@ -1235,7 +1241,9 @@ void GameManager::Draw()
         m_fpsTimer = now;
     }
 
+#ifdef _DEBUG
     DrawFormatStringToHandle(Config::SCREEN_WIDTH - 170, 14, GetColor(140, 240, 140), font13, "FPS: %.1f (%.1fms)", m_currentFps, m_frameProcessTimeMs);
+#endif
 
     if (m_state == GameState::Title)
     {
@@ -1398,8 +1406,9 @@ void GameManager::Draw()
         snprintf(camInfo, sizeof(camInfo), "移動: WASD  |  視点: マウス(感度:%.1fx) / 矢印  |  感度変更: [- / +]  |  視点リセット: [F]", m_camera.GetMouseSensitivity());
         DrawStringToHandle(gX + 14, gY + 42, camInfo, GetColor(210, 225, 245), font13);
 
+#ifdef _DEBUG
         // =========================================================================
-        // 3. F1 デバッグ情報＆ミニマップ＆10m距離目測オーバーレイ
+        // 3. F1 デバッグ情報＆ミニマップ＆10m距離目測オーバーレイ（Debugビルド時のみ表示）
         // =========================================================================
         if (m_cheatEnabled)
         {
@@ -1415,6 +1424,7 @@ void GameManager::Draw()
             SoftUI::DrawSoftCard(f1X, f1Y, f1W, f1H, 10, GetColor(18, 24, 40), 200, GetColor(90, 130, 190), 1);
             DrawStringToHandle(f1X + 8, f1Y + 4, "[F1] デバッグ情報・マップ・10m目測表示", GetColor(170, 220, 255), font13);
         }
+#endif
 
         // プレイ中の感度変更通知ポップアップ（ふわっと浮遊する角丸カード）
         if (m_sensitivityNoticeTimer > 0 && !m_isPaused)
@@ -1449,10 +1459,12 @@ void GameManager::Draw()
         DrawGameClearScreen();
     }
 
+#ifdef _DEBUG
     if (CheckHitKey(KEY_INPUT_F12))
     {
         SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, "d:\\MuscleCat\\screen_shot.png");
     }
+#endif
 }
 
 // ============================================================================

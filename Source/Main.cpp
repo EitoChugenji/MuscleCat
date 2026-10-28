@@ -13,6 +13,7 @@
 #include "GameManager.h"
 #include <ctime>
 #include <cstdlib>
+#include <filesystem>
 
 // ============================================================================
 // WinMain 関数：Windowsアプリケーションのエントリーポイント
@@ -20,6 +21,29 @@
 // ============================================================================
 int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
 {
+    // 実行ファイル(x64/Release や x64/Debug)から直接起動された場合でも Resource フォルダを見つけられるようカレントディレクトリを自動補正
+    {
+        namespace fs = std::filesystem;
+        std::error_code ec;
+        if (!fs::exists("Resource", ec))
+        {
+            wchar_t exePathBuf[MAX_PATH] = {};
+            if (GetModuleFileNameW(nullptr, exePathBuf, MAX_PATH) > 0)
+            {
+                fs::path dir = fs::path(exePathBuf).parent_path();
+                for (int i = 0; i < 4 && !dir.empty(); ++i)
+                {
+                    if (fs::exists(dir / "Resource", ec))
+                    {
+                        fs::current_path(dir, ec);
+                        break;
+                    }
+                    dir = dir.parent_path();
+                }
+            }
+        }
+    }
+
     // 乱数シードの初期化
     std::srand(static_cast<unsigned int>(std::time(nullptr)));
 
@@ -52,30 +76,33 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     CustomEffectManager::GetInstance().Init();  // 3Dプロシージャル炎・煙・雷撃・地面えぐりエフェクトの初期化
     SoundManager::GetInstance().Init();         // 全BGM・SEリソースの初期化
 
-    GameManager game;
-    game.Init();                                // ステージ構築・タイトル画面の初期セットアップ
-
-    // ------------------------------------------------------------------------
-    // 3. メインゲームループ（毎フレームの更新・描画・時間計測）
-    // ------------------------------------------------------------------------
-    while (ProcessMessage() == 0 && !game.ShouldQuit())
+    // GameManager（および内部のStage3D/Player3D等のMV1モデル）が DxLib_End() より前に破棄されるようスコープで囲む
     {
-        // フレーム開始時刻を記録（処理時間計測用）
-        LONGLONG frameStartUs = GetNowHiPerformanceCount();
+        GameManager game;
+        game.Init();                                // ステージ構築・タイトル画面の初期セットアップ
 
-        // 画面とZバッファをクリア
-        ClearDrawScreen();
+        // ------------------------------------------------------------------------
+        // 3. メインゲームループ（毎フレームの更新・描画・時間計測）
+        // ------------------------------------------------------------------------
+        while (ProcessMessage() == 0 && !game.ShouldQuit())
+        {
+            // フレーム開始時刻を記録（処理時間計測用）
+            LONGLONG frameStartUs = GetNowHiPerformanceCount();
 
-        // ゲーム状態の更新と描画
-        game.Update();
-        game.Draw();
+            // 画面とZバッファをクリア
+            ClearDrawScreen();
 
-        // 1フレームあたりのCPU処理時間（ミリ秒）を算出して記録
-        LONGLONG frameEndUs = GetNowHiPerformanceCount();
-        game.SetFrameProcessTime(static_cast<float>(frameEndUs - frameStartUs) / 1000.0f);
+            // ゲーム状態の更新と描画
+            game.Update();
+            game.Draw();
 
-        // 裏画面の内容を表画面へ反映（垂直同期）
-        ScreenFlip();
+            // 1フレームあたりのCPU処理時間（ミリ秒）を算出して記録
+            LONGLONG frameEndUs = GetNowHiPerformanceCount();
+            game.SetFrameProcessTime(static_cast<float>(frameEndUs - frameStartUs) / 1000.0f);
+
+            // 裏画面の内容を表画面へ反映（垂直同期）
+            ScreenFlip();
+        }
     }
 
     // ------------------------------------------------------------------------
