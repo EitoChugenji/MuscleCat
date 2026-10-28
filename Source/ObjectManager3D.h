@@ -23,7 +23,7 @@ class ObjectManager3D
 private:
     std::vector<std::shared_ptr<GameObject3D>> m_objects;               // 動的オブジェクト（ネズミ等）のリスト
     std::vector<std::shared_ptr<Obstacle3D>>   m_obstacles;             // 静的障害物（家具等）のリスト
-    std::shared_ptr<Player3D>                  m_player;                // プレイヤー（マッスルねこ）
+    std::shared_ptr<Player3D>                  m_player;                // プレイヤー（マッスルにゃんこ）
     Stage3D                                    m_stage;                 // 3Dステージ（床・壁コリジョン）
     int                                        m_caughtCount       = 0; // 捕獲したネズミの合計数
     int                                        m_caughtNormalCount = 0; // 捕獲した通常ネズミの数

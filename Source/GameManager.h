@@ -117,7 +117,7 @@ private:
     // 内部ヘルパー・画面別描画メソッド
     // ------------------------------------------------------------------------
     void SetupRoomObstacles();           // ステージ内の家具・障害物配置
-    void DrawTitleScreen();              // タイトル画面2D UI（ロゴ「マッスルねこ」・吹き出し・メニュー）描画
+    void DrawTitleScreen();              // タイトル画面2D UI（ロゴ「マッスルにゃんこ」・吹き出し・メニュー）描画
     void DrawTitle3DScene();             // タイトル画面3D演出（ステージリング・ライト柱・金粉）描画
     void DrawGameClearScreen();          // リザルト画面（アメコミ風ランクスタンプ・スコア・報酬）描画
     void DrawHowToPlayModal();           // ゲーム説明モーダルダイアログ描画

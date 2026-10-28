@@ -29,7 +29,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     SetUseCharCodeFormat(DX_CHARCODEFORMAT_UTF8);                       // ソースコード内のUTF-8文字列（日本語・絵文字等）を正しく描画
     ChangeWindowMode(TRUE);                                             // ウィンドウモードで起動
     SetGraphMode(Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, Config::COLOR_BIT); // 解像度 1280x720, 32bitカラー
-    SetMainWindowText(Config::TITLE);                                   // ウィンドウタイトルを「マッスルねこ」に設定
+    SetMainWindowText(Config::TITLE);                                   // ウィンドウタイトルを「マッスルにゃんこ」に設定
     SetUseDirect3DVersion(DX_DIRECT3D_11);                              // Effekseer連携のためDirect3D 11を使用
     SetAlwaysRunFlag(TRUE);                                             // 非アクティブ時も処理を継続
 

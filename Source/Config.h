@@ -15,7 +15,7 @@ namespace Config
     constexpr int SCREEN_WIDTH  = 1280;            // 画面横幅（ピクセル）
     constexpr int SCREEN_HEIGHT = 720;             // 画面縦幅（ピクセル）
     constexpr int COLOR_BIT     = 32;              // カラービット数
-    constexpr const char* TITLE = "マッスルねこ";  // ウィンドウタイトル名
+    constexpr const char* TITLE = "マッスルにゃんこ";  // ウィンドウタイトル名
 
     // ------------------------------------------------------------------------
     // 3Dステージ基準寸法（フォールバック描画および初期境界の基準値）

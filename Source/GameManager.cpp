@@ -2443,7 +2443,7 @@ void GameManager::DrawTitleScreen()
 
     // ------------------------------------------------------------------------
     // ------------------------------------------------------------------------
-    // 6. 元気で弾む「マッスルねこ」カートゥーンロゴ（ボヨヨンバウンス＋極太ブラックアウトライン＋ビビッドカラー）
+    // 6. 元気で弾む「マッスルにゃんこ」カートゥーンロゴ（ボヨヨンバウンス＋極太ブラックアウトライン＋ビビッドカラー）
     // ------------------------------------------------------------------------
     // ------------------------------------------------------------------------
     float t = GetNowCount() * 0.005f;
@@ -2451,7 +2451,7 @@ void GameManager::DrawTitleScreen()
     int logoBaseY = static_cast<int>(88.0f + bounceOffset);
 
     const char* txtMuscle = "マッスル";
-    const char* txtCat    = "ねこ";
+    const char* txtCat    = "にゃんこ";
     const char* txt3D     = "";
     int wMuscle = GetDrawStringWidthToHandle(txtMuscle, static_cast<int>(strlen(txtMuscle)), font60);
     int wCat    = GetDrawStringWidthToHandle(txtCat, static_cast<int>(strlen(txtCat)), font60);
