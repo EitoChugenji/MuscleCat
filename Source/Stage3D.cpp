@@ -420,6 +420,47 @@ void Stage3D::Draw3D()
     {
         ModelManager::GetInstance().DrawFallbackStage(m_halfWidth, m_halfDepth, m_wallHeight);
     }
+
+    //// 必要なのはDraw3D()の中でこれを呼ぶだけです（当たり判定は発生しません）
+    //ModelManager::GetInstance().DrawModelIfLoaded(
+    //    "Resource/Sousyoku/ABigTree3.mv1", // 3Dモデルのファイルパス
+    //    VGet(300.0f, 0.0f, 500.0f),       // 配置する座標 (X, Y, Z)
+    //    0.0f,                             // Y軸の回転角度（ラジアン）
+    //    10.0f                            // スケール（大きさ）
+    //);
+
+    //ModelManager::GetInstance().DrawModelIfLoaded(
+    //    "Resource/Sousyoku/ABigTree3.mv1", // 3Dモデルのファイルパス
+    //    VGet(300.0f, 0.0f, -500.0f),       // 配置する座標 (X, Y, Z)
+    //    0.0f,                             // Y軸の回転角度（ラジアン）
+    //    10.0f                            // スケール（大きさ）
+    //);
+
+     // 使いたいモデルのリスト（何個でも追加OK）
+    const char* models[] = {
+        "Resource/Sousyoku/ABigTree1.mv1",
+        "Resource/Sousyoku/ABigTree2.mv1",
+        "Resource/Sousyoku/ABigTree3.mv1",
+        "Resource/Sousyoku/ASmallTree1.mv1",
+    };
+
+    int modelCount = sizeof(models) / sizeof(models[0]);
+
+    static std::vector<VECTOR> treePos;
+    if (m_hasCollision && treePos.empty()) {
+        for (int i = 0; i < 300 && treePos.size() < 100; ++i) {
+            VECTOR p = VGet((rand() % 5000) - 2500.0f, 0.0f, (rand() % 4000) - 2000.0f);
+            float dummyY = 0.0f;
+            if (!GetGroundHeight(p, dummyY)) {
+                treePos.push_back(p);
+            }
+        }
+    }
+    // 順番に違う種類のモデルを描画
+    for (size_t i = 0; i < treePos.size(); ++i) {
+        ModelManager::GetInstance().DrawModelIfLoaded(models[i % modelCount], treePos[i], 0.0f, 40.0f);
+    }
+
 }
 
 // ============================================================================
