@@ -42,6 +42,8 @@ protected:
     float  m_walkAnimPhase      = 0.0f;                 // 歩行ホッピングのサイン波位相
     int    m_stunTimer          = 0;                    // スタン（気絶）残りフレーム数
     VECTOR m_prevPos            = VGet(0.0f, 0.0f, 0.0f); // 前フレームの座標（床外・壁抜け防止用）
+    int    m_stuckCheckTimer    = 0;                      // 壁スタック検知タイマー
+    VECTOR m_lastStuckCheckPos  = VGet(0.0f, 0.0f, 0.0f); // スタック検知用の前回検査座標
 
     // 室内巡回（パトロール）・逃走AI用パラメータ
     VECTOR m_targetWaypoint     = VGet(0.0f, 0.0f, 0.0f); // 現在向かっている巡回目標地点（Position.csv基準）

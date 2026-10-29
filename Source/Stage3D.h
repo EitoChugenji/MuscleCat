@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // @file   Stage3D.h
 // @brief  3Dステージモデルの読み込み・描画・壁押し戻し・接地高さ判定クラス定義
 // ============================================================================
@@ -120,6 +120,9 @@ public:
 
     // ステージ外周境界ボックス内に座標をクランプする
     bool ClampToBounds(VECTOR& outPos, float radius) const;
+
+    // 指定座標が壁や境界・段差から十分離れた安全なスポーン可能位置か検証する
+    bool IsSafeSpawnLocation(const VECTOR& pos, float minWallDist, float& outGroundY) const;
 
     // 各種ゲッター
     float GetHalfWidth() const  { return m_halfWidth; }
