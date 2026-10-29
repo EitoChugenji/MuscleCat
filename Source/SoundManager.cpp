@@ -40,14 +40,33 @@ void SoundManager::Init()
     // 保存されている音量設定を読み込み
     LoadSettings();
 
+    AppLogAdd("SoundManager: Initializing sounds...\n");
+
     // ------------------------------------------------------------------------
     // 1. BGMリソースの読み込み
     // ------------------------------------------------------------------------
-    const struct { BgmType type; const char* path; } bgmFiles[] = {
-        { BgmType::Title,  "Resource/Sounds/bgm_title.wav" },
-        { BgmType::Stage,  "Resource/Sounds/bgm_stage.wav" },
-        { BgmType::Clear,  "Resource/Sounds/bgm_clear.wav" },
-        { BgmType::TimeUp, "Resource/Sounds/bgm_timeup.wav" }
+    // BGMは長尺音源（MP3等）の高速ロード＆省メモリ再生のため MEMPRESS モードで読み込む
+    SetCreateSoundDataType(DX_SOUNDDATATYPE_MEMPRESS);
+
+    // メインBGM: mainBGM.mp3 が存在すれば最優先で使用、無ければ bgm_stage.wav にフォールバック
+    const char* stageBgmPath = "Resource/Sounds/mainBGM.mp3";
+    FILE* testFp = nullptr;
+    if (fopen_s(&testFp, stageBgmPath, "rb") == 0 && testFp)
+    {
+        fclose(testFp);
+        AppLogAdd("SoundManager: Found mainBGM at '%s'\n", stageBgmPath);
+    }
+    else
+    {
+        stageBgmPath = "Resource/Sounds/bgm_stage.wav";
+        AppLogAdd("SoundManager: mainBGM.mp3 not found, falling back to '%s'\n", stageBgmPath);
+    }
+
+    const struct { BgmType type; const char* path; const char* name; } bgmFiles[] = {
+        { BgmType::Title,  "Resource/Sounds/bgm_title.wav", "Title" },
+        { BgmType::Stage,  stageBgmPath,                   "Stage/Main" },
+        { BgmType::Clear,  "Resource/Sounds/bgm_clear.wav", "Clear" },
+        { BgmType::TimeUp, "Resource/Sounds/bgm_timeup.wav", "TimeUp" }
     };
 
     for (const auto& item : bgmFiles)
@@ -57,8 +76,28 @@ void SoundManager::Init()
         {
             m_bgmHandles[item.type] = handle;
             ChangeVolumeSoundMem(CalcBgmVolumeDxLib(), handle);
+            AppLogAdd("SoundManager: Loaded BGM [%s] from '%s' (handle=%d)\n", item.name, item.path, handle);
+        }
+        else
+        {
+            AppLogAdd("SoundManager: FAILED to load BGM [%s] from '%s'\n", item.name, item.path);
         }
     }
+
+    // もし Title BGM が見つからない場合は stageBgmPath をロードして割り当てる
+    if (m_bgmHandles.find(BgmType::Title) == m_bgmHandles.end() || m_bgmHandles[BgmType::Title] == -1)
+    {
+        int titleFallback = LoadSoundMem(stageBgmPath);
+        if (titleFallback != -1)
+        {
+            m_bgmHandles[BgmType::Title] = titleFallback;
+            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(), titleFallback);
+            AppLogAdd("SoundManager: Fallback Title BGM assigned to handle=%d\n", titleFallback);
+        }
+    }
+
+    // 効果音(SE)ロード用に MEMNOPRESS（一括メモリ展開、低遅延多重再生）に戻す
+    SetCreateSoundDataType(DX_SOUNDDATATYPE_MEMNOPRESS);
 
     // ------------------------------------------------------------------------
     // 2. SEリソースの読み込み（多重再生用にバッファ数 3〜6 を確保）
@@ -92,6 +131,7 @@ void SoundManager::Init()
     }
 
     m_isInitialized = true;
+    AppLogAdd("SoundManager: Initialization complete.\n");
 }
 
 void SoundManager::Release()
@@ -151,6 +191,7 @@ void SoundManager::PlayBGM(BgmType type, bool loop)
         ChangeVolumeSoundMem(CalcBgmVolumeDxLib(), it->second);
         int playType = loop ? DX_PLAYTYPE_LOOP : DX_PLAYTYPE_BACK;
         PlaySoundMem(it->second, playType, TRUE);
+        AppLogAdd("SoundManager: PlayBGM(type=%d, handle=%d, loop=%d)\n", static_cast<int>(type), it->second, loop ? 1 : 0);
     }
 }
 

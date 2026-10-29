@@ -612,6 +612,7 @@ void GameManager::Update()
             catPos.z + std::cos(m_titleCameraAngle) * camDist
         );
         SetCameraPositionAndTarget_UpVecY(camPos, center);
+        m_objManager.GetStage().Update(center);
 
         if (player)
         {
@@ -638,8 +639,8 @@ void GameManager::Update()
         bool keyEsc   = (CheckHitKey(KEY_INPUT_ESCAPE) != 0);
         bool keyUp    = (CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
         bool keyDown  = (CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
-        bool keyLeft  = (CheckHitKey(KEY_INPUT_LEFT) != 0 || CheckHitKey(KEY_INPUT_A) != 0);
-        bool keyRight = (CheckHitKey(KEY_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_D) != 0);
+        bool keyLeft  = (CheckHitKey(KEY_INPUT_LEFT) != 0 || CheckHitKey(KEY_INPUT_A) != 0 || CheckHitKey(KEY_INPUT_MINUS) != 0 || CheckHitKey(KEY_INPUT_SUBTRACT) != 0);
+        bool keyRight = (CheckHitKey(KEY_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_D) != 0 || CheckHitKey(KEY_INPUT_ADD) != 0);
         bool isEnter  = (CheckHitKey(KEY_INPUT_RETURN) != 0);
         bool isSpace  = (CheckHitKey(KEY_INPUT_SPACE) != 0);
         bool keyO     = (CheckHitKey(KEY_INPUT_O) != 0);
@@ -687,7 +688,7 @@ void GameManager::Update()
         // サウンド設定ダイアログ表示中
         if (m_showSoundSettings)
         {
-            UpdateTitleSoundSettings();
+            UpdateTitleSoundSettings(mx, my, isLeftClick, isMouseTrigger, triggerEsc, triggerUp, triggerDown, triggerLeft, triggerRight, triggerO);
             return;
         }
 
@@ -3525,35 +3526,10 @@ void GameManager::DrawPauseModal()
 // ============================================================================
 // タイトル画面：サウンド設定モーダル更新処理
 // ============================================================================
-void GameManager::UpdateTitleSoundSettings()
+void GameManager::UpdateTitleSoundSettings(int mx, int my, bool isLeftClick, bool isMouseTrigger,
+                                          bool triggerEsc, bool triggerUp, bool triggerDown,
+                                          bool triggerLeft, bool triggerRight, bool triggerO)
 {
-    int mx = 0, my = 0;
-    GetMousePoint(&mx, &my);
-    bool isLeftClick = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
-    bool isMouseTrigger = isLeftClick && !m_prevMouseLeft;
-    m_prevMouseLeft = isLeftClick;
-
-    bool keyEsc   = (CheckHitKey(KEY_INPUT_ESCAPE) != 0);
-    bool keyUp    = (CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
-    bool keyDown  = (CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
-    bool keyLeft  = (CheckHitKey(KEY_INPUT_LEFT) != 0 || CheckHitKey(KEY_INPUT_A) != 0 || CheckHitKey(KEY_INPUT_MINUS) != 0 || CheckHitKey(KEY_INPUT_SUBTRACT) != 0);
-    bool keyRight = (CheckHitKey(KEY_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_D) != 0 || CheckHitKey(KEY_INPUT_ADD) != 0);
-    bool isEnter  = (CheckHitKey(KEY_INPUT_RETURN) != 0);
-    bool isSpace  = (CheckHitKey(KEY_INPUT_SPACE) != 0);
-
-    bool triggerEsc   = keyEsc && !m_prevKeyEsc;
-    bool triggerUp    = keyUp && !m_prevKeyUp;
-    bool triggerDown  = keyDown && !m_prevKeyDown;
-    bool triggerLeft  = keyLeft && !m_prevKeyLeft;
-    bool triggerRight = keyRight && !m_prevKeyRight;
-
-    m_prevKeyEsc   = keyEsc;
-    m_prevKeyUp    = keyUp;
-    m_prevKeyDown  = keyDown;
-    m_prevKeyLeft  = keyLeft;
-    m_prevKeyRight = keyRight;
-    m_prevKeyEnter = isEnter;
-    m_prevKeySpace = isSpace;
 
     int modalW = 500;
     int modalH = 430;
@@ -3566,9 +3542,10 @@ void GameManager::UpdateTitleSoundSettings()
     int closeBtnY = modalY + modalH - 52;
 
     bool hoverClose = (mx >= closeBtnX && mx <= closeBtnX + closeBtnW && my >= closeBtnY && my <= closeBtnY + closeBtnH);
+    bool clickOutside = (isMouseTrigger && (mx < modalX || mx > modalX + modalW || my < modalY || my > modalY + modalH));
 
     // ESC または 閉じるボタンクリックで閉じる
-    if (triggerEsc || (hoverClose && isMouseTrigger))
+    if (triggerEsc || triggerO || (hoverClose && isMouseTrigger) || clickOutside)
     {
         m_showSoundSettings = false;
         SoundManager::GetInstance().PlaySE(SeType::Cancel);

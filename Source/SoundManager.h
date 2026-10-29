@@ -12,10 +12,11 @@
 enum class BgmType
 {
     None = -1,
-    Title,      // タイトル画面BGM（明るくポップな筋トレマーチ）
-    Stage,      // ゲームプレイBGM（疾走感・スピード感あふれるアクションBGM）
-    Clear,      // クリアファンファーレ（勝利の讃歌ジングル）
-    TimeUp,     // タイムアップジングル（コミカル脱力終了音）
+    Title,          // タイトル画面BGM（明るくポップな筋トレマーチ）
+    Stage,          // ゲームプレイ・メインBGM（疾走感あふれるアクションBGM: mainBGM.mp3）
+    Main = Stage,   // メインBGMエイリアス（BgmType::Stage と同義）
+    Clear,          // クリアファンファーレ（勝利の讃歌ジングル）
+    TimeUp,         // タイムアップジングル（コミカル脱力終了音）
     Count
 };
 
