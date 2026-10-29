@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   ModelManager.cpp
 // @brief  ModelManager クラスの実装（3Dモデルのキャッシュ管理・プリミティブ代替描画）
 // ============================================================================
@@ -391,9 +391,9 @@ void ModelManager::DrawFallbackStage(float halfW, float halfD, float wallH) {
     // ------------------------------------------------------------------------
     const float plankW = 25.0f; // フローリング板の幅
     const float plankL = 95.0f; // 板の長さ
-    unsigned int woodBase1 = GetColor(250, 222, 175); // 明るいアニメ調のゴールデンメープル
-    unsigned int woodBase2 = GetColor(240, 208, 158); // 木目バリエーション
-    unsigned int woodJoint = GetColor(190, 150, 105); // 板の目地ライン
+    unsigned int woodBase1 = GetColor(55, 110, 48);   // 森の新緑グリーン
+    unsigned int woodBase2 = GetColor(42, 88, 38);    // 深緑モスグリーン
+    unsigned int woodJoint = GetColor(32, 65, 28);    // 地面の継ぎ目ライン
 
     for (float x = -halfW; x < halfW; x += plankW) {
         float x2 = (x + plankW > halfW) ? halfW : (x + plankW);

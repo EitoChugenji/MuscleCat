@@ -99,13 +99,14 @@ Stage3D::~Stage3D()
         m_hasCollision = false;
         m_houseWallPolygons.clear();
         m_newMapWallPolygons.clear();
+        if (m_leafTextureHandle != -1) { DeleteGraph(m_leafTextureHandle); m_leafTextureHandle = -1; }
     }
 }
 
 void Stage3D::Init(ModelConfig::MapType mapType)
 {
     // 画面クリア背景色（アニメ調の明るいパステルブルー・空色）
-    SetBackgroundColor(175, 218, 252);
+    SetBackgroundColor(140, 195, 220);
 
     // 3Dライティング設定（アニメ・セルルック風：明るい環境光と高コントラスト）
     SetUseLighting(TRUE);
@@ -114,6 +115,7 @@ void Stage3D::Init(ModelConfig::MapType mapType)
     SetLightDifColor(GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
     SetLightSpcColor(GetColorF(0.7f, 0.7f, 0.7f, 1.0f));
 
+    m_skybox.Init();
     LoadStage(mapType);
 }
 
@@ -130,6 +132,7 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
     }
     m_houseWallPolygons.clear();
     m_newMapWallPolygons.clear();
+    if (m_leafTextureHandle != -1) { DeleteGraph(m_leafTextureHandle); m_leafTextureHandle = -1; }
 
     if (m_mapType == ModelConfig::MapType::House)
     {
@@ -141,7 +144,7 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
 
         // フォグ設定（室内用）
         SetFogEnable(TRUE);
-        SetFogColor(175, 218, 252);
+        SetFogColor(160, 215, 195);
         SetFogStartEnd(2500.0f, 5500.0f);
     }
     else // NewMap (newmap.mv1, scale: 100.0f)
@@ -154,8 +157,8 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
 
         // フォグ設定（広めの室内空間用）
         SetFogEnable(TRUE);
-        SetFogColor(175, 218, 252);
-        SetFogStartEnd(3500.0f, 7500.0f);
+        SetFogColor(160, 215, 195);
+        SetFogStartEnd(2500.0f, 9500.0f);
     }
 
     int baseHandle = ModelManager::GetInstance().LoadModelHandle(m_modelPath);
@@ -187,6 +190,24 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
     {
         BuildNewMapCollision();
     }
+    SetupForestTrees();
+    // 譽ｮ縺ｮ蠎翫・闡峨▲縺ｱ繝・け繧ｹ繝√Ε縺ｮ驕ｩ逕ｨ
+    m_leafTextureHandle = LoadGraph("Resource/Models/leaf_floor.png");
+    if (m_leafTextureHandle != -1 && m_modelHandle != -1)
+    {
+        int texNum = MV1GetTextureNum(m_modelHandle);
+        for (int i = 0; i < texNum; ++i)
+        {
+            MV1SetTextureGraphHandle(m_modelHandle, i, m_leafTextureHandle, FALSE);
+        }
+        int matNum = MV1GetMaterialNum(m_modelHandle);
+        for (int i = 0; i < matNum; ++i)
+        {
+            MV1SetMaterialDifColor(m_modelHandle, i, GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
+            MV1SetMaterialAmbColor(m_modelHandle, i, GetColorF(0.85f, 0.85f, 0.85f, 1.0f));
+        }
+    }
+    SetupGroundLeaves();
 }
 
 // ============================================================================
@@ -410,8 +431,202 @@ void Stage3D::BuildNewMapCollision()
         static_cast<int>(m_newMapWallPolygons.size()));
 }
 
+// ============================================================================
+// Stage Forest Trees Setup
+// ============================================================================
+void Stage3D::SetupForestTrees()
+{
+    m_forestTrees.clear();
+
+    const char* treeModels[] = {
+        "Resource/Sousyoku/ABigTree1.mv1",
+        "Resource/Sousyoku/ABigTree2.mv1",
+        "Resource/Sousyoku/ABigTree3.mv1",
+        "Resource/Sousyoku/ABigTree4.mv1",
+        "Resource/Sousyoku/ASmallTree1.mv1",
+        "Resource/Sousyoku/ASmallTree2.mv1",
+        "Resource/Sousyoku/ASmallTree3.mv1",
+        "Resource/Sousyoku/ASmallTree4.mv1",
+        "Resource/Sousyoku/ASmallTree5.mv1",
+        "Resource/Sousyoku/ASmallTree6.mv1",
+    };
+    const int numModels = sizeof(treeModels) / sizeof(treeModels[0]);
+
+    float stageMinX = m_minBounds.x;
+    float stageMaxX = m_maxBounds.x;
+    float stageMinZ = m_minBounds.z;
+    float stageMaxZ = m_maxBounds.z;
+
+    if (stageMinX >= stageMaxX || stageMinZ >= stageMaxZ)
+    {
+        if (m_mapType == ModelConfig::MapType::NewMap)
+        {
+            stageMinX = -2310.0f; stageMaxX = 2610.0f;
+            stageMinZ = -1837.5f; stageMaxZ = 1460.0f;
+        }
+        else
+        {
+            stageMinX = -305.0f; stageMaxX = 905.0f;
+            stageMinZ = -855.0f; stageMaxZ = 655.0f;
+        }
+    }
+
+    float cx = (stageMinX + stageMaxX) * 0.5f;
+    float cz = (stageMinZ + stageMaxZ) * 0.5f;
+    float halfW = (stageMaxX - stageMinX) * 0.5f;
+    float halfD = (stageMaxZ - stageMinZ) * 0.5f;
+
+    struct TreeLayerDef
+    {
+        int count;
+        float extraDistMin;
+        float extraDistMax;
+        float scaleMin;
+        float scaleMax;
+        float baseY;
+    };
+
+    std::vector<TreeLayerDef> layers;
+    float safeMargin = 160.0f;
+
+    if (m_mapType == ModelConfig::MapType::NewMap)
+    {
+        safeMargin = 160.0f;
+        layers = {
+            { 56,  40.0f,  260.0f, 36.0f, 56.0f,  -8.0f },
+            { 60, 280.0f,  850.0f, 46.0f, 72.0f, -10.0f },
+            { 48, 900.0f, 2200.0f, 58.0f, 92.0f, -12.0f }
+        };
+    }
+    else
+    {
+        safeMargin = 110.0f;
+        layers = {
+            { 36,  30.0f, 200.0f, 32.0f, 48.0f, -5.0f },
+            { 36, 220.0f, 750.0f, 40.0f, 65.0f, -7.0f }
+        };
+    }
+
+    float expandedHalfW = halfW + safeMargin;
+    float expandedHalfD = halfD + safeMargin;
+
+    for (size_t layerIdx = 0; layerIdx < layers.size(); ++layerIdx)
+    {
+        const auto& layer = layers[layerIdx];
+        for (int i = 0; i < layer.count; ++i)
+        {
+            float baseAngle = (static_cast<float>(i) / layer.count) * (3.14159265f * 2.0f);
+            float jitterAngle = static_cast<float>((i * 47 + static_cast<int>(layerIdx) * 29) % 100 - 50) * 0.0025f;
+            float angle = baseAngle + jitterAngle;
+
+            float cosA = std::cos(angle);
+            float sinA = std::sin(angle);
+            float absCos = std::abs(cosA);
+            float absSin = std::abs(sinA);
+
+            float tx = (absCos > 0.0001f) ? (expandedHalfW / absCos) : 1e9f;
+            float tz = (absSin > 0.0001f) ? (expandedHalfD / absSin) : 1e9f;
+            float tMin = (tx < tz) ? tx : tz;
+
+            float distFrac = static_cast<float>((i * 61 + static_cast<int>(layerIdx) * 37 + 13) % 100) / 100.0f;
+            float extraDist = layer.extraDistMin + (layer.extraDistMax - layer.extraDistMin) * distFrac;
+            float t = tMin + extraDist;
+
+            float x = cx + t * cosA;
+            float z = cz + t * sinA;
+
+            if (x >= stageMinX - 30.0f && x <= stageMaxX + 30.0f &&
+                z >= stageMinZ - 30.0f && z <= stageMaxZ + 30.0f)
+            {
+                continue;
+            }
+
+            float dummyFloorY = 0.0f;
+            if (GetGroundHeight(VGet(x, 100.0f, z), dummyFloorY))
+            {
+                continue;
+            }
+
+            float y = layer.baseY + static_cast<float>((i * 19 + static_cast<int>(layerIdx) * 7) % 7) - 3.0f;
+
+            ForestTreeInstance tree;
+            if (layerIdx == 2)
+            {
+                tree.modelPath = treeModels[i % 4];
+            }
+            else
+            {
+                tree.modelPath = treeModels[(i + static_cast<int>(layerIdx) * 3) % numModels];
+            }
+
+            tree.pos = VGet(x, y, z);
+            tree.rotY = static_cast<float>((i * 71 + 37) % 360) * (3.14159265f / 180.0f);
+            float scaleFrac = static_cast<float>((i * 43 + static_cast<int>(layerIdx) * 17) % 100) / 100.0f;
+            tree.scale = layer.scaleMin + (layer.scaleMax - layer.scaleMin) * scaleFrac;
+
+            m_forestTrees.push_back(tree);
+        }
+    }
+}
+
+// ============================================================================
+// Ground Fallen Leaves Setup
+// ============================================================================
+void Stage3D::SetupGroundLeaves()
+{
+    m_groundLeaves.clear();
+
+    unsigned int leafColors[] = {
+        GetColor(76, 166, 52),   // 譏弱ｋ縺・眠邱・        GetColor(92, 184, 62),   // 魄ｮ繧・°縺ｪ繝ｪ繝ｼ繝輔げ繝ｪ繝ｼ繝ｳ
+        GetColor(120, 198, 48),  // 闍･闡蛾ｻ・ｷ・        GetColor(48, 122, 38),   // 豺ｱ邱・        GetColor(180, 142, 42),  // 鮟・≡濶ｲ
+        GetColor(196, 158, 48),  // 繧､繧ｨ繝ｭ繝ｼ繧ｴ繝ｼ繝ｫ繝・        GetColor(158, 88, 36)    // 譫ｯ繧瑚痩繧ｪ繝ｬ繝ｳ繧ｸ
+    };
+    const int colorCount = sizeof(leafColors) / sizeof(leafColors[0]);
+
+    float spawnRangeX = (m_mapType == ModelConfig::MapType::NewMap) ? 2500.0f : 800.0f;
+    float spawnRangeZ = (m_mapType == ModelConfig::MapType::NewMap) ? 2100.0f : 800.0f;
+    size_t targetCount = (m_mapType == ModelConfig::MapType::NewMap) ? 550 : 250;
+
+    srand(98765);
+
+    for (int attempt = 0; attempt < 3500 && m_groundLeaves.size() < targetCount; ++attempt)
+    {
+        float rx = ((rand() % 2000) / 1000.0f - 1.0f) * spawnRangeX;
+        float rz = ((rand() % 2000) / 1000.0f - 1.0f) * spawnRangeZ;
+
+        float groundY = 0.0f;
+        VECTOR groundNorm = VGet(0.0f, 1.0f, 0.0f);
+
+        if (GetGroundHeight(VGet(rx, 100.0f, rz), groundY, &groundNorm))
+        {
+            if (groundNorm.y > 0.45f)
+            {
+                GroundFallenLeaf leaf;
+                leaf.pos    = VGet(rx, groundY + 0.35f, rz);
+                leaf.normal = groundNorm;
+                leaf.rotY   = static_cast<float>(rand() % 360) * (3.14159265f / 180.0f);
+                leaf.size   = 3.8f + static_cast<float>(rand() % 35) * 0.1f;
+                leaf.color  = leafColors[rand() % colorCount];
+                m_groundLeaves.push_back(leaf);
+            }
+        }
+    }
+}
+
+void Stage3D::Update(const VECTOR& centerPos)
+{
+    m_skybox.Update(centerPos);
+}
+
+// ============================================================================
+// Stage 3D Drawing
+// ============================================================================
 void Stage3D::Draw3D()
 {
+    // 1. Forest Skybox / Skydome drawing (most distant background)
+    m_skybox.Draw(GetCameraPosition());
+
+    // 2. Stage model
     if (m_modelHandle != -1)
     {
         MV1DrawModel(m_modelHandle);
@@ -419,6 +634,60 @@ void Stage3D::Draw3D()
     else if (!ModelManager::GetInstance().DrawModelIfLoaded(m_modelPath, VGet(0.0f, 0.0f, 0.0f), 0.0f, m_scale))
     {
         ModelManager::GetInstance().DrawFallbackStage(m_halfWidth, m_halfDepth, m_wallHeight);
+    }
+
+    // 2.5. 蠎企擇縺ｫ謨｣繧峨・繧玖誠縺｡闡峨・闕芽痩縺ｮ謠冗判・亥慍髱｢縺ｫ謗･蝨ｰ・・    SetUseLighting(TRUE);
+    SetUseBackCulling(FALSE);
+
+    for (const auto& leaf : m_groundLeaves)
+    {
+        float s = leaf.size;
+        VECTOR localPts[4] = {
+            VGet(0.0f,       0.0f,  s * 1.4f),
+            VGet(-s * 0.65f, 0.0f,  0.0f),
+            VGet(0.0f,       0.0f, -s * 0.9f),
+            VGet( s * 0.65f, 0.0f,  0.0f)
+        };
+
+        MATRIX mRotY = MGetRotY(leaf.rotY);
+
+        VECTOR up = VGet(0.0f, 1.0f, 0.0f);
+        VECTOR axis = VCross(up, leaf.normal);
+        float axisLen = VSize(axis);
+        MATRIX mAlign = MGetIdent();
+        if (axisLen > 0.001f)
+        {
+            axis = VScale(axis, 1.0f / axisLen);
+            float dot = VDot(up, leaf.normal);
+            if (dot > 1.0f) dot = 1.0f;
+            if (dot < -1.0f) dot = -1.0f;
+            float angle = std::acos(dot);
+            mAlign = MGetRotAxis(axis, angle);
+        }
+
+        MATRIX mCombined = MMult(mRotY, mAlign);
+
+        VECTOR wPts[4];
+        for (int k = 0; k < 4; ++k)
+        {
+            VECTOR r = VTransform(localPts[k], mCombined);
+            wPts[k] = VAdd(leaf.pos, r);
+        }
+
+        DrawTriangle3D(wPts[0], wPts[1], wPts[2], leaf.color, TRUE);
+        DrawTriangle3D(wPts[0], wPts[2], wPts[3], leaf.color, TRUE);
+    }
+    SetUseBackCulling(TRUE);
+
+    // 3. 3D Trees surrounding the stage
+    for (const auto& tree : m_forestTrees)
+    {
+        ModelManager::GetInstance().DrawModelIfLoaded(
+            tree.modelPath.c_str(),
+            tree.pos,
+            tree.rotY,
+            tree.scale
+        );
     }
 }
 

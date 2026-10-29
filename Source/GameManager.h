@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   GameManager.h
 // @brief  ゲーム全体のシーン遷移（タイトル・プレイ中・リザルト・ポーズ）およびUI管理
 // ============================================================================
@@ -122,7 +122,9 @@ private:
     void DrawGameClearScreen();          // リザルト画面（アメコミ風ランクスタンプ・スコア・報酬）描画
     void DrawHowToPlayModal();           // ゲーム説明モーダルダイアログ描画
     void DrawSoundSettingsModal();       // サウンド設定モーダルダイアログ描画
-    void UpdateTitleSoundSettings();     // タイトル画面でのサウンド設定更新
+    void UpdateTitleSoundSettings(int mx, int my, bool isLeftClick, bool isMouseTrigger,
+                                  bool triggerEsc, bool triggerUp, bool triggerDown,
+                                  bool triggerLeft, bool triggerRight, bool triggerO); // タイトル画面でのサウンド設定更新
     void UpdatePause(bool triggerEsc);   // ポーズ画面中の入力・感度調整更新
     void DrawPauseModal();               // ポーズモーダルダイアログ描画
     void DrawDebug3DOverlay();           // F1デバッグ時の3Dオーバーレイ（10m目測■・1.8m物差し・壁可視化）描画

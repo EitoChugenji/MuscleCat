@@ -62,6 +62,9 @@
     <ClInclude Include="Source\Stage3D.h">
       <Filter>ヘッダーファイル</Filter>
     </ClInclude>
+    <ClInclude Include="Source\Skybox3D.h">
+      <Filter>ヘッダーファイル</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Camera3D.cpp">
@@ -104,6 +107,9 @@
       <Filter>ソースファイル</Filter>
     </ClCompile>
     <ClCompile Include="Source\Stage3D.cpp">
+      <Filter>ソースファイル</Filter>
+    </ClCompile>
+    <ClCompile Include="Source\Skybox3D.cpp">
       <Filter>ソースファイル</Filter>
     </ClCompile>
   </ItemGroup>
