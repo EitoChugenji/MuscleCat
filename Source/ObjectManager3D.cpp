@@ -119,6 +119,8 @@ void ObjectManager3D::SpawnFastMouse()
 
 void ObjectManager3D::Update(Camera3D& camera)
 {
+    VECTOR playerPos = m_player ? m_player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
+    m_stage.Update(playerPos);
     // コンボ持続タイマー更新
     if (m_comboTimer > 0)
     {

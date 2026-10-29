@@ -1,10 +1,11 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   Stage3D.h
 // @brief  3Dステージモデルの読み込み・描画・壁押し戻し・接地高さ判定クラス定義
 // ============================================================================
 #pragma once
 #include "DxLib.h"
 #include "ModelConfig.h"
+#include "Skybox3D.h"
 #include <string>
 #include <vector>
 
@@ -18,6 +19,28 @@ struct WallPolygon
     VECTOR normal;                  // 単位法線ベクトル
     VECTOR minPos, maxPos;          // 高速カリング用のAABBバウンディングボックス
     bool   isInvisibleWall = false; // 透明補助壁フラグ（F1デバッグ可視化用）
+};
+
+// ============================================================================
+// 森の3D木々・装飾オブジェクト配置構造体
+// ============================================================================
+struct ForestTreeInstance
+{
+    std::string modelPath;  // 3Dモデルパス
+    VECTOR      pos;        // 配置座標
+    float       rotY;       // Y軸回転
+    float       scale;      // スケール
+};
+
+// ============================================================================
+// 蠎翫↓謨｣繧峨・繧玖誠縺｡闡峨・闕芽痩讒矩菴難ｼ域｣ｮ縺ｮ蝨ｰ髱｢貍泌・逕ｨ・・// ============================================================================
+struct GroundFallenLeaf
+{
+    VECTOR       pos;    // 謗･蝨ｰ蠎ｧ讓・(蠎企擇 Y + 0.35f)
+    VECTOR       normal; // 蝨ｰ髱｢縺ｮ豕慕ｷ壹・繧ｯ繝医Ν
+    float        rotY;   // 蝗櫁ｻ｢隗貞ｺｦ
+    float        size;   // 闡峨・螟ｧ縺阪＆
+    unsigned int color;  // 闡峨・濶ｲ
 };
 
 // ============================================================================
@@ -49,10 +72,16 @@ private:
     std::vector<WallPolygon> m_newMapWallPolygons;
     VECTOR                   m_newMapMinBounds;
     VECTOR                   m_newMapMaxBounds;
+    Skybox3D                 m_skybox;        // 森のスカイボックス・スカイドーム描画
+    std::vector<ForestTreeInstance> m_forestTrees;   // ステージ外周の3D森（木々・切り株・自然物）
+    std::vector<GroundFallenLeaf>   m_groundLeaves;  // 床面に散らばる落ち葉・草葉群
+    int                             m_leafTextureHandle = -1; // 森の床・葉っぱテクスチャ
 
     // マップ別の壁コリジョン抽出処理
     void BuildHouseCollision();
     void BuildNewMapCollision();
+    void SetupForestTrees();
+    void SetupGroundLeaves();
 
     // ポリゴン群に対する球/円柱の反復押し戻しソルバおよびマップ別衝突解決
     bool ResolvePolygonWallCollision(const std::vector<WallPolygon>& polygons, VECTOR& outPos, float radius, VECTOR* outPushNormal) const;
@@ -76,6 +105,7 @@ public:
 
     // マップモデルの切り替え・コリジョン再構築
     void LoadStage(ModelConfig::MapType mapType);
+    void Update(const VECTOR& centerPos);
 
     // 3Dステージモデルの描画
     void Draw3D();
