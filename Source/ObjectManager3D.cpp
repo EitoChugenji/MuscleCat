@@ -67,19 +67,36 @@ void ObjectManager3D::SpawnNormalMouse()
         pts.push_back(VGet(0.0f, 5.0f, 0.0f));
     }
 
+    VECTOR playerPos = m_player ? m_player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
     VECTOR pos = pts[rand() % pts.size()];
-    for (int attempt = 0; attempt < 8; ++attempt)
+    float gy = 0.0f;
+    bool foundSafe = false;
+
+    // 候補点から壁（マージン80以上）および猫（距離350以上）から離れた安全な位置を探す
+    for (int attempt = 0; attempt < 24; ++attempt)
     {
-        float ox = (attempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
-        float oz = (attempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
-        VECTOR test = VGet(pos.x + ox, pos.y, pos.z + oz);
-        float gy = 0.0f;
-        if (m_stage.GetGroundHeight(test, gy))
+        int pIdx = (attempt == 0) ? (rand() % pts.size()) : (rand() % pts.size());
+        float ox = static_cast<float>((rand() % 160) - 80);
+        float oz = static_cast<float>((rand() % 160) - 80);
+        VECTOR test = VGet(pts[pIdx].x + ox, pts[pIdx].y, pts[pIdx].z + oz);
+
+        if (m_player && MathHelper::DistanceXZ(test, playerPos) < 350.0f)
+        {
+            continue;
+        }
+
+        if (m_stage.IsSafeSpawnLocation(test, 80.0f, gy))
         {
             test.y = gy;
             pos = test;
+            foundSafe = true;
             break;
         }
+    }
+
+    if (!foundSafe && m_stage.GetGroundHeight(pos, gy))
+    {
+        pos.y = gy;
     }
 
     auto mouse = std::make_shared<NormalMouse3D>(pos, m_player);
@@ -96,19 +113,36 @@ void ObjectManager3D::SpawnFastMouse()
         pts.push_back(VGet(0.0f, 5.0f, 0.0f));
     }
 
+    VECTOR playerPos = m_player ? m_player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
     VECTOR pos = pts[rand() % pts.size()];
-    for (int attempt = 0; attempt < 8; ++attempt)
+    float gy = 0.0f;
+    bool foundSafe = false;
+
+    // 候補点から壁（マージン80以上）および猫（距離350以上）から離れた安全な位置を探す
+    for (int attempt = 0; attempt < 24; ++attempt)
     {
-        float ox = (attempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
-        float oz = (attempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
-        VECTOR test = VGet(pos.x + ox, pos.y, pos.z + oz);
-        float gy = 0.0f;
-        if (m_stage.GetGroundHeight(test, gy))
+        int pIdx = (attempt == 0) ? (rand() % pts.size()) : (rand() % pts.size());
+        float ox = static_cast<float>((rand() % 160) - 80);
+        float oz = static_cast<float>((rand() % 160) - 80);
+        VECTOR test = VGet(pts[pIdx].x + ox, pts[pIdx].y, pts[pIdx].z + oz);
+
+        if (m_player && MathHelper::DistanceXZ(test, playerPos) < 350.0f)
+        {
+            continue;
+        }
+
+        if (m_stage.IsSafeSpawnLocation(test, 80.0f, gy))
         {
             test.y = gy;
             pos = test;
+            foundSafe = true;
             break;
         }
+    }
+
+    if (!foundSafe && m_stage.GetGroundHeight(pos, gy))
+    {
+        pos.y = gy;
     }
 
     auto mouse = std::make_shared<FastMouse3D>(pos, m_player);

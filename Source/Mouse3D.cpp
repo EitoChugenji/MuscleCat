@@ -271,13 +271,20 @@ void MouseBase3D::OnWallCollision(const VECTOR& pushNormal)
     float nx = pushNormal.x / nLen;
     float nz = pushNormal.z / nLen;
 
-    // 速度ベクトルの法線方向成分を打ち消し、壁に沿って滑らせる
+    float spd = GetCurrentSpeed();
+    if (spd < 2.5f) spd = 2.5f;
+
+    // 速度ベクトルの法線方向成分を打ち消し、壁から離れる方向へ反射
     float dot = m_vx * nx + m_vz * nz;
     if (dot < 0.0f)
     {
-        m_vx -= dot * nx * 1.5f; // 反射成分を加えて跳ね返らせる
-        m_vz -= dot * nz * 1.5f;
+        m_vx -= dot * nx * 1.8f;
+        m_vz -= dot * nz * 1.8f;
     }
+
+    // 壁からの押し出し推進力を追加して壁へのスタックを防止
+    m_vx += nx * (spd * 0.6f);
+    m_vz += nz * (spd * 0.6f);
 
     // 壁と向かい合っている場合はパトロール目的地を即座に再選択
     ChooseNewPatrolTarget();
@@ -286,6 +293,31 @@ void MouseBase3D::OnWallCollision(const VECTOR& pushNormal)
 void MouseBase3D::UpdateWanderMovement(float speed)
 {
     m_patrolTimer--;
+
+    // スタック検知：25フレームごとに移動量を検査し、壁や角で固まっている場合は緊急脱出
+    if (!IsStunned())
+    {
+        m_stuckCheckTimer++;
+        if (m_stuckCheckTimer >= 25)
+        {
+            m_stuckCheckTimer = 0;
+            float movedDist = MathHelper::DistanceXZ(m_pos, m_lastStuckCheckPos);
+            if (movedDist < 4.0f) // 25フレームで4ユニット未満しか進めていない（スタック状態）
+            {
+                // 新しい目的地を再選択し、開けた方向へ速度を強制付与
+                ChooseNewPatrolTarget();
+                float edX = m_targetWaypoint.x - m_pos.x;
+                float edZ = m_targetWaypoint.z - m_pos.z;
+                float edLen = std::sqrt(edX * edX + edZ * edZ);
+                if (edLen > 1.0f)
+                {
+                    m_vx = (edX / edLen) * speed;
+                    m_vz = (edZ / edLen) * speed;
+                }
+            }
+            m_lastStuckCheckPos = m_pos;
+        }
+    }
 
     float distToTarget = MathHelper::DistanceXZ(m_pos, m_targetWaypoint);
     if (distToTarget < 35.0f || m_patrolTimer <= 0)

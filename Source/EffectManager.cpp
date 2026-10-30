@@ -205,25 +205,8 @@ void EffectManager::PlayPumpSuccessEffect(const VECTOR& pos, int repCount)
 // ============================================================================
 void EffectManager::UpdateMuscleAura(const VECTOR& pos, bool isActive, int repCount)
 {
-    if (!m_effectEnabled || !isActive || m_muscleAuraResHandle == -1)
-    {
-        StopMuscleAura();
-        return;
-    }
-
-    // 未再生または再生終了していたらループ再生し直す
-    if (m_activeAuraHandle == -1 || IsEffekseer3DEffectPlaying(m_activeAuraHandle) == -1)
-    {
-        m_activeAuraHandle = PlayEffekseer3DEffect(m_muscleAuraResHandle);
-    }
-
-    // プレイヤーの足元座標および現在の筋トレレベルに合わせたスケールを反映
-    if (m_activeAuraHandle != -1)
-    {
-        float auraScale = 1.0f + static_cast<float>(repCount) * 0.1f;
-        SetPosPlayingEffekseer3DEffect(m_activeAuraHandle, pos.x, pos.y + 2.0f, pos.z);
-        SetScalePlayingEffekseer3DEffect(m_activeAuraHandle, auraScale, auraScale, auraScale);
-    }
+    // ユーザーリクエスト: 筋トレ時は炎エフェクト（CustomEffectManager）のみとし、竜巻エフェクト（Aura01）は完全消去
+    StopMuscleAura();
 }
 
 // ============================================================================

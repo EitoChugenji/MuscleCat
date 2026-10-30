@@ -110,10 +110,10 @@ void Stage3D::Init(ModelConfig::MapType mapType)
 
     // 3Dライティング設定（アニメ・セルルック風：明るい環境光と高コントラスト）
     SetUseLighting(TRUE);
-    SetGlobalAmbientLight(GetColorF(0.86f, 0.86f, 0.88f, 1.0f));
-    ChangeLightTypeDir(VGet(0.35f, -0.85f, 0.4f));
-    SetLightDifColor(GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
-    SetLightSpcColor(GetColorF(0.7f, 0.7f, 0.7f, 1.0f));
+    SetGlobalAmbientLight(GetColorF(0.50f, 0.52f, 0.55f, 1.0f));
+    ChangeLightTypeDir(VGet(0.45f, -0.75f, 0.45f));
+    SetLightDifColor(GetColorF(0.95f, 0.93f, 0.88f, 1.0f));
+    SetLightSpcColor(GetColorF(0.20f, 0.20f, 0.20f, 1.0f));
 
     m_skybox.Init();
     LoadStage(mapType);
@@ -191,20 +191,29 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
         BuildNewMapCollision();
     }
     SetupForestTrees();
-    // 譽ｮ縺ｮ蠎翫・闡峨▲縺ｱ繝・け繧ｹ繝√Ε縺ｮ驕ｩ逕ｨ
-    m_leafTextureHandle = LoadGraph("Resource/Models/leaf_floor.png");
-    if (m_leafTextureHandle != -1 && m_modelHandle != -1)
+    // ステージモデルのマテリアルカラー設定（脱・真っ白化：マップに応じた視認性の高い配色）
+    if (m_modelHandle != -1)
     {
-        int texNum = MV1GetTextureNum(m_modelHandle);
-        for (int i = 0; i < texNum; ++i)
-        {
-            MV1SetTextureGraphHandle(m_modelHandle, i, m_leafTextureHandle, FALSE);
-        }
         int matNum = MV1GetMaterialNum(m_modelHandle);
+        COLOR_F difCol, ambCol;
+        if (m_mapType == ModelConfig::MapType::House)
+        {
+            // マップ1（House）: 室内ナチュラルウッド・フローリング調（温かみのある木目カラー）
+            difCol = GetColorF(0.70f, 0.54f, 0.38f, 1.0f);
+            ambCol = GetColorF(0.38f, 0.28f, 0.18f, 1.0f);
+        }
+        else
+        {
+            // マップ2（NewMap）: 屋外パーク＆トレーニングフィールド（目に優しい爽やかな芝生グリーン）
+            // 白猫や茶ネズミ、ダンベルがくっきりと浮かび上がり、スロープの立体感が鮮明に見える
+            difCol = GetColorF(0.32f, 0.58f, 0.30f, 1.0f);
+            ambCol = GetColorF(0.22f, 0.38f, 0.20f, 1.0f);
+        }
         for (int i = 0; i < matNum; ++i)
         {
-            MV1SetMaterialDifColor(m_modelHandle, i, GetColorF(1.0f, 1.0f, 1.0f, 1.0f));
-            MV1SetMaterialAmbColor(m_modelHandle, i, GetColorF(0.85f, 0.85f, 0.85f, 1.0f));
+            MV1SetMaterialDifColor(m_modelHandle, i, difCol);
+            MV1SetMaterialAmbColor(m_modelHandle, i, ambCol);
+            MV1SetMaterialSpcColor(m_modelHandle, i, GetColorF(0.04f, 0.04f, 0.04f, 1.0f));
         }
     }
     SetupGroundLeaves();
@@ -636,7 +645,8 @@ void Stage3D::Draw3D()
         ModelManager::GetInstance().DrawFallbackStage(m_halfWidth, m_halfDepth, m_wallHeight);
     }
 
-    // 2.5. 蠎企擇縺ｫ謨｣繧峨・繧玖誠縺｡闡峨・闕芽痩縺ｮ謠冗判・亥慍髱｢縺ｫ謗･蝨ｰ・・    SetUseLighting(TRUE);
+    // 2.5. 地面に散らばる落ち葉・草の描画（地面に接地）
+    SetUseLighting(TRUE);
     SetUseBackCulling(FALSE);
 
     for (const auto& leaf : m_groundLeaves)
@@ -1020,3 +1030,58 @@ bool Stage3D::GetGroundHeight(const VECTOR& pos, float& outGroundY, VECTOR* outG
     }
 }
 
+
+// ============================================================================
+// 指定座標が壁や境界・段差から十分離れた安全なスポーン可能位置か検証する
+// ============================================================================
+bool Stage3D::IsSafeSpawnLocation(const VECTOR& pos, float minWallDist, float& outGroundY) const
+{
+    // 1. 床面接地チェック
+    if (!GetGroundHeight(pos, outGroundY))
+    {
+        return false;
+    }
+
+    VECTOR testPos = VGet(pos.x, outGroundY, pos.z);
+
+    // 2. 外周境界チェック（外周から minWallDist 以上内側か）
+    const VECTOR& minB = GetMinBounds();
+    const VECTOR& maxB = GetMaxBounds();
+    if (testPos.x < minB.x + minWallDist || testPos.x > maxB.x - minWallDist ||
+        testPos.z < minB.z + minWallDist || testPos.z > maxB.z - minWallDist)
+    {
+        return false;
+    }
+
+    // 3. 壁ポリゴンとの距離チェック（minWallDist 半径の球で衝突押し出しがあるか）
+    VECTOR pushNormal = VGet(0.0f, 0.0f, 0.0f);
+    VECTOR clampedPos = testPos;
+    if (ResolveWallCollision(clampedPos, minWallDist, &pushNormal))
+    {
+        return false; // 壁から minWallDist 以内に近すぎる
+    }
+
+    // 4. 周囲4方向（前後左右）も床が存在するか（崖っぷち・急な段差際でないか）
+    const float probeDist = minWallDist * 0.6f;
+    const VECTOR offsets[4] = {
+        VGet( probeDist, 0.0f,  0.0f),
+        VGet(-probeDist, 0.0f,  0.0f),
+        VGet( 0.0f,      0.0f,  probeDist),
+        VGet( 0.0f,      0.0f, -probeDist)
+    };
+    for (int k = 0; k < 4; ++k)
+    {
+        float probeGy = 0.0f;
+        VECTOR probeP = VAdd(testPos, offsets[k]);
+        if (!GetGroundHeight(probeP, probeGy))
+        {
+            return false; // すぐ近くが床外（崖）
+        }
+        if (std::abs(probeGy - outGroundY) > 35.0f)
+        {
+            return false; // 急な段差際
+        }
+    }
+
+    return true;
+}

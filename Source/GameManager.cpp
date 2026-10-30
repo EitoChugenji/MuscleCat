@@ -520,7 +520,18 @@ void GameManager::StartGame()
     // 部屋・ステージの家具配置
     SetupRoomObstacles();
 
-    // ネズミの生成（Position.csv の Mouse 行からスポーン候補座標を取得）
+    // ------------------------------------------------------------------------
+    // ネズミの安全スポーン処理
+    // 要件:
+    // 1. 猫の周囲には初期スポーンさせない（猫から最低 450.0f 以上離す）
+    // 2. ステージの壁付近・角・段差際・外周境界にはスポーンさせない（壁から最低 100.0f 以上離す）
+    // 3. ネズミ同士が重ならないよう分散配置する（間隔 90.0f 以上）
+    // ------------------------------------------------------------------------
+    const VECTOR catStartPos = player->GetPos();
+    const float MIN_DIST_FROM_CAT = 450.0f; // 猫からの最小安全距離
+    const float MIN_WALL_MARGIN   = 100.0f; // 壁からの最小安全マージン
+    const float MIN_MOUSE_SPACING = 90.0f;  // ネズミ同士の最小間隔
+
     std::vector<VECTOR> spawnRooms = CsvManager::GetInstance().GetMousePositionsForMap(m_selectedMap);
     if (spawnRooms.empty())
     {
@@ -528,41 +539,117 @@ void GameManager::StartGame()
     }
     int roomCount = static_cast<int>(spawnRooms.size());
 
-    // ステージモデルの床上に確実に接地させるスポーン座標決定ヘルパー
-    auto FindGuaranteedGroundSpawnPos = [&](int candidateIndex) -> VECTOR
+    std::vector<VECTOR> decidedSpawnPositions;
+
+    auto IsFarFromOtherMice = [&](const VECTOR& p) -> bool
     {
-        for (int offsetAttempt = 0; offsetAttempt < roomCount; ++offsetAttempt)
+        for (const auto& dp : decidedSpawnPositions)
         {
-            int rIdx = (candidateIndex + offsetAttempt) % roomCount;
+            if (MathHelper::DistanceXZ(p, dp) < MIN_MOUSE_SPACING)
+            {
+                return false;
+            }
+        }
+        return true;
+    };
+
+    auto FindSafeSpawnPos = [&](int candidateIndex) -> VECTOR
+    {
+        float outGy = 0.0f;
+
+        // 1. Position.csv の候補点から、壁・猫から十分離れた安全な地点を探索
+        for (int offset = 0; offset < roomCount; ++offset)
+        {
+            int rIdx = (candidateIndex + offset) % roomCount;
             const VECTOR& basePos = spawnRooms[rIdx];
 
-            for (int jitterAttempt = 0; jitterAttempt < 6; ++jitterAttempt)
+            for (int jitterAttempt = 0; jitterAttempt < 12; ++jitterAttempt)
             {
-                float ox = (jitterAttempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
-                float oz = (jitterAttempt == 0) ? 0.0f : static_cast<float>((rand() % 40) - 20);
-                VECTOR testPos = VGet(basePos.x + ox, basePos.y, basePos.z + oz);
-                float gy = 0.0f;
-                if (stage.GetGroundHeight(testPos, gy))
+                float ox = (jitterAttempt == 0) ? 0.0f : static_cast<float>((rand() % 160) - 80);
+                float oz = (jitterAttempt == 0) ? 0.0f : static_cast<float>((rand() % 160) - 80);
+                VECTOR candidate = VGet(basePos.x + ox, basePos.y, basePos.z + oz);
+
+                // 猫の周囲チェック
+                if (MathHelper::DistanceXZ(candidate, catStartPos) < MIN_DIST_FROM_CAT)
                 {
-                    testPos.y = gy;
-                    return testPos;
+                    continue;
+                }
+
+                // ネズミ同士の重なりチェック
+                if (!IsFarFromOtherMice(candidate))
+                {
+                    continue;
+                }
+
+                // 壁・境界・段差からの安全マージン（100.0f）チェック
+                if (stage.IsSafeSpawnLocation(candidate, MIN_WALL_MARGIN, outGy))
+                {
+                    candidate.y = outGy;
+                    decidedSpawnPositions.push_back(candidate);
+                    return candidate;
                 }
             }
         }
 
-        // 万一のセーフティネット：猫の初期位置近傍
+        // 2. 候補点で見つからない場合、ステージ中央〜広場エリアから安全な座標を自動探索
+        const VECTOR& minB = stage.GetMinBounds();
+        const VECTOR& maxB = stage.GetMaxBounds();
+        float innerMargin = 250.0f; // 外周から250以上内側の安全領域
+        float rangeX = (maxB.x - minB.x) - innerMargin * 2.0f;
+        float rangeZ = (maxB.z - minB.z) - innerMargin * 2.0f;
+        int maxAttempts = 150;
+
+        for (int searchAttempt = 0; searchAttempt < maxAttempts; ++searchAttempt)
+        {
+            float rx = minB.x + innerMargin + static_cast<float>(rand() % static_cast<int>(rangeX > 100.0f ? rangeX : 100.0f));
+            float rz = minB.z + innerMargin + static_cast<float>(rand() % static_cast<int>(rangeZ > 100.0f ? rangeZ : 100.0f));
+            VECTOR candidate = VGet(rx, 100.0f, rz);
+
+            if (MathHelper::DistanceXZ(candidate, catStartPos) < MIN_DIST_FROM_CAT)
+            {
+                continue;
+            }
+
+            if (!IsFarFromOtherMice(candidate))
+            {
+                continue;
+            }
+
+            if (stage.IsSafeSpawnLocation(candidate, MIN_WALL_MARGIN, outGy))
+            {
+                candidate.y = outGy;
+                decidedSpawnPositions.push_back(candidate);
+                return candidate;
+            }
+        }
+
+        // 3. 最終セーフティネット（壁マージンを少し緩めて広場中央側で探す）
+        for (int fallbackAttempt = 0; fallbackAttempt < 50; ++fallbackAttempt)
+        {
+            float rx = (m_selectedMap == ModelConfig::MapType::House) ? (static_cast<float>(rand() % 400) - 200.0f) : (static_cast<float>(rand() % 1600) - 800.0f);
+            float rz = (m_selectedMap == ModelConfig::MapType::House) ? (static_cast<float>(rand() % 400) - 200.0f) : (static_cast<float>(rand() % 1400) - 700.0f);
+            VECTOR candidate = VGet(rx, 100.0f, rz);
+            if (MathHelper::DistanceXZ(candidate, catStartPos) >= 300.0f && stage.IsSafeSpawnLocation(candidate, 60.0f, outGy))
+            {
+                candidate.y = outGy;
+                decidedSpawnPositions.push_back(candidate);
+                return candidate;
+            }
+        }
+
         float fallbackGy = 0.0f;
-        VECTOR fallbackPos = defaultStartPos;
+        VECTOR fallbackPos = VGet(catStartPos.x, catStartPos.y, catStartPos.z - 500.0f);
         if (stage.GetGroundHeight(fallbackPos, fallbackGy))
         {
             fallbackPos.y = fallbackGy;
         }
+        decidedSpawnPositions.push_back(fallbackPos);
         return fallbackPos;
     };
 
     for (int i = 0; i < Config::NORMAL_MOUSE_COUNT; ++i)
     {
-        VECTOR spawnPos = FindGuaranteedGroundSpawnPos(i);
+        VECTOR spawnPos = FindSafeSpawnPos(i);
         auto mouse = std::make_shared<NormalMouse3D>(spawnPos, player);
         mouse->SetMapType(m_selectedMap);
         m_objManager.AddObject(mouse);
@@ -570,7 +657,7 @@ void GameManager::StartGame()
 
     for (int i = 0; i < Config::FAST_MOUSE_COUNT; ++i)
     {
-        VECTOR spawnPos = FindGuaranteedGroundSpawnPos(Config::NORMAL_MOUSE_COUNT + i);
+        VECTOR spawnPos = FindSafeSpawnPos(Config::NORMAL_MOUSE_COUNT + i);
         auto mouse = std::make_shared<FastMouse3D>(spawnPos, player);
         mouse->SetMapType(m_selectedMap);
         m_objManager.AddObject(mouse);
