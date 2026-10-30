@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   SoundManager.cpp
 // @brief  ゲーム内の全BGM・SE（効果音）の読み込み・再生・音量制御シングルトン実装
 // ============================================================================
@@ -48,12 +48,26 @@ void SoundManager::Init()
     // BGMは長尺音源（MP3等）の高速ロード＆省メモリ再生のため MEMPRESS モードで読み込む
     SetCreateSoundDataType(DX_SOUNDDATATYPE_MEMPRESS);
 
+    // タイトルBGM: TitleBGM.mp3 が存在すれば最優先で使用、無ければ bgm_title.wav にフォールバック
+    const char* titleBgmPath = "Resource/Sounds/TitleBGM.mp3";
+    FILE* testFpTitle = nullptr;
+    if (fopen_s(&testFpTitle, titleBgmPath, "rb") == 0 && testFpTitle)
+    {
+        fclose(testFpTitle);
+        AppLogAdd("SoundManager: Found TitleBGM at '%s'\n", titleBgmPath);
+    }
+    else
+    {
+        titleBgmPath = "Resource/Sounds/bgm_title.wav";
+        AppLogAdd("SoundManager: TitleBGM.mp3 not found, falling back to '%s'\n", titleBgmPath);
+    }
+
     // メインBGM: mainBGM.mp3 が存在すれば最優先で使用、無ければ bgm_stage.wav にフォールバック
     const char* stageBgmPath = "Resource/Sounds/mainBGM.mp3";
-    FILE* testFp = nullptr;
-    if (fopen_s(&testFp, stageBgmPath, "rb") == 0 && testFp)
+    FILE* testFpStage = nullptr;
+    if (fopen_s(&testFpStage, stageBgmPath, "rb") == 0 && testFpStage)
     {
-        fclose(testFp);
+        fclose(testFpStage);
         AppLogAdd("SoundManager: Found mainBGM at '%s'\n", stageBgmPath);
     }
     else
@@ -63,7 +77,7 @@ void SoundManager::Init()
     }
 
     const struct { BgmType type; const char* path; const char* name; } bgmFiles[] = {
-        { BgmType::Title,  "Resource/Sounds/bgm_title.wav", "Title" },
+        { BgmType::Title,  titleBgmPath,                   "Title" },
         { BgmType::Stage,  stageBgmPath,                   "Stage/Main" },
         { BgmType::Clear,  "Resource/Sounds/bgm_clear.wav", "Clear" },
         { BgmType::TimeUp, "Resource/Sounds/bgm_timeup.wav", "TimeUp" }
@@ -136,11 +150,6 @@ void SoundManager::Init()
 
 void SoundManager::Release()
 {
-    if (!m_isInitialized)
-    {
-        return;
-    }
-
     SaveSettings();
     StopAll();
 

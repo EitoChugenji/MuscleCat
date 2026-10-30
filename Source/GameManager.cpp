@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   GameManager.cpp
 // @brief  GameManager クラスの実装（タイトル・ゲーム本編・リザルト・ポーズ・デバッグ）
 // ============================================================================
@@ -2882,84 +2882,6 @@ void GameManager::DrawTitleScreen()
 
     SoftUI::DrawSoftCard(hintX - 18, hintY - 4, hintW + 36, 26, 13, GetColor(18, 24, 40), 200, GetColor(255, 215, 60), 1);
     DrawStringToHandle(hintX, hintY, stageHint, GetColor(255, 235, 120), font13);
-
-    // ------------------------------------------------------------------------
-    // 9. 豪華チャンピオン・ワークアウトHUD（画面左下：ふわっと浮遊する角丸HUD）
-    // ------------------------------------------------------------------------
-    {
-        int cycle = m_titleAnimTimer % 540;
-        float workoutFloat = std::sin(m_titleAnimTimer * 0.035f) * 2.5f;
-        int bX = 32;
-        int bY = Config::SCREEN_HEIGHT - 124 + static_cast<int>(workoutFloat);
-        int bW = 314;
-        int bH = 64;
-
-        unsigned int borderCol = (cycle < 200)
-            ? GetColor(255, 150, 40)
-            : ((cycle >= 270 && cycle < 470) ? GetColor(80, 220, 255) : GetColor(120, 240, 160));
-
-        SoftUI::DrawSoftCard(bX, bY, bW, bH, 16, GetColor(20, 26, 44), 225, borderCol, 2);
-
-        // ヘッダー小見出し
-        DrawStringToHandle(bX + 14, bY + 6, "★ LIVE TRAINING ROUTINE ★", GetColor(255, 230, 90), font13);
-
-        if (cycle < 200)
-        {
-            // スクワットセット (0〜200F)
-            int rep = (cycle < 65) ? 1 : ((cycle < 130) ? 2 : 3);
-            float repProgress = std::fmod(static_cast<float>(cycle), 65.0f) / 65.0f;
-
-            char buf[64];
-            snprintf(buf, sizeof(buf), "SQUAT SET : REP %d / 3", rep);
-            DrawStringToHandle(bX + 14, bY + 24, buf, GetColor(255, 220, 60), font18);
-
-            // ゲージバー（角丸）
-            int gX = bX + 14, gY = bY + 49, gW = bW - 28, gH = 6;
-            DrawRoundRect(gX, gY, gX + gW, gY + gH, 3, 3, GetColor(12, 14, 20), TRUE);
-            int fillW = static_cast<int>(gW * repProgress);
-            if (fillW > 0)
-            {
-                int rVal = (fillW > 4) ? 3 : 1;
-                DrawRoundRect(gX, gY, gX + fillW, gY + gH, rVal, rVal, GetColor(255, 145, 35), TRUE);
-            }
-        }
-        else if (cycle >= 270 && cycle < 470)
-        {
-            // 腕立て伏せセット (270〜470F)
-            int pCycle = cycle - 270;
-            int rep = (pCycle < 50) ? 1 : ((pCycle < 100) ? 2 : ((pCycle < 150) ? 3 : 4));
-            float repProgress = std::fmod(static_cast<float>(pCycle), 50.0f) / 50.0f;
-
-            char buf[64];
-            snprintf(buf, sizeof(buf), "PUSH-UP SET : REP %d / 4", rep);
-            DrawStringToHandle(bX + 14, bY + 24, buf, GetColor(110, 235, 255), font18);
-
-            // ゲージバー（角丸）
-            int gX = bX + 14, gY = bY + 49, gW = bW - 28, gH = 6;
-            DrawRoundRect(gX, gY, gX + gW, gY + gH, 3, 3, GetColor(12, 14, 20), TRUE);
-            int fillW = static_cast<int>(gW * repProgress);
-            if (fillW > 0)
-            {
-                int rVal = (fillW > 4) ? 3 : 1;
-                DrawRoundRect(gX, gY, gX + fillW, gY + gH, rVal, rVal, GetColor(80, 220, 255), TRUE);
-            }
-        }
-        else
-        {
-            // インターバル・ポーズ
-            DrawStringToHandle(bX + 14, bY + 24, "INTERVAL : POSING TIME!", GetColor(140, 255, 180), font18);
-
-            float restRatio = (cycle < 270) ? (static_cast<float>(cycle - 200) / 70.0f) : (static_cast<float>(cycle - 470) / 70.0f);
-            int gX = bX + 14, gY = bY + 49, gW = bW - 28, gH = 6;
-            DrawRoundRect(gX, gY, gX + gW, gY + gH, 3, 3, GetColor(12, 14, 20), TRUE);
-            int fillW = static_cast<int>(gW * (1.0f - restRatio));
-            if (fillW > 0)
-            {
-                int rVal = (fillW > 4) ? 3 : 1;
-                DrawRoundRect(gX, gY, gX + fillW, gY + gH, rVal, rVal, GetColor(120, 240, 160), TRUE);
-            }
-        }
-    }
 
     // ------------------------------------------------------------------------
     // 10. 遊び方モーダルが開いていれば描画

@@ -1,6 +1,8 @@
-﻿================================================================================
+================================================================================
                         『マッスルにゃんこ』 コード管理・構成まとめ
 ================================================================================
+※ 本ファイルはチャット上で「update」と指示することにより、最新のソースコード・
+   リソース構成を再解析して自動更新されます。
 
 【1. 全体アーキテクチャ・依存関係図】
 
@@ -11,17 +13,20 @@
       ├── [ModelManager]        (シングルトン: .mv1 3Dモデルキャッシュ & プロシージャル代替描画)
       ├── [EffectManager]       (シングルトン: Effekseer 3Dパーティクル管理)
       ├── [CustomEffectManager] (シングルトン: 3Dポリゴンによる炎・湯気・地面えぐり・雷撃・捕獲祝祭)
+      ├── [SoundManager]        (シングルトン: BGM・SE 15種の一元管理 / 音量調整 / 設定永続化)
       │
-      └── [GameManager]         (ゲーム全体の進行・シーン遷移・UI描画・デバッグ制御)
+      └── [GameManager]         (ゲーム全体の進行・シーン遷移・UI描画・サウンド/デバッグ制御)
               │
               ├── [Camera3D]        (TPS三人称視点カメラ・マウス回転・正面回り込み・壁遮蔽回避)
               │
               └── [ObjectManager3D] (全3Dオブジェクトの更新・描画・衝突解決・捕獲コンボ管理)
                       │
-                      ├── [Stage3D]    (ステージ床・壁ポリゴン抽出・マップ別押し戻し・坂道接地)
+                      ├── [Stage3D]    (ステージ床・壁ポリゴン抽出・押し戻し・坂道接地・外周3D森・落ち葉)
+                      │       │
+                      │       └── [Skybox3D] (巨大3D森林スカイドーム / 舞い散る木の葉パーティクル)
                       │
                       └── [GameObject3D] (全3Dオブジェクトの抽象基底クラス)
-                              ├── [Player3D]      (プレイヤー操作猫・筋トレQTE・飛びつき・スタン攻撃)
+                              ├── [Player3D]      (プレイヤー操作猫・筋トレQTE・飛びつき・スタン攻撃・筋肉痛)
                               ├── [Obstacle3D]    (室内の家具・トレーニング器具等の静的障害物)
                               └── [MouseBase3D]   (ネズミ共通基底：巡回AI・逃走AI・スタン・伸縮アニメ)
                                     ├── [NormalMouse3D] (通常ネズミ)
@@ -37,13 +42,14 @@
 【2. 各ファイル・クラスの役割と詳細構成】
 
 ■ 1. Main.cpp
-  - 役割: アプリケーションの起動、初期化、メインループ、終了解放。
+  - 役割: アプリケーションの起動、初期化、カレントディレクトリ補正、メインループ、終了解放。
   - 主な処理:
-    1) DxLib初期設定 (UTF-8文字コード、1280x720ウィンドウ、タイトル「マッスルにゃんこ」、Direct3D 11)。
-    2) シングルトン群 (`CsvManager`, `FontManager`, `ModelManager`, `EffectManager`, `CustomEffectManager`) の `Init()`。
-    3) `GameManager` の初期化と `while (ProcessMessage() == 0 && !game.ShouldQuit())` ループの実行。
-    4) `GetNowHiPerformanceCount()` による1フレームあたりのCPU処理時間(ms)計測。
-    5) 終了時に逆順で全リソースを安全に `Release()`。
+    1) 実行ファイル位置からのカレントディレクトリ自動補正（exe直接起動時でも Resource フォルダを検出）。
+    2) DxLib初期設定 (UTF-8文字コード、1280x720ウィンドウ、タイトル「マッスルにゃんこ」、Direct3D 11)。
+    3) シングルトン群 (`CsvManager`, `FontManager`, `ModelManager`, `EffectManager`, `CustomEffectManager`, `SoundManager`) の順次 `Init()`。
+    4) `GameManager` の初期化と `while (ProcessMessage() == 0 && !game.ShouldQuit())` ループの実行。
+    5) `GetNowHiPerformanceCount()` による1フレームあたりのCPU処理時間(ms)計測。
+    6) 終了時に初期化の逆順で全リソースを安全に `Release()`。
 
 ■ 2. Common.h / Config.h / ModelConfig.h
   - Common.h:
@@ -56,7 +62,8 @@
     - 制限時間モード設定 (`USE_TIME_LIMIT_MODE = true`, `TIME_LIMIT_SECONDS = 120.0f`)
   - ModelConfig.h:
     - プレイヤーモデル (`cat.mv1`)、バーベルモデル (`Barbell.mv1`)、ネズミモデル (`ネズミ.mv1`) のパス・スケール設定
-    - ステージモデル (`MapType::House` = `firstmap.mv1`, `MapType::NewMap` = `newmap.mv1`) のパス・スケール設定
+    - ステージモデル (`MapType::House` = `firstmap.mv1`, `MapType::NewMap` / `SlopeHills` = `newmap.mv1`) のパス・スケール設定
+    - 室内家具モデル (`Kitchen.mv1`, `Refrigerator.mv1`, `table.mv1`, `TV.mv1`) の配置設定
 
 ■ 3. CsvManager.h / CsvManager.cpp (シングルトン)
   - 役割: 外部CSVファイル (`Statu.csv`, `Position.csv`) の読み込みとマップ別座標フィルタリング。
@@ -92,7 +99,36 @@
     - スタン攻撃（Tackle）時の電撃ソニックブーム・3Dスピードライン・全身を纏う3D稲妻アーク。
     - ネズミ捕獲時の3D星＆ダイヤ噴水・ゴールド衝撃波リング・放射サンバースト光線・昇天ソウル演出。
 
-■ 8. Camera3D.h / Camera3D.cpp
+■ 8. SoundManager.h / SoundManager.cpp (シングルトン)
+  - 役割: 全BGM・SE（効果音）の読み込み、多重再生、音量制御、設定永続化。
+  - 主な機能:
+    - BGM再生制御 (`BgmType::Title`, `BgmType::Stage/Main`, `BgmType::Clear`, `BgmType::TimeUp`)。
+      長尺音源を `DX_SOUNDDATATYPE_MEMPRESS` で省メモリ再生。
+      `TitleBGM.mp3` および `mainBGM.mp3` が存在すれば最優先使用、未配置時は `.wav` へ自動フォールバック。
+    - SE再生制御 (`SeType`: Cursor, Decide, Cancel, Pause, SquatStart, SquatSuccess, SquatFail,
+      Pounce, Tackle, Catch, RatSqueak, PumpDecay, Stamp, Countdown, Footstep)。
+    - 音量調整・バランス制御 (`m_masterVolume`, `m_bgmVolume`, `m_seVolume`)。
+    - 設定の自動読み込み・保存 (`Resource/SoundConfig.txt` への入出力)。
+
+■ 9. Skybox3D.h / Skybox3D.cpp
+  - 役割: 巨大3D森林スカイドームの描画および舞い散る木の葉パーティクルの管理。
+  - 主な機能:
+    - `GenerateForestTexture()`: 2048x1024 の高精細スクリーンテクスチャを動的生成。
+      澄んだコバルトブルーから地平線へのグラデーション、木漏れ日、連なる山並み、森林シルエット、頭上のキャノピー（天蓋）を描画。
+    - `BuildDomeMesh()`: 半径45000 units、48x16分割の巨大スカイドーム3Dメッシュを構築しテクスチャを貼付。
+    - `ForestLeafParticle`: プレイヤー周囲の風と揺らぎに乗って舞い落ちる木の葉（40枚）を常時更新・3D描画。
+
+■ 10. Stage3D.h / Stage3D.cpp
+  - 役割: 3Dステージモデルの管理、壁ポリゴン抽出、押し戻し衝突判定、床・坂道の接地高さ取得、外周森・落ち葉の描画。
+  - 主な機能:
+    - `BuildHouseCollision()` / `BuildNewMapCollision()` : マップ1(`firstmap.mv1`)とマップ2(`newmap.mv1`)それぞれのメッシュ構造に合わせて垂直壁ポリゴン(`WallPolygon`)を抽出。
+    - `ResolveWallCollision()` : 三角形上の最近接点(`ClosestPointOnTriangle`)を用いた最大4回反復の滑らかな壁押し戻し。
+    - `GetGroundHeight()`      : レイキャストにより床・スロープの正確なY座標を取得し、壁上への誤ワープを防止。
+    - `SetupForestTrees()`     : ステージ外周に10種類の樹木モデル(`Resource/Sousyoku/ABigTree1〜4`, `ASmallTree1〜6`)を安全マージンを保ちながら多重レイヤー配置。
+    - `SetupGroundLeaves()`    : ステージ床面に落ち葉群(`GroundFallenLeaf`)を散乱配置し、フロアテクスチャ(`leaf_floor.png`)を適用。
+    - `Skybox3D` を内包し、背景スカイドームと木の葉パーティクルを一体制御。
+
+■ 11. Camera3D.h / Camera3D.cpp
   - 役割: プレイヤー追従TPSカメラの制御。
   - 主な機能:
     - マウス移動（感度 0.2x〜3.0x 調整可能）および矢印キーによる水平・垂直回転、[F]キーでの正面リセット。
@@ -100,26 +136,20 @@
     - `MV1CollCheck_Line` レイキャストによるステージ壁面の遮蔽検知とカメラ手前引き寄せ回避。
     - 捕獲・衝撃時の減衰付きカメラシェイク (`TriggerShake`)。
 
-■ 9. Stage3D.h / Stage3D.cpp
-  - 役割: 3Dステージモデルの管理、壁ポリゴン抽出、押し戻し衝突判定、床・坂道の高さ取得。
-  - 主な機能:
-    - `BuildHouseCollision()` / `BuildNewMapCollision()` : マップ1(`firstmap.mv1`)とマップ2(`newmap.mv1`)それぞれのメッシュ構造に合わせて垂直壁ポリゴン(`WallPolygon`)を抽出。
-    - `ResolveWallCollision()` : 三角形上の最近接点(`ClosestPointOnTriangle`)を用いた最大4回反復の滑らかな壁押し戻し。
-    - `GetGroundHeight()`      : レイキャストにより床・スロープの正確なY座標を取得し、壁上への誤ワープを防止。
-
-■ 10. GameObject3D.h / Obstacle3D.h / Obstacle3D.cpp
+■ 12. GameObject3D.h / Obstacle3D.h / Obstacle3D.cpp
   - `GameObject3D` : 全3Dオブジェクト共通の座標(`m_pos`)、向き(`m_rotY`)、半径(`m_radius`)、生存フラグ(`m_isAlive`)を持つ抽象基底クラス。
   - `Obstacle3D`   : 室内の家具・器具を表し、AABB対円の水平押し出し判定 (`ResolveCollision`) を実装。
 
-■ 11. Mouse3D.h / Mouse3D.cpp
+■ 13. Mouse3D.h / Mouse3D.cpp
   - 役割: 捕獲ターゲットであるネズミ（`NormalMouse3D` / `FastMouse3D`）のAIとアニメーション。
   - 主な機能:
     - パトロール巡回AI (`ChooseNewPatrolTarget`, `UpdateWanderMovement`) とプレイヤー接近時の逃走AI (`UpdateFleeMovement`)。
     - 仲間が捕まるごとに移動速度が上昇する動的難易度調整 (`m_speedBonus`)。
     - プレイヤーのスタン攻撃を受けた際の気絶状態 (`ApplyStun`) と3D頭上ピヨピヨ星演出 (`DrawStunEffect`)。
     - ホッピング跳躍・ロール揺れ・前傾・Squash & Stretch・スタン横倒し痙攣を計算する `GetAnimTransform()`。
+    - 捕獲時およびスタン時のSEトリガー連携。
 
-■ 12. Player3D.h / Player3D.cpp
+■ 14. Player3D.h / Player3D.cpp
   - 役割: プレイヤーキャラクター「マッスルにゃんこ」のアクション・成長・アニメーション制御。
   - 主な機能:
     - カメラの水平向きを基準としたWASD移動と、レベルに応じた速度上昇 (`CalculateSpeedForRep`)・体格巨大化。
@@ -128,24 +158,49 @@
     - Lv.4 (4 Rep) 以上で解放される2大アクション:
       1) 飛びつき (`Pounce`: 左クリック / SHIFT) : 前方のネズミへ緩やかにホーミングしながら放物線跳躍して捕獲。
       2) スタン攻撃 (`Tackle`: 右クリック / E)   : 電撃を纏って超高速突進し、接触したネズミを長時間スタンさせる（壁に激突すると猫自身が1.5秒スタン）。
-    - Mixamoボーンフレーム (`LeftHand`, `RightHand`) のワールド座標から変換行列を構築し、スクワット中に両手でバーベル (`Barbell.mv1`) を保持する `DrawBarbell()`。
+    - 補助モデル (`cat_soreness.mv1`) の自動ロードによる筋肉痛モーション (`06_MuscleSoreness`) およびタックルモーション (`05_Push`) の補完再生。
+    - Mixamoボーンフレーム (`LeftHand`, `RightHand`) のワールド座標から変換行列を構築し、スクワット中に両手でバーベル (`Barbell.mv1`) を保持する `DrawBarbell()`（筋肉痛時・腕立て伏せ時は非保持）。
+    - アクション・足音・QTE結果に応じた各種SEの自動再生。
 
-■ 13. ObjectManager3D.h / ObjectManager3D.cpp
+■ 15. ObjectManager3D.h / ObjectManager3D.cpp
   - 役割: ステージ内の全オブジェクトの一括管理、衝突解決、捕獲コンボ演出。
   - 主な機能:
     - プレイヤー・ネズミ群・障害物・ステージの更新と描画順序制御。
+    - `m_stage.Update(playerPos)` を経由したスカイボックス・木の葉パーティクルの連続更新。
     - 壁・障害物との押し出し判定および床のない領域（崖・マップ外）への落下を防止する壁沿いスライディング処理。
     - ネズミ捕獲判定、約3.5秒以内の連続捕獲によるコンボラッシュ集計、ヒットストップ、3D座標から浮かび上がるコミック風ポップアップ描画。
 
-■ 14. GameManager.h / GameManager.cpp
-  - 役割: シーン遷移 (`Title` / `Playing` / `GameClear`)、ポーズ制御、2D UI描画、F1デバッグ機能。
+■ 16. GameManager.h / GameManager.cpp
+  - 役割: シーン遷移 (`Title` / `Playing` / `GameClear`)、ポーズ制御、サウンド設定、2D UI描画、F1デバッグ機能。
   - 主な機能:
     - タイトル画面 (`DrawTitleScreen`, `DrawTitle3DScene`):
-      3D空間でスクワットと腕立て伏せを交互に行う猫の周囲をカメラが旋回し、「マッスルにゃんこ」の立体カートゥーンロゴ、48種類以上のボディビル掛け声吹き出し、ステージ選択UIを描画。
+      3D空間でスクワットと腕立て伏せを交互に行う猫の周囲をカメラが旋回し、「マッスルにゃんこ」の立体カートゥーンロゴ、48種類以上のボディビル掛け声吹き出し、ステージ選択UI、タイトルBGM再生。
+    - タイトルサウンド設定モーダル (`DrawSoundSettingsModal`, `UpdateTitleSoundSettings`):
+      タイトル画面で[O]キーまたはUIクリックで開き、BGM音量・SE音量・マウス感度をキーボード／マウスドラッグで調整可能。
     - プレイ中HUD & ポーズ画面 (`Draw`, `UpdatePause`, `DrawPauseModal`):
-      左上ステータスバッジ（レベル・維持ゲージ・残りネズミ数・120秒制限時間タイマー）、右下操作ガイド、ESCポーズメニュー（リトライ・タイトル・マウス感度スライダー）。
+      左上ステータスバッジ（レベル・維持ゲージ・残りネズミ数・120秒制限時間タイマー）、右下操作ガイド、ESCポーズメニュー（リトライ・タイトル・マウス感度・BGM音量・SE音量スライダー）。ポーズ時のBGM一時停止とSE効果。
     - リザルト画面 (`DrawGameClearScreen`):
-      クリア/タイムアップ時にまず筋トレする猫へカメラがズームイン（75フレーム）し、背景で猫がスクワットし続ける状態でアメコミ風S/A/B/Cランクスタンプ、クリア統計、報酬ボーナス（ダンベル・猫缶・スター）を表示。
+      クリア/タイムアップ時にまず筋トレする猫へカメラがズームイン（75フレーム）し、クリアBGM/タイムアップBGM再生、アメコミ風S/A/B/Cランクスタンプ、クリア統計、報酬ボーナスを表示。
     - F1デバッグオーバーレイ (`DrawDebug3DOverlay`, `DrawDebug2DOverlay`):
       猫の身長1.8mを基準とした10m×10m×10m目測ワイヤーフレームキューブ、身長物差し、壁ポリゴン可視化、2Dミニマップレーダー、各種デバッグチート機能（[1]〜[8]キー）。
+
+--------------------------------------------------------------------------------
+
+【3. リソース構成・連携フォルダ一覧】
+
+  - `Resource/Models/`
+      - `CatModel/`          : `cat.mv1` (本体), `cat_soreness.mv1` (筋肉痛・突進モーション補助)
+      - `AccessoryModels/`   : `Barbell.mv1` (バーベル), `Kitchen.mv1`, `Refrigerator.mv1`, `table.mv1`, `TV.mv1`
+      - `MouseModel/`        : `ネズミ.mv1` (通常・高速兼用ネズミ)
+      - `Maps/`              : `firstmap.mv1` (マップ1: 通常ハウス), `newmap.mv1` (マップ2: NEW MAP)
+      - `Sousyoku/`          : `ABigTree1〜4.mv1`, `ASmallTree1〜6.mv1` (外周森林用3D樹木群)
+      - `leaf_floor.png`     : ステージ床面用森林落ち葉テクスチャ
+  - `Resource/Sounds/`
+      - BGM: `TitleBGM.mp3` (タイトル優先), `bgm_title.wav` (フォールバック), `mainBGM.mp3` (メイン優先), `bgm_stage.wav`, `bgm_clear.wav`, `bgm_timeup.wav`
+      - SE : `se_cursor.wav`, `se_decide.wav`, `se_cancel.wav`, `se_pause.wav`, `se_squat_start.wav`, `se_squat_success.wav`, `se_squat_fail.wav`, `se_pounce.wav`, `se_tackle.wav`, `se_catch.wav`, `se_rat_squeak.wav`, `se_pump_decay.wav`, `se_stamp.wav`, `se_countdown.wav`, `se_footstep.wav`
+  - `Resource/CSV/` (および `Source/CSV/`)
+      - `Statu.csv`          : 猫・ネズミの初速・成長率・最大速度パラメータ定義
+      - `Position.csv`       : 猫の初期位置およびネズミのスポーン・ウェイポイント座標定義
+  - `Resource/SoundConfig.txt`
+      - BGM音量・SE音量のユーザー設定永続化ファイル
 ================================================================================
