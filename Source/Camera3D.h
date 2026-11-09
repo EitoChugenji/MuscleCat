@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   Camera3D.h
 // @brief  プレイヤー追従型3Dサードパーソンカメラ（TPS視点・壁めり込み防止・シェイク）
 // ============================================================================
@@ -57,7 +57,8 @@ public:
         bool isFrontView = false,
         int stageModelHandle = -1,
         const VECTOR* minBounds = nullptr,
-        const VECTOR* maxBounds = nullptr
+        const VECTOR* maxBounds = nullptr,
+        bool isPullUpView = false
     );
 
     // 計算されたカメラ座標・注視点（＋シェイクオフセット）をDxLibの3Dカメラへ反映する

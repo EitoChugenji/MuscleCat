@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   Camera3D.cpp
 // @brief  Camera3D クラスの実装（マウス視点操作、正面回り込み、壁遮蔽回避）
 // ============================================================================
@@ -79,7 +79,8 @@ void Camera3D::Update(
     bool isFrontView,
     int stageModelHandle,
     const VECTOR* minBounds,
-    const VECTOR* maxBounds
+    const VECTOR* maxBounds,
+    bool isPullUpView
 )
 {
     // ------------------------------------------------------------------------
@@ -134,14 +135,16 @@ void Camera3D::Update(
 
     // 通常時の背後アングル(m_angleH)と、筋トレ中の正面アングル(targetRotY + π)を補間
     float frontAngleH = targetRotY + MathHelper::PI;
+    float frontTargetDist = isPullUpView ? 175.0f : 145.0f;
     float renderAngleH = MathHelper::LerpAngle(m_angleH, frontAngleH, m_frontViewBlend);
-    float renderAngleV = MathHelper::Lerp(m_angleV, 0.22f, m_frontViewBlend);
-    float renderDist   = MathHelper::Lerp(m_distance, 145.0f, m_frontViewBlend);
+    float renderAngleV = MathHelper::Lerp(m_angleV, isPullUpView ? 0.18f : 0.22f, m_frontViewBlend);
+    float renderDist   = MathHelper::Lerp(m_distance, frontTargetDist, m_frontViewBlend);
 
     // ------------------------------------------------------------------------
     // 3. 注視点のスムーズ追従および理想カメラ座標の算出
     // ------------------------------------------------------------------------
-    VECTOR desiredTarget = VGet(targetPos.x, targetPos.y + m_heightOffset, targetPos.z);
+    float targetHeightOffset = (isFrontView && isPullUpView) ? (m_heightOffset + 22.0f) : m_heightOffset;
+    VECTOR desiredTarget = VGet(targetPos.x, targetPos.y + targetHeightOffset, targetPos.z);
     m_targetPos.x = MathHelper::Lerp(m_targetPos.x, desiredTarget.x, 0.25f);
     m_targetPos.y = MathHelper::Lerp(m_targetPos.y, desiredTarget.y, 0.25f);
     m_targetPos.z = MathHelper::Lerp(m_targetPos.z, desiredTarget.z, 0.25f);

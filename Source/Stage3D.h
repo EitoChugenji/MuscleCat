@@ -145,4 +145,3 @@ public:
         return (m_mapType == ModelConfig::MapType::House) ? m_houseWallPolygons : m_newMapWallPolygons;
     }
 };
-

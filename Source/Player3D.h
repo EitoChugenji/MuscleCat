@@ -19,6 +19,18 @@ enum class MuscleState
 };
 
 // ============================================================================
+// 筋トレ時のワークアウトアニメーション種別列挙型（メニュー画面で個別にON/OFF選択可能）
+// ============================================================================
+enum class WorkoutMotionType : int
+{
+    Squat  = 0, // スクワット (03_squat / バーベル保持)
+    PushUp = 1, // 腕立て伏せ (05_PushUp)
+    SitUp  = 2, // 腹筋・シットアップ (06_Situp)
+    PullUp = 3, // 懸垂・プルアップ (07_PullUp)
+    Count  = 4
+};
+
+// ============================================================================
 // 3D残像トレイル用構造体（飛びつき・スタン攻撃の高速移動時に背後に残る半透明残像）
 // ============================================================================
 struct TrailPoint3D
@@ -73,6 +85,9 @@ private:
     bool  m_isSkillChecking    = false; // 現在筋トレQTE中かどうか
     bool  m_isTitleSquat       = false; // タイトル/リザルト画面でのスクワット演出フラグ
     bool  m_isTitlePushUp      = false; // タイトル画面での腕立て伏せ（プッシュアップ）演出フラグ
+    bool  m_isTitleSitUp       = false; // タイトル画面での腹筋（シットアップ）演出フラグ
+    bool  m_isTitlePullUp      = false; // タイトル画面での懸垂（プルアップ）演出フラグ
+    WorkoutMotionType m_activeWorkoutMotion = WorkoutMotionType::Squat; // 今回の筋トレで再生中のアニメーション種別
     float m_scCursor           = 0.0f;  // QTEゲージ内の針の現在位置 (0.0f 〜 1.0f)
     float m_scCursorDir        = 1.0f;  // 針の往復移動方向 (+1.0f: 右進, -1.0f: 左進)
     float m_scZoneStart        = 0.55f; // 成功ゾーンの開始位置 (0.0f 〜 1.0f)
@@ -131,10 +146,16 @@ private:
     int   m_animIndexSquat       = 2;     // 03_squat: スクワット（筋トレQTE）モーション
     int   m_animIndexIdol        = 3;     // 04_Idol: 待機モーション
     int   m_animIndexPush        = 4;     // 05_Push / Attack: タックル突進モーション
-    int   m_animIndexPushUp      = 4;     // 05_PushUp: 腕立て伏せモーション（タイトル演出用）
+    int   m_animIndexPushUp      = 4;     // 05_PushUp: 腕立て伏せモーション
+    int   m_animIndexSitUp       = 5;     // 06_Situp: 腹筋（シットアップ）モーション
+    int   m_animIndexPullUp      = 6;     // 07_PullUp: 懸垂（プルアップ）モーション
     int   m_animIndexSoreness    = 5;     // 06_MuscleSoreness: 筋肉痛モーション
     bool  m_pushFromSubModel     = false; // Pushアニメーションを補助モデルから参照するか
     bool  m_sorenessFromSubModel = false; // 筋肉痛アニメーションを補助モデルから参照するか
+
+    // 筋トレアニメーション各モーションのON/OFF設定（メニュー画面のトグルボタンと連動）
+    static bool s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)];
+    static int  s_workoutSequenceIndex;
 
     // バーベルを両手に追従させるためのMixamoボーンフレーム番号キャッシュ
     int   m_lHandFrame         = -1;    // 左手首ボーン (mixamorig:LeftHand)
@@ -149,6 +170,7 @@ private:
     void InitModel();                   // モデル・アニメーション・ボーンフレームの初期化
     void UpdateAnimation(bool isMoving);// 現在の行動状態に応じたアニメーション切り替え・再生進行
     void DrawBarbell(float catScale);   // 両手ボーン座標から変換行列を構築してバーベルを描画
+    void DrawPullUpBar(float catScale); // 懸垂モーション時に両手位置に合わせた懸垂バー＆支柱ラックを描画
 
 public:
     Player3D(const VECTOR& pos);
@@ -217,13 +239,88 @@ public:
     bool IsSkillChecking() const { return m_isSkillChecking; }
 
     // ------------------------------------------------------------------------
+    // 筋トレ時アニメーションのON/OFF選択設定（メニュー画面連動）
+    // ------------------------------------------------------------------------
+    static bool IsWorkoutMotionEnabled(WorkoutMotionType type)
+    {
+        int idx = static_cast<int>(type);
+        if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return true;
+        return s_workoutMotionEnabled[idx];
+    }
+
+    static void SetWorkoutMotionEnabled(WorkoutMotionType type, bool enabled)
+    {
+        int idx = static_cast<int>(type);
+        if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return;
+        s_workoutMotionEnabled[idx] = enabled;
+    }
+
+    static void ToggleWorkoutMotionEnabled(WorkoutMotionType type)
+    {
+        int idx = static_cast<int>(type);
+        if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return;
+        // 最低1つはONになるよう保護（最後の1つをOFFにしようとした場合は切り替えないか全ONに戻す）
+        if (s_workoutMotionEnabled[idx] && GetEnabledWorkoutMotionCount() <= 1)
+        {
+            return;
+        }
+        s_workoutMotionEnabled[idx] = !s_workoutMotionEnabled[idx];
+    }
+
+    static int GetEnabledWorkoutMotionCount()
+    {
+        int count = 0;
+        for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+        {
+            if (s_workoutMotionEnabled[i]) count++;
+        }
+        return count;
+    }
+
+    static WorkoutMotionType PickNextEnabledWorkoutMotion()
+    {
+        std::vector<WorkoutMotionType> enabledList;
+        for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+        {
+            if (s_workoutMotionEnabled[i])
+            {
+                enabledList.push_back(static_cast<WorkoutMotionType>(i));
+            }
+        }
+        if (enabledList.empty())
+        {
+            return WorkoutMotionType::Squat;
+        }
+        int randIdx = GetRand(static_cast<int>(enabledList.size()) - 1);
+        WorkoutMotionType chosen = enabledList[randIdx];
+        s_workoutSequenceIndex++;
+        return chosen;
+    }
+
+    static const char* GetWorkoutMotionName(WorkoutMotionType type)
+    {
+        switch (type)
+        {
+        case WorkoutMotionType::Squat:  return "スクワット";
+        case WorkoutMotionType::PushUp: return "腕立て伏せ";
+        case WorkoutMotionType::SitUp:  return "腹筋";
+        case WorkoutMotionType::PullUp: return "懸垂";
+        default:                        return "スクワット";
+        }
+    }
+
+    WorkoutMotionType GetActiveWorkoutMotion() const { return m_activeWorkoutMotion; }
+
+    // ------------------------------------------------------------------------
     // タイトル画面・リザルト画面用の自動トレーニングアニメーション制御
     // ------------------------------------------------------------------------
     enum class TitleWorkoutType
     {
         Idle = 0, // 待機・ポージング
         Squat,    // バーベルスクワット
-        PushUp    // 腕立て伏せ（プッシュアップ）
+        PushUp,   // 腕立て伏せ（プッシュアップ）
+        SitUp,    // 腹筋（シットアップ）
+        PullUp    // 懸垂（プルアップ）
     };
 
     void UpdateTitleAnimation(TitleWorkoutType workoutType)
@@ -232,6 +329,8 @@ public:
         m_animTime += 1.0f / 60.0f;
         m_isTitleSquat    = (workoutType == TitleWorkoutType::Squat);
         m_isTitlePushUp   = (workoutType == TitleWorkoutType::PushUp);
+        m_isTitleSitUp    = (workoutType == TitleWorkoutType::SitUp);
+        m_isTitlePullUp   = (workoutType == TitleWorkoutType::PullUp);
         m_isSkillChecking = false;
         m_isPouncing      = false;
         m_isTackling      = false;
@@ -248,7 +347,20 @@ public:
 
     void UpdateTitleAnimation(bool isSquatting)
     {
-        UpdateTitleAnimation(isSquatting ? TitleWorkoutType::Squat : TitleWorkoutType::Idle);
+        if (!isSquatting)
+        {
+            UpdateTitleAnimation(TitleWorkoutType::Idle);
+            return;
+        }
+        // 有効になっている筋トレモーションの中から選択して再生
+        switch (m_activeWorkoutMotion)
+        {
+        case WorkoutMotionType::PushUp: UpdateTitleAnimation(TitleWorkoutType::PushUp); break;
+        case WorkoutMotionType::SitUp:  UpdateTitleAnimation(TitleWorkoutType::SitUp);  break;
+        case WorkoutMotionType::PullUp: UpdateTitleAnimation(TitleWorkoutType::PullUp); break;
+        case WorkoutMotionType::Squat:
+        default:                        UpdateTitleAnimation(TitleWorkoutType::Squat);  break;
+        }
     }
 
     // ネズミ捕獲成功時のリアクション（パンプ維持タイマーを15秒に全快リセット）

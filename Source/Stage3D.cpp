@@ -441,7 +441,7 @@ void Stage3D::BuildNewMapCollision()
 }
 
 // ============================================================================
-// Stage Forest Trees Setup
+// Stage Forest Trees Setup（本数を維持しつつ重なりを防止した自然な森林配置）
 // ============================================================================
 void Stage3D::SetupForestTrees()
 {
@@ -487,7 +487,7 @@ void Stage3D::SetupForestTrees()
 
     struct TreeLayerDef
     {
-        int count;
+        int   count;
         float extraDistMin;
         float extraDistMax;
         float scaleMin;
@@ -498,62 +498,130 @@ void Stage3D::SetupForestTrees()
     std::vector<TreeLayerDef> layers;
     float safeMargin = 160.0f;
 
+    // 木の総本数は従来と完全同一（Map2: 56+60+48=164本 / Map1: 36+36=72本）
     if (m_mapType == ModelConfig::MapType::NewMap)
     {
-        safeMargin = 160.0f;
+        safeMargin = 165.0f;
         layers = {
-            { 56,  40.0f,  260.0f, 36.0f, 56.0f,  -8.0f },
-            { 60, 280.0f,  850.0f, 46.0f, 72.0f, -10.0f },
-            { 48, 900.0f, 2200.0f, 58.0f, 92.0f, -12.0f }
+            { 56,   45.0f,  380.0f, 36.0f, 54.0f,  -8.0f },
+            { 60,  400.0f, 1050.0f, 46.0f, 70.0f, -10.0f },
+            { 48, 1080.0f, 2350.0f, 58.0f, 88.0f, -12.0f }
         };
     }
     else
     {
-        safeMargin = 110.0f;
+        safeMargin = 115.0f;
         layers = {
-            { 36,  30.0f, 200.0f, 32.0f, 48.0f, -5.0f },
-            { 36, 220.0f, 750.0f, 40.0f, 65.0f, -7.0f }
+            { 36,  35.0f, 240.0f, 32.0f, 48.0f, -5.0f },
+            { 36, 260.0f, 780.0f, 40.0f, 64.0f, -7.0f }
         };
     }
 
     float expandedHalfW = halfW + safeMargin;
     float expandedHalfD = halfD + safeMargin;
 
+    // 矩形外周の弧長パラメータ u ∈ [0, 1) から外周上の基準点と外向き法線を求めるラムダ
+    // （角の密集を防ぎ、全周にわたって均等かつ自然な間隔で配置する）
+    auto SamplePerimeterPoint = [&](float u, float hw, float hd, float& outX, float& outZ, float& outNx, float& outNz)
+    {
+        u = u - std::floor(u);
+        float w = hw * 2.0f;
+        float d = hd * 2.0f;
+        float perim = 2.0f * (w + d);
+        float dist  = u * perim;
+
+        if (dist < w)
+        {
+            // 上辺 (+Z)
+            outX = -hw + dist;
+            outZ =  hd;
+        }
+        else if (dist < w + d)
+        {
+            // 右辺 (+X)
+            outX =  hw;
+            outZ =  hd - (dist - w);
+        }
+        else if (dist < 2.0f * w + d)
+        {
+            // 下辺 (-Z)
+            outX =  hw - (dist - (w + d));
+            outZ = -hd;
+        }
+        else
+        {
+            // 左辺 (-X)
+            outX = -hw;
+            outZ = -hd + (dist - (2.0f * w + d));
+        }
+
+        // 角付近で外向きベクトルが滑らかに回転するよう、内側のクランプ矩形からの方向を算出
+        float cornerR = (hw < hd ? hw : hd) * 0.28f;
+        float innerX  = (outX < -hw + cornerR) ? (-hw + cornerR) : ((outX > hw - cornerR) ? (hw - cornerR) : outX);
+        float innerZ  = (outZ < -hd + cornerR) ? (-hd + cornerR) : ((outZ > hd - cornerR) ? (hd - cornerR) : outZ);
+        float vx = outX - innerX;
+        float vz = outZ - innerZ;
+        float vLen = std::sqrt(vx * vx + vz * vz);
+        if (vLen > 0.001f)
+        {
+            outNx = vx / vLen;
+            outNz = vz / vLen;
+        }
+        else
+        {
+            outNx = 0.0f;
+            outNz = 1.0f;
+        }
+    };
+
+    // 各木の樹冠半径（重なり防止用の最小クリアランス半径）を算出するラムダ
+    auto GetTreeCanopyRadius = [](const ForestTreeInstance& t) -> float
+    {
+        bool isBig = (t.modelPath.find("ABigTree") != std::string::npos);
+        return t.scale * (isBig ? 3.35f : 2.65f);
+    };
+
+    // 1. 初期候補配置（レイヤーごとに互い違いの位相オフセット＋控えめな自然揺らぎ）
     for (size_t layerIdx = 0; layerIdx < layers.size(); ++layerIdx)
     {
         const auto& layer = layers[layerIdx];
+        float layerPhaseOffset = static_cast<float>(layerIdx) * 0.381966f; // 黄金比オフセットで前後の列が重ならない
+
         for (int i = 0; i < layer.count; ++i)
         {
-            float baseAngle = (static_cast<float>(i) / layer.count) * (3.14159265f * 2.0f);
-            float jitterAngle = static_cast<float>((i * 47 + static_cast<int>(layerIdx) * 29) % 100 - 50) * 0.0025f;
-            float angle = baseAngle + jitterAngle;
+            // 隣接スロットを追い越さない範囲（±0.28スロット分）で自然な揺らぎを与える
+            float slotJitter = (static_cast<float>((i * 47 + static_cast<int>(layerIdx) * 29 + 17) % 100) / 100.0f - 0.5f) * 0.56f;
+            float u = (static_cast<float>(i) + 0.5f + slotJitter) / static_cast<float>(layer.count)
+                    + layerPhaseOffset / static_cast<float>(layer.count);
 
-            float cosA = std::cos(angle);
-            float sinA = std::sin(angle);
-            float absCos = std::abs(cosA);
-            float absSin = std::abs(sinA);
+            float bx = 0.0f, bz = 0.0f, nx = 0.0f, nz = 1.0f;
+            SamplePerimeterPoint(u, expandedHalfW, expandedHalfD, bx, bz, nx, nz);
 
-            float tx = (absCos > 0.0001f) ? (expandedHalfW / absCos) : 1e9f;
-            float tz = (absSin > 0.0001f) ? (expandedHalfD / absSin) : 1e9f;
-            float tMin = (tx < tz) ? tx : tz;
-
-            float distFrac = static_cast<float>((i * 61 + static_cast<int>(layerIdx) * 37 + 13) % 100) / 100.0f;
+            // 奥行き方向（extraDist）を黄金比ハッシュで分散させ、一列に並ばず自然な奥行き感を出す
+            float distFrac = std::fmod(static_cast<float>(i) * 0.6180339f + static_cast<float>(layerIdx) * 0.27f, 1.0f);
             float extraDist = layer.extraDistMin + (layer.extraDistMax - layer.extraDistMin) * distFrac;
-            float t = tMin + extraDist;
 
-            float x = cx + t * cosA;
-            float z = cz + t * sinA;
+            // 接線方向にもわずかな自然オフセットを加える
+            float tx = -nz;
+            float tz =  nx;
+            float tangentOffset = static_cast<float>((i * 73 + static_cast<int>(layerIdx) * 41) % 61 - 30) * 1.8f;
 
-            if (x >= stageMinX - 30.0f && x <= stageMaxX + 30.0f &&
-                z >= stageMinZ - 30.0f && z <= stageMaxZ + 30.0f)
+            float x = cx + bx + nx * extraDist + tx * tangentOffset;
+            float z = cz + bz + nz * extraDist + tz * tangentOffset;
+
+            // ステージ内・床面上に入った場合は外周側へ押し出す
+            if (x > stageMinX - safeMargin && x < stageMaxX + safeMargin &&
+                z > stageMinZ - safeMargin && z < stageMaxZ + safeMargin)
             {
-                continue;
+                x = cx + bx + nx * (layer.extraDistMin + 60.0f);
+                z = cz + bz + nz * (layer.extraDistMin + 60.0f);
             }
 
             float dummyFloorY = 0.0f;
             if (GetGroundHeight(VGet(x, 100.0f, z), dummyFloorY))
             {
-                continue;
+                x += nx * 180.0f;
+                z += nz * 180.0f;
             }
 
             float y = layer.baseY + static_cast<float>((i * 19 + static_cast<int>(layerIdx) * 7) % 7) - 3.0f;
@@ -576,8 +644,80 @@ void Stage3D::SetupForestTrees()
             m_forestTrees.push_back(tree);
         }
     }
-}
 
+    // 2. 木同士の重なり解消（ポアソンディスク風の反復リラクゼーション処理）
+    //    全ての木ペアについて樹冠半径の合計以上の距離を確保し、ステージ領域外へ保つ
+    const size_t totalTrees = m_forestTrees.size();
+    for (int iter = 0; iter < 24; ++iter)
+    {
+        bool anyMoved = false;
+        for (size_t a = 0; a < totalTrees; ++a)
+        {
+            float rA = GetTreeCanopyRadius(m_forestTrees[a]);
+            for (size_t b = a + 1; b < totalTrees; ++b)
+            {
+                float rB = GetTreeCanopyRadius(m_forestTrees[b]);
+                float minDist = rA + rB;
+
+                float dx = m_forestTrees[b].pos.x - m_forestTrees[a].pos.x;
+                float dz = m_forestTrees[b].pos.z - m_forestTrees[a].pos.z;
+                float distSq = dx * dx + dz * dz;
+
+                if (distSq < minDist * minDist)
+                {
+                    float dist = std::sqrt(distSq);
+                    float nx = 1.0f, nz = 0.0f;
+                    if (dist > 0.001f)
+                    {
+                        nx = dx / dist;
+                        nz = dz / dist;
+                    }
+                    else
+                    {
+                        float fallbackAngle = static_cast<float>(a * 37 + b * 13);
+                        nx = std::cos(fallbackAngle);
+                        nz = std::sin(fallbackAngle);
+                    }
+
+                    float overlap = (minDist - dist) * 0.52f;
+                    m_forestTrees[a].pos.x -= nx * overlap;
+                    m_forestTrees[a].pos.z -= nz * overlap;
+                    m_forestTrees[b].pos.x += nx * overlap;
+                    m_forestTrees[b].pos.z += nz * overlap;
+                    anyMoved = true;
+                }
+            }
+        }
+
+        // 各反復後にステージ境界内へ押し込まれた木を外側へ戻す
+        for (size_t idx = 0; idx < totalTrees; ++idx)
+        {
+            float relX = m_forestTrees[idx].pos.x - cx;
+            float relZ = m_forestTrees[idx].pos.z - cz;
+            float minAllowW = expandedHalfW + 35.0f;
+            float minAllowD = expandedHalfD + 35.0f;
+
+            if (std::abs(relX) < minAllowW && std::abs(relZ) < minAllowD)
+            {
+                float penX = minAllowW - std::abs(relX);
+                float penZ = minAllowD - std::abs(relZ);
+                if (penX < penZ)
+                {
+                    m_forestTrees[idx].pos.x = cx + ((relX >= 0.0f) ? minAllowW : -minAllowW);
+                }
+                else
+                {
+                    m_forestTrees[idx].pos.z = cz + ((relZ >= 0.0f) ? minAllowD : -minAllowD);
+                }
+            }
+        }
+
+        if (!anyMoved)
+        {
+            break;
+        }
+    }
+}
 // ============================================================================
 // Ground Fallen Leaves Setup
 // ============================================================================
