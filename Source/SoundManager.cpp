@@ -9,6 +9,12 @@
 
 SoundManager::SoundManager()
 {
+    // BGMごとの音源音圧補正スケール
+    // TitleBGM.mp3 は音圧が高いため、ゲーム起動時（最初）に爆音にならないよう控えめ（0.45f）に調整
+    m_bgmScales[BgmType::Title]  = 0.45f;
+    m_bgmScales[BgmType::Stage]  = 0.60f;
+    m_bgmScales[BgmType::Clear]  = 0.80f;
+    m_bgmScales[BgmType::TimeUp] = 0.80f;
 }
 
 SoundManager::~SoundManager()
@@ -16,9 +22,34 @@ SoundManager::~SoundManager()
     Release();
 }
 
-int SoundManager::CalcBgmVolumeDxLib() const
+float SoundManager::GetBgmScale(BgmType type) const
 {
-    float v = m_masterVolume * m_bgmVolume;
+    auto it = m_bgmScales.find(type);
+    if (it != m_bgmScales.end())
+    {
+        return it->second;
+    }
+    return 1.0f;
+}
+
+void SoundManager::SetBgmScale(BgmType type, float scale)
+{
+    m_bgmScales[type] = (std::max)(0.0f, (std::min)(2.0f, scale));
+    if (m_currentBgm == type)
+    {
+        auto it = m_bgmHandles.find(m_currentBgm);
+        if (it != m_bgmHandles.end() && it->second != -1)
+        {
+            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(m_currentBgm), it->second);
+        }
+    }
+}
+
+int SoundManager::CalcBgmVolumeDxLib(BgmType type) const
+{
+    BgmType target = (type != BgmType::None) ? type : m_currentBgm;
+    float scale = GetBgmScale(target);
+    float v = m_masterVolume * m_bgmVolume * scale;
     v = (std::max)(0.0f, (std::min)(1.0f, v));
     return static_cast<int>(v * 255.0f);
 }
@@ -89,7 +120,7 @@ void SoundManager::Init()
         if (handle != -1)
         {
             m_bgmHandles[item.type] = handle;
-            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(), handle);
+            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(item.type), handle);
             AppLogAdd("SoundManager: Loaded BGM [%s] from '%s' (handle=%d)\n", item.name, item.path, handle);
         }
         else
@@ -105,7 +136,7 @@ void SoundManager::Init()
         if (titleFallback != -1)
         {
             m_bgmHandles[BgmType::Title] = titleFallback;
-            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(), titleFallback);
+            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(BgmType::Title), titleFallback);
             AppLogAdd("SoundManager: Fallback Title BGM assigned to handle=%d\n", titleFallback);
         }
     }
@@ -202,7 +233,7 @@ void SoundManager::PlayBGM(BgmType type, bool loop)
     {
         m_currentBgm = type;
         m_isBgmPaused = false;
-        ChangeVolumeSoundMem(CalcBgmVolumeDxLib(), it->second);
+        ChangeVolumeSoundMem(CalcBgmVolumeDxLib(type), it->second);
         int playType = loop ? DX_PLAYTYPE_LOOP : DX_PLAYTYPE_BACK;
         PlaySoundMem(it->second, playType, TRUE);
         AppLogAdd("SoundManager: PlayBGM(type=%d, handle=%d, loop=%d)\n", static_cast<int>(type), it->second, loop ? 1 : 0);
@@ -243,7 +274,7 @@ void SoundManager::ResumeBGM()
         auto it = m_bgmHandles.find(m_currentBgm);
         if (it != m_bgmHandles.end() && it->second != -1)
         {
-            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(), it->second);
+            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(m_currentBgm), it->second);
             PlaySoundMem(it->second, DX_PLAYTYPE_LOOP, FALSE);
             m_isBgmPaused = false;
         }
@@ -302,7 +333,7 @@ void SoundManager::SetBGMVolume(float volume)
         auto it = m_bgmHandles.find(m_currentBgm);
         if (it != m_bgmHandles.end() && it->second != -1)
         {
-            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(), it->second);
+            ChangeVolumeSoundMem(CalcBgmVolumeDxLib(m_currentBgm), it->second);
         }
     }
 }

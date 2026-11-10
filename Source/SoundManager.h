@@ -99,24 +99,29 @@ public:
     // 全サウンドの一括停止
     void StopAll();
 
+    // BGM個別音量スケール取得・設定
+    float GetBgmScale(BgmType type) const;
+    void  SetBgmScale(BgmType type, float scale);
+
 private:
     SoundManager();
     ~SoundManager();
     SoundManager(const SoundManager&) = delete;
     SoundManager& operator=(const SoundManager&) = delete;
 
-    // 音量換算ヘルパー（0.0f〜1.0f を DxLibの 0〜255 に変換）
-    int CalcBgmVolumeDxLib() const;
+    // 音量換算ヘルパー（0.0f〜1.0f を DxLibの 0〜255 に変換、BGM個別スケール対応）
+    int CalcBgmVolumeDxLib(BgmType type = BgmType::None) const;
     int CalcSeVolumeDxLib(float scale) const;
 
     // サウンドハンドル保持テーブル
-    std::unordered_map<BgmType, int> m_bgmHandles;
-    std::unordered_map<SeType, int>  m_seHandles;
+    std::unordered_map<BgmType, int>   m_bgmHandles;
+    std::unordered_map<SeType, int>    m_seHandles;
+    std::unordered_map<BgmType, float> m_bgmScales;
 
     BgmType m_currentBgm       = BgmType::None;
     bool    m_isBgmPaused      = false;
     float   m_masterVolume     = 1.0f;
-    float   m_bgmVolume        = 0.70f;
+    float   m_bgmVolume        = 0.50f;
     float   m_seVolume         = 0.85f;
     bool    m_isInitialized    = false;
 };
