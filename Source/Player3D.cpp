@@ -45,8 +45,7 @@ Player3D::Player3D(const VECTOR& pos)
 {
     m_speed = CalculateSpeedForRep(0);
     m_rotY = 0.0f;
-    m_prevPounceKey = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
-    m_prevTackleKey = ((GetMouseInput() & MOUSE_INPUT_RIGHT) != 0);
+    SyncInputState();
 
     // 3Dモデルおよびアニメーションの初期化
     InitModel();
@@ -520,10 +519,9 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
             m_isPouncing = false;
             m_pos.y = m_groundY;
             m_pounceCooldown = GetPounceCooldownMax();
+            CustomEffectManager::GetInstance().FinishPounceGroundGouge(groundPos, m_pounceDir, m_repCount);
+            camera.TriggerShake(4.5f, 7);
         }
-
-        CustomEffectManager::GetInstance().FinishPounceGroundGouge(groundPos, m_pounceDir, m_repCount);
-        camera.TriggerShake(4.5f, 7);
     }
     
     else
@@ -902,6 +900,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         {
                             // 【成功】Rep追加 & 15秒タイマーリセット
                             m_repCount++;
+                            m_workoutSuccessCount++;
+                            if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
                             SoundManager::GetInstance().PlaySE(SeType::SquatSuccess);
                             m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒
                             m_lastResultSuccess = true;
@@ -996,6 +996,20 @@ void Player3D::Draw3D()
 
     // 足元接地高さ補正（モデル原点が足元にあるためオフセット0で地面接地）
     float offsetY = 0.0f;
+
+    // Fake Shadow under cat
+    {
+        float scaleRatio = scale / ModelConfig::CAT_MODEL_SCALE;
+        float baseRadius = 24.0f * scaleRatio;
+        bool isPronePose = ((m_isSkillChecking && (m_activeWorkoutMotion == WorkoutMotionType::PushUp || m_activeWorkoutMotion == WorkoutMotionType::SitUp)) || m_isTitlePushUp || m_isTitleSitUp);
+        float shadowRx = isPronePose ? (baseRadius * 0.90f) : baseRadius;
+        float shadowRz = isPronePose ? (baseRadius * 1.65f) : (baseRadius * 1.10f);
+        float jumpH = (m_pos.y > m_groundY) ? (m_pos.y - m_groundY) : 0.0f;
+        float atten = 1.0f / (1.0f + jumpH * 0.010f);
+        int shadowAlpha = static_cast<int>(155.0f * atten);
+        VECTOR shadowPos = VGet(m_pos.x, m_groundY, m_pos.z);
+        MathHelper::DrawFakeShadow3D(shadowPos, shadowRx * atten, shadowRz * atten, m_rotY, shadowAlpha);
+    }
 
     // 1. 飛びつき・タックル残像の描画
     for (const auto& trail : m_trails)
@@ -1376,6 +1390,8 @@ void Player3D::Draw2D()
 void Player3D::AddRep(int amount)
 {
     m_repCount += amount;
+    if (amount > 0) { m_workoutSuccessCount += amount; }
+    if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
     m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒リセット
     m_state = MuscleState::Muscular;
     m_speed = CalculateSpeedForRep(GetEffectiveRep());

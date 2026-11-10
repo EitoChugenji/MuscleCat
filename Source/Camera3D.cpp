@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // @file   Camera3D.cpp
 // @brief  Camera3D クラスの実装（マウス視点操作、正面回り込み、壁遮蔽回避）
 // ============================================================================
@@ -26,7 +26,7 @@ Camera3D::Camera3D()
 void Camera3D::Init(const VECTOR& targetPos, float targetRotY)
 {
     m_angleH = targetRotY;
-    m_angleV = 0.28f; // 少し見下ろす快適なTPS視点角度
+    m_angleV = 0.08f; // 少し見下ろす快適なTPS視点角度
     m_frontViewBlend = 0.0f;
     m_targetPos = VGet(targetPos.x, targetPos.y + m_heightOffset, targetPos.z);
 
@@ -42,6 +42,7 @@ void Camera3D::Init(const VECTOR& targetPos, float targetRotY)
 
     // マウスカーソルを画面中心に初期化
     SetMousePoint(Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+    m_warmupFrames = 5;
 }
 
 // ============================================================================
@@ -67,6 +68,7 @@ void Camera3D::AdjustMouseSensitivity(float delta)
 void Camera3D::ResetMouseToCenter() const
 {
     SetMousePoint(Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+    m_warmupFrames = 5;
 }
 
 // ============================================================================
@@ -102,7 +104,12 @@ void Camera3D::Update(
         int dx = mx - centerX;
         int dy = my - centerY;
 
-        if (dx != 0 || dy != 0)
+        if (m_warmupFrames > 0)
+        {
+            SetMousePoint(centerX, centerY);
+            m_warmupFrames--;
+        }
+        else if (dx != 0 || dy != 0)
         {
             m_angleH += static_cast<float>(dx) * mouseRotSpeed;
             m_angleV += static_cast<float>(dy) * mouseRotSpeed;
@@ -117,7 +124,7 @@ void Camera3D::Update(
     if (CheckHitKey(KEY_INPUT_DOWN))  m_angleV -= keyRotSpeed * 0.7f;
 
     // 垂直角度（ピッチ）を制限し、地面下への潜り込みや真上でのジンバルロックを防止
-    m_angleV = MathHelper::Clamp(m_angleV, 0.08f, 1.15f);
+    m_angleV = MathHelper::Clamp(m_angleV, -0.20f, 0.78f);
 
     // [F]キーが押された瞬間、プレイヤーの向いている正面方向へカメラを即座にリセット
     bool resetKey = (CheckHitKey(KEY_INPUT_F) != 0);

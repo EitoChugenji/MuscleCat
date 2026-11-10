@@ -36,11 +36,11 @@ struct ForestTreeInstance
 // 蠎翫↓謨｣繧峨・繧玖誠縺｡闡峨・闕芽痩讒矩菴難ｼ域｣ｮ縺ｮ蝨ｰ髱｢貍泌・逕ｨ・・// ============================================================================
 struct GroundFallenLeaf
 {
-    VECTOR       pos;    // 謗･蝨ｰ蠎ｧ讓・(蠎企擇 Y + 0.35f)
-    VECTOR       normal; // 蝨ｰ髱｢縺ｮ豕慕ｷ壹・繧ｯ繝医Ν
-    float        rotY;   // 蝗櫁ｻ｢隗貞ｺｦ
-    float        size;   // 闡峨・螟ｧ縺阪＆
-    unsigned int color;  // 闡峨・濶ｲ
+    VECTOR       pos;
+    VECTOR       normal;
+    float        rotY;
+    float        size;
+    unsigned int color;
 };
 
 // ============================================================================
@@ -74,7 +74,8 @@ private:
     VECTOR                   m_newMapMaxBounds;
     Skybox3D                 m_skybox;        // 森のスカイボックス・スカイドーム描画
     std::vector<ForestTreeInstance> m_forestTrees;   // ステージ外周の3D森（木々・切り株・自然物）
-    std::vector<GroundFallenLeaf>   m_groundLeaves;  // 床面に散らばる落ち葉・草葉群
+    std::vector<GroundFallenLeaf>   m_groundLeaves;
+    std::vector<VERTEX3D>           m_stageVertices;  // 床面に散らばる落ち葉・草葉群
     int                             m_leafTextureHandle = -1; // 森の床・葉っぱテクスチャ
 
     // マップ別の壁コリジョン抽出処理
@@ -82,6 +83,7 @@ private:
     void BuildNewMapCollision();
     void SetupForestTrees();
     void SetupGroundLeaves();
+    void BuildStageVisualMesh();
 
     // ポリゴン群に対する球/円柱の反復押し戻しソルバおよびマップ別衝突解決
     bool ResolvePolygonWallCollision(const std::vector<WallPolygon>& polygons, VECTOR& outPos, float radius, VECTOR* outPushNormal) const;

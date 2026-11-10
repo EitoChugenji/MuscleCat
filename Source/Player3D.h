@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   Player3D.h
 // @brief  プレイヤー操作キャラクター（マッスルにゃんこ）の制御・アクション・描画クラス定義
 // ============================================================================
@@ -95,6 +95,8 @@ private:
     float m_prevScZoneCenter   = -1.0f; // 前回の成功ゾーン中心位置（連続で同じ場所にならないよう分散）
     int   m_scHoldingFrames    = 0;     // スペースキー長押し継続フレーム数（15秒超過で筋疲労失敗）
     int   m_repCount           = 0;     // 現在の筋トレレベル（Rep数）
+    int   m_maxRepCount        = 0;     // プレイ中に到達した最大レベル（リザルトスコア集計用）
+    int   m_workoutSuccessCount= 0;     // 筋トレQTE成功回数（リザルトスコア集計用）
     bool  m_prevTriggerKey     = false; // 前フレームの筋トレキー押下状態（エッジ検出用）
     int   m_resultShowTimer    = 0;     // 成功/失敗/減衰テキストの表示残りフレーム
     bool  m_lastResultSuccess  = false; // 直前の筋トレQTEが成功したか
@@ -374,6 +376,8 @@ public:
     }
 
     int   GetRepCount() const                 { return m_repCount; }
+    int   GetMaxRepCount() const              { return m_maxRepCount; }
+    int   GetWorkoutSuccessCount() const      { return m_workoutSuccessCount; }
     float GetSorenessRemainingSeconds() const { return static_cast<float>(m_sorenessTimer) / 60.0f; }
     float GetPumpDecayRemainingSeconds() const{ return static_cast<float>(m_pumpDecayTimer) / 60.0f; }
 
@@ -536,5 +540,13 @@ public:
     }
 
     // 3D頭上気絶エフェクト（回転する星とリング）の描画
+    void SyncInputState()
+    {
+        int mouseInput   = GetMouseInput();
+        m_prevTriggerKey = (CheckHitKey(KEY_INPUT_SPACE) != 0);
+        m_prevPounceKey  = ((mouseInput & MOUSE_INPUT_LEFT) != 0 || CheckHitKey(KEY_INPUT_LSHIFT) != 0 || CheckHitKey(KEY_INPUT_RSHIFT) != 0);
+        m_prevTackleKey  = ((mouseInput & MOUSE_INPUT_RIGHT) != 0 || CheckHitKey(KEY_INPUT_E) != 0);
+    }
+
     void DrawStunEffect();
 };

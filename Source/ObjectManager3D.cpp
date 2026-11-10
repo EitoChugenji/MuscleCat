@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   ObjectManager3D.cpp
 // @brief  ObjectManager3D クラスの実装（更新・描画・捕獲コンボ判定・壁/床衝突解決）
 // ============================================================================
@@ -29,6 +29,7 @@ void ObjectManager3D::Clear()
     m_isTimeFrozen = false;
     m_hitStopFrames = 0;
     m_comboCount = 0;
+    m_maxComboCount = 0;
     m_comboTimer = 0;
     m_catchFlashTimer = 0;
     m_catchPopups.clear();
@@ -496,6 +497,7 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     {
                         m_comboCount = 1;
                     }
+                    if (m_comboCount > m_maxComboCount) { m_maxComboCount = m_comboCount; }
                     m_comboTimer = 210; // 約3.5秒のコンボ猶予
                     m_catchFlashTimer = 16; // 画面端インパクトゴールドフラッシュ
 
@@ -673,7 +675,7 @@ void ObjectManager3D::CheckObstacleAndStageCollisions(Camera3D& camera)
 
         auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
         VECTOR mPos = obj->GetPos();
-        float mRadius = obj->GetRadius();
+        float mRadius = mouse ? mouse->GetWallCollisionRadius() : obj->GetRadius();
         VECTOR prevPos = mouse ? mouse->GetPrevPos() : mPos;
         bool collided = false;
 
@@ -691,6 +693,30 @@ void ObjectManager3D::CheckObstacleAndStageCollisions(Camera3D& camera)
         if (m_stage.ResolveWallCollision(mPos, mRadius, &pushNormal))
         {
             collided = true;
+        }
+
+        if (mouse)
+        {
+            float rotY = mouse->GetRotY();
+            constexpr float END_OFFSET = 38.0f;
+            constexpr float END_RADIUS = 36.0f;
+            const float signs[2] = { -1.0f, 1.0f };
+            for (float s : signs)
+            {
+                VECTOR endPos = VGet(mPos.x + std::sin(rotY) * (END_OFFSET * s), mPos.y, mPos.z + std::cos(rotY) * (END_OFFSET * s));
+                VECTOR prevEndPos = endPos;
+                VECTOR endPush = VGet(0.0f, 0.0f, 0.0f);
+                if (m_stage.ResolveWallCollision(endPos, END_RADIUS, &endPush))
+                {
+                    mPos.x += (endPos.x - prevEndPos.x);
+                    mPos.z += (endPos.z - prevEndPos.z);
+                    collided = true;
+                    if (pushNormal.x == 0.0f && pushNormal.z == 0.0f)
+                    {
+                        pushNormal = endPush;
+                    }
+                }
+            }
         }
 
         // セーフティネット：外周境界ボックスによる制限

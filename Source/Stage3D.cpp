@@ -144,8 +144,8 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
 
         // フォグ設定（室内用）
         SetFogEnable(TRUE);
-        SetFogColor(160, 215, 195);
-        SetFogStartEnd(2500.0f, 5500.0f);
+        SetFogColor(188, 224, 248);
+        SetFogStartEnd(4500.0f, 13000.0f);
     }
     else // NewMap (newmap.mv1, scale: 100.0f)
     {
@@ -157,8 +157,8 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
 
         // フォグ設定（広めの室内空間用）
         SetFogEnable(TRUE);
-        SetFogColor(160, 215, 195);
-        SetFogStartEnd(2500.0f, 9500.0f);
+        SetFogColor(188, 224, 248);
+        SetFogStartEnd(5000.0f, 15000.0f);
     }
 
     int baseHandle = ModelManager::GetInstance().LoadModelHandle(m_modelPath);
@@ -216,6 +216,7 @@ void Stage3D::LoadStage(ModelConfig::MapType mapType)
             MV1SetMaterialSpcColor(m_modelHandle, i, GetColorF(0.04f, 0.04f, 0.04f, 1.0f));
         }
     }
+    BuildStageVisualMesh();
     SetupGroundLeaves();
 }
 
@@ -441,307 +442,404 @@ void Stage3D::BuildNewMapCollision()
 }
 
 // ============================================================================
-// Stage Forest Trees Setup（本数を維持しつつ重なりを防止した自然な森林配置）
+// Stage Forest Trees Setup (Fixed non-overlapping tree placement outside stage)
 // ============================================================================
 void Stage3D::SetupForestTrees()
 {
     m_forestTrees.clear();
 
-    const char* treeModels[] = {
-        "Resource/Sousyoku/ABigTree1.mv1",
-        "Resource/Sousyoku/ABigTree2.mv1",
-        "Resource/Sousyoku/ABigTree3.mv1",
-        "Resource/Sousyoku/ABigTree4.mv1",
-        "Resource/Sousyoku/ASmallTree1.mv1",
-        "Resource/Sousyoku/ASmallTree2.mv1",
-        "Resource/Sousyoku/ASmallTree3.mv1",
-        "Resource/Sousyoku/ASmallTree4.mv1",
-        "Resource/Sousyoku/ASmallTree5.mv1",
-        "Resource/Sousyoku/ASmallTree6.mv1",
-    };
-    const int numModels = sizeof(treeModels) / sizeof(treeModels[0]);
-
-    float stageMinX = m_minBounds.x;
-    float stageMaxX = m_maxBounds.x;
-    float stageMinZ = m_minBounds.z;
-    float stageMaxZ = m_maxBounds.z;
-
-    if (stageMinX >= stageMaxX || stageMinZ >= stageMaxZ)
+    struct FixedTreePlacement
     {
-        if (m_mapType == ModelConfig::MapType::NewMap)
-        {
-            stageMinX = -2310.0f; stageMaxX = 2610.0f;
-            stageMinZ = -1837.5f; stageMaxZ = 1460.0f;
-        }
-        else
-        {
-            stageMinX = -305.0f; stageMaxX = 905.0f;
-            stageMinZ = -855.0f; stageMaxZ = 655.0f;
-        }
-    }
-
-    float cx = (stageMinX + stageMaxX) * 0.5f;
-    float cz = (stageMinZ + stageMaxZ) * 0.5f;
-    float halfW = (stageMaxX - stageMinX) * 0.5f;
-    float halfD = (stageMaxZ - stageMinZ) * 0.5f;
-
-    struct TreeLayerDef
-    {
-        int   count;
-        float extraDistMin;
-        float extraDistMax;
-        float scaleMin;
-        float scaleMax;
-        float baseY;
+        const char* modelPath;
+        float       x;
+        float       y;
+        float       z;
+        float       rotY;
+        float       scale;
     };
 
-    std::vector<TreeLayerDef> layers;
-    float safeMargin = 160.0f;
-
-    // 木の総本数は従来と完全同一（Map2: 56+60+48=164本 / Map1: 36+36=72本）
     if (m_mapType == ModelConfig::MapType::NewMap)
     {
-        safeMargin = 165.0f;
-        layers = {
-            { 56,   45.0f,  380.0f, 36.0f, 54.0f,  -8.0f },
-            { 60,  400.0f, 1050.0f, 46.0f, 70.0f, -10.0f },
-            { 48, 1080.0f, 2350.0f, 58.0f, 88.0f, -12.0f }
+        static const FixedTreePlacement kNewMapTrees[] = {
+            { "Resource/Sousyoku/ABigTree1.mv1",  -2310.0f,   -8.0f,   2060.0f,  0.44f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",  -1299.8f,   -8.0f,   2060.0f,  1.61f, 38.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",   -289.5f,   -8.0f,   2060.0f,  2.78f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",    720.7f,   -8.0f,   2060.0f,  3.94f, 38.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",   1731.0f,   -8.0f,   2060.0f,  5.11f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",   2740.2f,   -8.0f,   2045.7f,  0.00f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",   3210.0f,   -8.0f,   1261.0f,  1.17f, 38.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",   3210.0f,   -8.0f,    250.8f,  2.34f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",   3210.0f,   -8.0f,   -759.5f,  3.51f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",   3210.0f,   -8.0f,  -1769.7f,  4.68f, 38.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",   2610.0f,   -8.0f,  -2437.5f,  5.85f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",   1599.8f,   -8.0f,  -2437.5f,  0.73f, 38.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",    589.5f,   -8.0f,  -2437.5f,  1.90f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",   -420.7f,   -8.0f,  -2437.5f,  3.07f, 38.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",  -1431.0f,   -8.0f,  -2437.5f,  4.24f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",  -2440.2f,   -8.0f,  -2423.2f,  5.41f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",  -2910.0f,   -8.0f,  -1638.5f,  0.30f, 38.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",  -2910.0f,   -8.0f,   -628.3f,  1.47f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",  -2910.0f,   -8.0f,    382.0f,  2.64f, 38.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",  -2910.0f,   -8.0f,   1392.2f,  3.80f, 38.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",  -1784.3f,  -10.0f,   2860.0f,  4.97f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",   -733.0f,  -10.0f,   2860.0f,  6.14f, 46.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",    318.3f,  -10.0f,   2860.0f,  1.03f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",   1369.6f,  -10.0f,   2860.0f,  2.20f, 46.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",   2420.9f,  -10.0f,   2860.0f,  3.37f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",   3418.7f,  -10.0f,   2602.8f,  4.54f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",   3981.0f,  -10.0f,   1743.6f,  5.71f, 46.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",   4010.0f,  -10.0f,    694.3f,  0.59f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",   4010.0f,  -10.0f,   -357.0f,  1.76f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",   4010.0f,  -10.0f,  -1408.3f,  2.93f, 46.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",   3874.0f,  -10.0f,  -2439.4f,  4.10f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",   3123.4f,  -10.0f,  -3140.0f,  5.27f, 46.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",   2084.3f,  -10.0f,  -3237.5f,  0.16f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",   1033.0f,  -10.0f,  -3237.5f,  1.33f, 46.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",    -18.3f,  -10.0f,  -3237.5f,  2.50f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",  -1069.6f,  -10.0f,  -3237.5f,  3.67f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",  -2120.9f,  -10.0f,  -3237.5f,  4.83f, 46.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",  -3118.7f,  -10.0f,  -2980.3f,  6.00f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",  -3681.0f,  -10.0f,  -2121.1f,  0.89f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",  -3710.0f,  -10.0f,  -1071.8f,  2.06f, 46.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",  -3710.0f,  -10.0f,    -20.5f,  3.23f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",  -3710.0f,  -10.0f,   1030.8f,  4.40f, 46.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",  -3574.0f,  -10.0f,   2061.9f,  5.57f, 46.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",  -2823.4f,  -10.0f,   2762.5f,  0.45f, 46.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",  -2034.2f,  -12.0f,   3760.0f,  1.62f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",   -931.1f,  -12.0f,   3760.0f,  2.79f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",    171.9f,  -12.0f,   3760.0f,  3.96f, 54.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",   1275.0f,  -12.0f,   3760.0f,  5.13f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",   2378.1f,  -12.0f,   3760.0f,  0.02f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",   3460.5f,  -12.0f,   3597.0f,  1.19f, 54.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",   4350.6f,  -12.0f,   2963.4f,  2.36f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",   4847.9f,  -12.0f,   1990.7f,  3.53f, 54.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",   4910.0f,  -12.0f,    892.4f,  4.69f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",   4910.0f,  -12.0f,   -210.7f,  5.86f, 54.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",   4910.0f,  -12.0f,  -1313.8f,  0.75f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",   4837.4f,  -12.0f,  -2410.7f,  1.92f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",   4321.6f,  -12.0f,  -3373.9f,  3.09f, 54.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",   3419.6f,  -12.0f,  -3990.3f,  4.26f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",   2334.2f,  -12.0f,  -4137.5f,  5.43f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",   1231.1f,  -12.0f,  -4137.5f,  0.31f, 54.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",    128.1f,  -12.0f,  -4137.5f,  1.48f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",   -975.0f,  -12.0f,  -4137.5f,  2.65f, 54.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",  -2078.1f,  -12.0f,  -4137.5f,  3.82f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",  -3160.5f,  -12.0f,  -3974.5f,  4.99f, 54.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",  -4050.6f,  -12.0f,  -3340.9f,  6.16f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",  -4547.9f,  -12.0f,  -2368.2f,  1.05f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",  -4610.0f,  -12.0f,  -1269.9f,  2.22f, 54.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",  -4610.0f,  -12.0f,   -166.8f,  3.39f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",  -4610.0f,  -12.0f,    936.3f,  4.56f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",  -4537.4f,  -12.0f,   2033.2f,  5.72f, 54.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",  -4021.6f,  -12.0f,   2996.4f,  0.61f, 54.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",  -3119.6f,  -12.0f,   3612.8f,  1.78f, 54.0f },
         };
-    }
-    else
-    {
-        safeMargin = 115.0f;
-        layers = {
-            { 36,  35.0f, 240.0f, 32.0f, 48.0f, -5.0f },
-            { 36, 260.0f, 780.0f, 40.0f, 64.0f, -7.0f }
-        };
-    }
-
-    float expandedHalfW = halfW + safeMargin;
-    float expandedHalfD = halfD + safeMargin;
-
-    // 矩形外周の弧長パラメータ u ∈ [0, 1) から外周上の基準点と外向き法線を求めるラムダ
-    // （角の密集を防ぎ、全周にわたって均等かつ自然な間隔で配置する）
-    auto SamplePerimeterPoint = [&](float u, float hw, float hd, float& outX, float& outZ, float& outNx, float& outNz)
-    {
-        u = u - std::floor(u);
-        float w = hw * 2.0f;
-        float d = hd * 2.0f;
-        float perim = 2.0f * (w + d);
-        float dist  = u * perim;
-
-        if (dist < w)
+        const size_t count = sizeof(kNewMapTrees) / sizeof(kNewMapTrees[0]);
+        m_forestTrees.reserve(count);
+        for (size_t i = 0; i < count; ++i)
         {
-            // 上辺 (+Z)
-            outX = -hw + dist;
-            outZ =  hd;
-        }
-        else if (dist < w + d)
-        {
-            // 右辺 (+X)
-            outX =  hw;
-            outZ =  hd - (dist - w);
-        }
-        else if (dist < 2.0f * w + d)
-        {
-            // 下辺 (-Z)
-            outX =  hw - (dist - (w + d));
-            outZ = -hd;
-        }
-        else
-        {
-            // 左辺 (-X)
-            outX = -hw;
-            outZ = -hd + (dist - (2.0f * w + d));
-        }
-
-        // 角付近で外向きベクトルが滑らかに回転するよう、内側のクランプ矩形からの方向を算出
-        float cornerR = (hw < hd ? hw : hd) * 0.28f;
-        float innerX  = (outX < -hw + cornerR) ? (-hw + cornerR) : ((outX > hw - cornerR) ? (hw - cornerR) : outX);
-        float innerZ  = (outZ < -hd + cornerR) ? (-hd + cornerR) : ((outZ > hd - cornerR) ? (hd - cornerR) : outZ);
-        float vx = outX - innerX;
-        float vz = outZ - innerZ;
-        float vLen = std::sqrt(vx * vx + vz * vz);
-        if (vLen > 0.001f)
-        {
-            outNx = vx / vLen;
-            outNz = vz / vLen;
-        }
-        else
-        {
-            outNx = 0.0f;
-            outNz = 1.0f;
-        }
-    };
-
-    // 各木の樹冠半径（重なり防止用の最小クリアランス半径）を算出するラムダ
-    auto GetTreeCanopyRadius = [](const ForestTreeInstance& t) -> float
-    {
-        bool isBig = (t.modelPath.find("ABigTree") != std::string::npos);
-        return t.scale * (isBig ? 3.35f : 2.65f);
-    };
-
-    // 1. 初期候補配置（レイヤーごとに互い違いの位相オフセット＋控えめな自然揺らぎ）
-    for (size_t layerIdx = 0; layerIdx < layers.size(); ++layerIdx)
-    {
-        const auto& layer = layers[layerIdx];
-        float layerPhaseOffset = static_cast<float>(layerIdx) * 0.381966f; // 黄金比オフセットで前後の列が重ならない
-
-        for (int i = 0; i < layer.count; ++i)
-        {
-            // 隣接スロットを追い越さない範囲（±0.28スロット分）で自然な揺らぎを与える
-            float slotJitter = (static_cast<float>((i * 47 + static_cast<int>(layerIdx) * 29 + 17) % 100) / 100.0f - 0.5f) * 0.56f;
-            float u = (static_cast<float>(i) + 0.5f + slotJitter) / static_cast<float>(layer.count)
-                    + layerPhaseOffset / static_cast<float>(layer.count);
-
-            float bx = 0.0f, bz = 0.0f, nx = 0.0f, nz = 1.0f;
-            SamplePerimeterPoint(u, expandedHalfW, expandedHalfD, bx, bz, nx, nz);
-
-            // 奥行き方向（extraDist）を黄金比ハッシュで分散させ、一列に並ばず自然な奥行き感を出す
-            float distFrac = std::fmod(static_cast<float>(i) * 0.6180339f + static_cast<float>(layerIdx) * 0.27f, 1.0f);
-            float extraDist = layer.extraDistMin + (layer.extraDistMax - layer.extraDistMin) * distFrac;
-
-            // 接線方向にもわずかな自然オフセットを加える
-            float tx = -nz;
-            float tz =  nx;
-            float tangentOffset = static_cast<float>((i * 73 + static_cast<int>(layerIdx) * 41) % 61 - 30) * 1.8f;
-
-            float x = cx + bx + nx * extraDist + tx * tangentOffset;
-            float z = cz + bz + nz * extraDist + tz * tangentOffset;
-
-            // ステージ内・床面上に入った場合は外周側へ押し出す
-            if (x > stageMinX - safeMargin && x < stageMaxX + safeMargin &&
-                z > stageMinZ - safeMargin && z < stageMaxZ + safeMargin)
-            {
-                x = cx + bx + nx * (layer.extraDistMin + 60.0f);
-                z = cz + bz + nz * (layer.extraDistMin + 60.0f);
-            }
-
-            float dummyFloorY = 0.0f;
-            if (GetGroundHeight(VGet(x, 100.0f, z), dummyFloorY))
-            {
-                x += nx * 180.0f;
-                z += nz * 180.0f;
-            }
-
-            float y = layer.baseY + static_cast<float>((i * 19 + static_cast<int>(layerIdx) * 7) % 7) - 3.0f;
-
+            const auto& src = kNewMapTrees[i];
             ForestTreeInstance tree;
-            if (layerIdx == 2)
-            {
-                tree.modelPath = treeModels[i % 4];
-            }
-            else
-            {
-                tree.modelPath = treeModels[(i + static_cast<int>(layerIdx) * 3) % numModels];
-            }
-
-            tree.pos = VGet(x, y, z);
-            tree.rotY = static_cast<float>((i * 71 + 37) % 360) * (3.14159265f / 180.0f);
-            float scaleFrac = static_cast<float>((i * 43 + static_cast<int>(layerIdx) * 17) % 100) / 100.0f;
-            tree.scale = layer.scaleMin + (layer.scaleMax - layer.scaleMin) * scaleFrac;
-
+            tree.modelPath = src.modelPath;
+            tree.pos       = VGet(src.x, src.y, src.z);
+            tree.rotY      = src.rotY;
+            tree.scale     = src.scale;
             m_forestTrees.push_back(tree);
         }
     }
-
-    // 2. 木同士の重なり解消（ポアソンディスク風の反復リラクゼーション処理）
-    //    全ての木ペアについて樹冠半径の合計以上の距離を確保し、ステージ領域外へ保つ
-    const size_t totalTrees = m_forestTrees.size();
-    for (int iter = 0; iter < 24; ++iter)
+    else
     {
-        bool anyMoved = false;
-        for (size_t a = 0; a < totalTrees; ++a)
+        static const FixedTreePlacement kHouseTrees[] = {
+            { "Resource/Sousyoku/ABigTree1.mv1",   -305.0f,   -5.0f,   1155.0f,  0.44f, 34.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",    553.2f,   -5.0f,   1155.0f,  1.61f, 34.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",   1329.1f,   -5.0f,    919.8f,  2.78f, 34.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",   1405.0f,   -5.0f,     75.9f,  3.94f, 34.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",   1405.0f,   -5.0f,   -782.2f,  5.11f, 34.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",    905.0f,   -5.0f,  -1355.0f,  0.00f, 34.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",     46.8f,   -5.0f,  -1355.0f,  1.17f, 34.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",   -729.1f,   -5.0f,  -1119.8f,  2.34f, 34.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",   -805.0f,   -5.0f,   -275.9f,  3.51f, 34.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",   -805.0f,   -5.0f,    582.2f,  4.68f, 34.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",    169.8f,   -7.0f,   1905.0f,  5.85f, 42.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",   1118.3f,   -7.0f,   1886.7f,  0.73f, 42.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",   1907.9f,   -7.0f,   1401.1f,  1.90f, 42.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",   2155.0f,   -7.0f,    505.0f,  3.07f, 42.0f },
+            { "Resource/Sousyoku/ABigTree3.mv1",   2155.0f,   -7.0f,   -444.6f,  4.24f, 42.0f },
+            { "Resource/Sousyoku/ASmallTree4.mv1",   2040.5f,   -7.0f,  -1377.6f,  5.41f, 42.0f },
+            { "Resource/Sousyoku/ASmallTree3.mv1",   1368.5f,   -7.0f,  -2015.9f,  0.30f, 42.0f },
+            { "Resource/Sousyoku/ABigTree4.mv1",    430.2f,   -7.0f,  -2105.0f,  1.47f, 42.0f },
+            { "Resource/Sousyoku/ASmallTree5.mv1",   -518.3f,   -7.0f,  -2086.7f,  2.64f, 42.0f },
+            { "Resource/Sousyoku/ASmallTree6.mv1",  -1307.9f,   -7.0f,  -1601.1f,  3.80f, 42.0f },
+            { "Resource/Sousyoku/ABigTree1.mv1",  -1555.0f,   -7.0f,   -705.0f,  4.97f, 42.0f },
+            { "Resource/Sousyoku/ASmallTree1.mv1",  -1555.0f,   -7.0f,    244.6f,  6.14f, 42.0f },
+            { "Resource/Sousyoku/ABigTree2.mv1",  -1440.5f,   -7.0f,   1177.6f,  1.03f, 42.0f },
+            { "Resource/Sousyoku/ASmallTree2.mv1",   -768.5f,   -7.0f,   1815.9f,  2.20f, 42.0f },
+        };
+        const size_t count = sizeof(kHouseTrees) / sizeof(kHouseTrees[0]);
+        m_forestTrees.reserve(count);
+        for (size_t i = 0; i < count; ++i)
         {
-            float rA = GetTreeCanopyRadius(m_forestTrees[a]);
-            for (size_t b = a + 1; b < totalTrees; ++b)
-            {
-                float rB = GetTreeCanopyRadius(m_forestTrees[b]);
-                float minDist = rA + rB;
-
-                float dx = m_forestTrees[b].pos.x - m_forestTrees[a].pos.x;
-                float dz = m_forestTrees[b].pos.z - m_forestTrees[a].pos.z;
-                float distSq = dx * dx + dz * dz;
-
-                if (distSq < minDist * minDist)
-                {
-                    float dist = std::sqrt(distSq);
-                    float nx = 1.0f, nz = 0.0f;
-                    if (dist > 0.001f)
-                    {
-                        nx = dx / dist;
-                        nz = dz / dist;
-                    }
-                    else
-                    {
-                        float fallbackAngle = static_cast<float>(a * 37 + b * 13);
-                        nx = std::cos(fallbackAngle);
-                        nz = std::sin(fallbackAngle);
-                    }
-
-                    float overlap = (minDist - dist) * 0.52f;
-                    m_forestTrees[a].pos.x -= nx * overlap;
-                    m_forestTrees[a].pos.z -= nz * overlap;
-                    m_forestTrees[b].pos.x += nx * overlap;
-                    m_forestTrees[b].pos.z += nz * overlap;
-                    anyMoved = true;
-                }
-            }
-        }
-
-        // 各反復後にステージ境界内へ押し込まれた木を外側へ戻す
-        for (size_t idx = 0; idx < totalTrees; ++idx)
-        {
-            float relX = m_forestTrees[idx].pos.x - cx;
-            float relZ = m_forestTrees[idx].pos.z - cz;
-            float minAllowW = expandedHalfW + 35.0f;
-            float minAllowD = expandedHalfD + 35.0f;
-
-            if (std::abs(relX) < minAllowW && std::abs(relZ) < minAllowD)
-            {
-                float penX = minAllowW - std::abs(relX);
-                float penZ = minAllowD - std::abs(relZ);
-                if (penX < penZ)
-                {
-                    m_forestTrees[idx].pos.x = cx + ((relX >= 0.0f) ? minAllowW : -minAllowW);
-                }
-                else
-                {
-                    m_forestTrees[idx].pos.z = cz + ((relZ >= 0.0f) ? minAllowD : -minAllowD);
-                }
-            }
-        }
-
-        if (!anyMoved)
-        {
-            break;
+            const auto& src = kHouseTrees[i];
+            ForestTreeInstance tree;
+            tree.modelPath = src.modelPath;
+            tree.pos       = VGet(src.x, src.y, src.z);
+            tree.rotY      = src.rotY;
+            tree.scale     = src.scale;
+            m_forestTrees.push_back(tree);
         }
     }
 }
 // ============================================================================
 // Ground Fallen Leaves Setup
 // ============================================================================
+
+// ============================================================================
+// Build custom shaded stage mesh (1?: ??????????? / 2?: ???????????????)
+// ============================================================================
+void Stage3D::BuildStageVisualMesh()
+{
+    m_stageVertices.clear();
+    if (m_modelHandle == -1)
+    {
+        return;
+    }
+
+    int meshNum = MV1GetMeshNum(m_modelHandle);
+    if (MV1SetupReferenceMesh(m_modelHandle, -1, TRUE) < 0)
+    {
+        return;
+    }
+
+    MV1_REF_POLYGONLIST refAll = MV1GetReferenceMesh(m_modelHandle, -1, TRUE);
+    m_stageVertices.reserve(static_cast<size_t>(refAll.PolygonNum) * 3 + 6);
+
+    // 1. ???????3D????????????????????
+    {
+        float groundY = (m_mapType == ModelConfig::MapType::House) ? -5.5f : -8.5f;
+        float ext = 8500.0f;
+        COLOR_U8 grassCol = GetColorU8(96, 158, 78, 255);
+        COLOR_U8 zeroSpc  = GetColorU8(0, 0, 0, 0);
+        VECTOR upNorm = VGet(0.0f, 1.0f, 0.0f);
+
+        VECTOR gp[4] = {
+            VGet(-ext, groundY,  ext),
+            VGet( ext, groundY,  ext),
+            VGet( ext, groundY, -ext),
+            VGet(-ext, groundY, -ext)
+        };
+        const int triIdx[6] = { 0, 1, 2, 0, 2, 3 };
+        for (int k = 0; k < 6; ++k)
+        {
+            VERTEX3D v{};
+            v.pos  = gp[triIdx[k]];
+            v.norm = upNorm;
+            v.dif  = grassCol;
+            v.spc  = zeroSpc;
+            m_stageVertices.push_back(v);
+        }
+    }
+
+    // ?????????????????????????
+    VECTOR sunDir = VNorm(VGet(-0.48f, 0.76f, -0.44f));
+    COLOR_U8 zeroSpc = GetColorU8(0, 0, 0, 0);
+
+    for (int i = 0; i < refAll.PolygonNum; ++i)
+    {
+        const auto& poly = refAll.Polygons[i];
+        VECTOR v0 = refAll.Vertexs[poly.VIndex[0]].Position;
+        VECTOR v1 = refAll.Vertexs[poly.VIndex[1]].Position;
+        VECTOR v2 = refAll.Vertexs[poly.VIndex[2]].Position;
+
+        if (m_mapType == ModelConfig::MapType::House)
+        {
+            // ????????? Mesh[10] (pCube55) ???????
+            if (poly.MeshIndex == 10)
+            {
+                continue;
+            }
+
+            // 1??House?: ??????Mesh[2]?????????2????????????(Y?27)???? Y=17.5f ?????
+            if (poly.MeshIndex != 2)
+            {
+                auto lowerWallY = [](VECTOR& v)
+                {
+                    if (v.y > 5.0f)
+                    {
+                        v.y = 5.0f + (v.y - 5.0f) * (12.5f / 195.0f);
+                    }
+                };
+                lowerWallY(v0);
+                lowerWallY(v1);
+                lowerWallY(v2);
+            }
+        }
+        else
+        {
+            float polyMinY = CalcMin3(v0.y, v1.y, v2.y);
+            if (polyMinY < -20.0f)
+            {
+                continue;
+            }
+        }
+
+        VECTOR e1 = VSub(v1, v0);
+        VECTOR e2 = VSub(v2, v0);
+        VECTOR cross = VCross(e1, e2);
+        float lenSq = cross.x * cross.x + cross.y * cross.y + cross.z * cross.z;
+        VECTOR normal = (lenSq > 0.000001f) ? VScale(cross, 1.0f / std::sqrt(lenSq)) : VGet(0.0f, 1.0f, 0.0f);
+
+        float polyMinY = CalcMin3(v0.y, v1.y, v2.y);
+        float polyMaxY = CalcMax3(v0.y, v1.y, v2.y);
+        float cx = (v0.x + v1.x + v2.x) * (1.0f / 3.0f);
+        float cz = (v0.z + v1.z + v2.z) * (1.0f / 3.0f);
+
+        float baseR = 200.0f, baseG = 200.0f, baseB = 200.0f;
+
+        if (m_mapType == ModelConfig::MapType::House)
+        {
+            if (poly.MeshIndex == 2)
+            {
+                // 1???: ??????????????????????????????????????
+                int plankIdx = static_cast<int>(std::floor((cx + 2000.0f) / 90.0f));
+                float stripe = (plankIdx % 2 == 0) ? 1.0f : 0.95f;
+                baseR = 222.0f * stripe;
+                baseG = 182.0f * stripe;
+                baseB = 136.0f * stripe;
+            }
+            else
+            {
+                // 1????????17.5f?: ???????????????????????????????
+                if (normal.y >= 0.75f)
+                {
+                    baseR = 240.0f;
+                    baseG = 230.0f;
+                    baseB = 212.0f;
+                }
+                else
+                {
+                    baseR = 164.0f;
+                    baseG = 118.0f;
+                    baseB = 82.0f;
+                }
+            }
+        }
+        else
+        {
+            // 2??NewMap?: ??????????????????????????????????
+            int tileX = static_cast<int>(std::floor((cx + 5000.0f) / 180.0f));
+            int tileZ = static_cast<int>(std::floor((cz + 5000.0f) / 180.0f));
+            float checker = ((tileX + tileZ) % 2 == 0) ? 1.0f : 0.96f;
+
+            if (normal.y >= 0.96f)
+            {
+                if (polyMaxY >= 95.0f)
+                {
+                    // ????????????: ???????????
+                    baseR = 238.0f * checker;
+                    baseG = 226.0f * checker;
+                    baseB = 206.0f * checker;
+                }
+                else if (polyMaxY > 12.0f && polyMaxY < 35.0f)
+                {
+                    // ????????????????????: ?????????
+                    baseR = 220.0f;
+                    baseG = 198.0f;
+                    baseB = 172.0f;
+                }
+                else
+                {
+                    // ???????????: ??????????????????????????????
+                    baseR = 196.0f * checker;
+                    baseG = 162.0f * checker;
+                    baseB = 124.0f * checker;
+                }
+            }
+            else if (normal.y >= 0.35f)
+            {
+                // ???????: ??????????????????????????
+                int stepStripe = static_cast<int>(std::floor((cx + cz + 5000.0f) / 70.0f));
+                float sFactor = (stepStripe % 2 == 0) ? 1.0f : 0.94f;
+                baseR = 216.0f * sFactor;
+                baseG = 152.0f * sFactor;
+                baseB = 108.0f * sFactor;
+            }
+            else
+            {
+                if (polyMaxY < 60.0f)
+                {
+                    // ???????????????????: ??????????????????
+                    baseR = 152.0f;
+                    baseG = 122.0f;
+                    baseB = 94.0f;
+                }
+                else
+                {
+                    // ??????????: ????????????????????????????????
+                    baseR = 166.0f;
+                    baseG = 176.0f;
+                    baseB = 188.0f;
+                }
+            }
+        }
+
+        // ????????????????????????????????????????????
+        float ndotl = VDot(normal, sunDir);
+        float shade = 0.80f + 0.22f * ndotl;
+        if (std::abs(normal.y) < 0.35f)
+        {
+            // ??????????????????????????????????????
+            shade = 0.72f + 0.26f * ((ndotl + 1.0f) * 0.5f);
+        }
+
+        int r = static_cast<int>(MathHelper::Clamp(baseR * shade, 0.0f, 255.0f));
+        int g = static_cast<int>(MathHelper::Clamp(baseG * shade, 0.0f, 255.0f));
+        int b = static_cast<int>(MathHelper::Clamp(baseB * shade, 0.0f, 255.0f));
+        COLOR_U8 col = GetColorU8(r, g, b, 255);
+
+        const VECTOR pts[3] = { v0, v1, v2 };
+        for (int k = 0; k < 3; ++k)
+        {
+            VERTEX3D vt{};
+            vt.pos  = pts[k];
+            vt.norm = normal;
+            vt.dif  = col;
+            vt.spc  = zeroSpc;
+            m_stageVertices.push_back(vt);
+        }
+    }
+
+    MV1TerminateReferenceMesh(m_modelHandle, -1, TRUE);
+}
+
 void Stage3D::SetupGroundLeaves()
 {
     m_groundLeaves.clear();
 
     unsigned int leafColors[] = {
-        GetColor(76, 166, 52),   // 譏弱ｋ縺・眠邱・        GetColor(92, 184, 62),   // 魄ｮ繧・°縺ｪ繝ｪ繝ｼ繝輔げ繝ｪ繝ｼ繝ｳ
-        GetColor(120, 198, 48),  // 闍･闡蛾ｻ・ｷ・        GetColor(48, 122, 38),   // 豺ｱ邱・        GetColor(180, 142, 42),  // 鮟・≡濶ｲ
-        GetColor(196, 158, 48),  // 繧､繧ｨ繝ｭ繝ｼ繧ｴ繝ｼ繝ｫ繝・        GetColor(158, 88, 36)    // 譫ｯ繧瑚痩繧ｪ繝ｬ繝ｳ繧ｸ
+        GetColor(76, 166, 52),
+        GetColor(92, 184, 62),
+        GetColor(120, 198, 48),
+        GetColor(48, 122, 38),
+        GetColor(180, 142, 42),
+        GetColor(196, 158, 48),
+        GetColor(158, 88, 36)
     };
     const int colorCount = sizeof(leafColors) / sizeof(leafColors[0]);
 
     float spawnRangeX = (m_mapType == ModelConfig::MapType::NewMap) ? 2500.0f : 800.0f;
     float spawnRangeZ = (m_mapType == ModelConfig::MapType::NewMap) ? 2100.0f : 800.0f;
-    size_t targetCount = (m_mapType == ModelConfig::MapType::NewMap) ? 550 : 250;
+    size_t targetCount = (m_mapType == ModelConfig::MapType::NewMap) ? 180 : 80;
 
-    srand(98765);
+    unsigned int leafSeed = 98765u;
+    auto nextLeafRand = [&leafSeed]() -> int {
+        leafSeed = leafSeed * 1664525u + 1013904223u;
+        return static_cast<int>((leafSeed >> 1) & 0x7FFF);
+    };
 
     for (int attempt = 0; attempt < 3500 && m_groundLeaves.size() < targetCount; ++attempt)
     {
-        float rx = ((rand() % 2000) / 1000.0f - 1.0f) * spawnRangeX;
-        float rz = ((rand() % 2000) / 1000.0f - 1.0f) * spawnRangeZ;
+        float rx = ((nextLeafRand() % 2000) / 1000.0f - 1.0f) * spawnRangeX;
+        float rz = ((nextLeafRand() % 2000) / 1000.0f - 1.0f) * spawnRangeZ;
 
         float groundY = 0.0f;
         VECTOR groundNorm = VGet(0.0f, 1.0f, 0.0f);
@@ -753,9 +851,9 @@ void Stage3D::SetupGroundLeaves()
                 GroundFallenLeaf leaf;
                 leaf.pos    = VGet(rx, groundY + 0.35f, rz);
                 leaf.normal = groundNorm;
-                leaf.rotY   = static_cast<float>(rand() % 360) * (3.14159265f / 180.0f);
-                leaf.size   = 3.8f + static_cast<float>(rand() % 35) * 0.1f;
-                leaf.color  = leafColors[rand() % colorCount];
+                leaf.rotY   = static_cast<float>(nextLeafRand() % 360) * (3.14159265f / 180.0f);
+                leaf.size   = 3.8f + static_cast<float>(nextLeafRand() % 35) * 0.1f;
+                leaf.color  = leafColors[nextLeafRand() % colorCount];
                 m_groundLeaves.push_back(leaf);
             }
         }
@@ -775,8 +873,14 @@ void Stage3D::Draw3D()
     // 1. Forest Skybox / Skydome drawing (most distant background)
     m_skybox.Draw(GetCameraPosition());
 
-    // 2. Stage model
-    if (m_modelHandle != -1)
+    // 2. Stage model (???????????????????????????)
+    if (!m_stageVertices.empty())
+    {
+        SetUseLighting(FALSE);
+        DrawPolygon3D(m_stageVertices.data(), static_cast<int>(m_stageVertices.size() / 3), DX_NONE_GRAPH, FALSE);
+        SetUseLighting(TRUE);
+    }
+    else if (m_modelHandle != -1)
     {
         MV1DrawModel(m_modelHandle);
     }
