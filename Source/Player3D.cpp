@@ -21,7 +21,7 @@
 #include <algorithm>
 
 // 筋トレアニメーション各モーションの初期設定（デフォルトは4種すべてON）
-bool Player3D::s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)] = { true, true, true, true };
+bool Player3D::s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)] = { true, true, true, true, true, true, true, true, true };
 int  Player3D::s_workoutSequenceIndex = 0;
 
 float Player3D::CalculateSpeedForRep(int effectiveRep) const
@@ -63,6 +63,24 @@ Player3D::~Player3D()
     {
         MV1DeleteModel(m_barbellModelHandle);
         m_barbellModelHandle = -1;
+    }
+
+    if (m_dumbbellModelHandle != -1)
+    {
+        MV1DeleteModel(m_dumbbellModelHandle);
+        m_dumbbellModelHandle = -1;
+    }
+
+    if (m_flatBenchModelHandle != -1)
+    {
+        MV1DeleteModel(m_flatBenchModelHandle);
+        m_flatBenchModelHandle = -1;
+    }
+
+    if (m_inclineBenchModelHandle != -1)
+    {
+        MV1DeleteModel(m_inclineBenchModelHandle);
+        m_inclineBenchModelHandle = -1;
     }
 }
 
@@ -127,13 +145,18 @@ void Player3D::InitModel()
                 return idx;
             };
 
-            m_animIndexRun      = findAnim({ "01_run", "01_ru", "run" }, 0);
-            m_animIndexAttack   = findAnim({ "02_attack", "2_attack", "attack" }, 1);
-            m_animIndexSquat    = findAnim({ "03_squat", "3_squat", "squat" }, 2);
-            m_animIndexIdol     = findAnim({ "04_idol", "4_idol", "74_ido", "idol", "idle" }, 3);
-            m_animIndexPushUp   = findAnim({ "05_pushup", "5_pushup", "pushup", "push_up" }, 4);
-            m_animIndexSitUp    = findAnim({ "06_situp", "6_situp", "situp", "sit_up" }, 5);
-            m_animIndexPullUp   = findAnim({ "07_pullup", "7_pullup", "77_pullup", "pullup", "pull_up" }, 6);
+            m_animIndexRun             = findAnim({ "01_run", "01_ru", "run" }, 0);
+            m_animIndexAttack          = findAnim({ "02_attack", "2_attack", "attack" }, 1);
+            m_animIndexSquat           = findAnim({ "03_squat", "3_squat", "squat" }, 2);
+            m_animIndexIdol            = findAnim({ "04_idol", "4_idol", "74_ido", "idol", "idle" }, 3);
+            m_animIndexPushUp          = findAnim({ "05_pushup", "5_pushup", "pushup", "push_up" }, 4);
+            m_animIndexSitUp           = findAnim({ "06_situp", "6_situp", "situp", "sit_up" }, 5);
+            m_animIndexPullUp          = findAnim({ "07_pullup", "7_pullup", "77_pullup", "pullup", "pull_up" }, 6);
+            m_animIndexSideRaise       = findAnim({ "08_sideraise", "sideraise", "78_siderai" }, 7);
+            m_animIndexDumbbellCurl    = findAnim({ "10_dumbbell curl", "10_dumbbell", "dumbbell curl", "curl" }, 8);
+            m_animIndexInclineBench    = findAnim({ "11_inclinebenti", "inclinebenti", "incline" }, 9);
+            m_animIndexBenchPress      = findAnim({ "12_benchpress", "benchpress" }, 10);
+            m_animIndexInOverHeadPress = findAnim({ "13_inoverheadpress", "inoverheadpress", "overhead" }, 11);
 
             // タックル（スタン攻撃）用：pushup以外の独立したパンチ/プッシュがあれば使用。無ければ補助モデルまたはAttackを使用
             m_pushFromSubModel  = false;
@@ -175,11 +198,13 @@ void Player3D::InitModel()
             m_attachAnimIndex      = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, m_currentAnimSrcHandle, FALSE);
             m_animPlayTime         = 0.0f;
 
-            // バーベル配置用の両手ボーンフレームを検索・キャッシュ
-            m_lHandFrame = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHand");
-            m_rHandFrame = MV1SearchFrame(m_modelHandle, "mixamorig:RightHand");
+            // 器具配置用の手・指・前腕ボーンフレームを検索・キャッシュ
+            m_lHandFrame        = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHand");
+            m_rHandFrame        = MV1SearchFrame(m_modelHandle, "mixamorig:RightHand");
             m_lHandKnuckleFrame = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHandMiddle1");
             m_rHandKnuckleFrame = MV1SearchFrame(m_modelHandle, "mixamorig:RightHandMiddle1");
+            m_lForeArmFrame     = MV1SearchFrame(m_modelHandle, "mixamorig:LeftForeArm");
+            m_rForeArmFrame     = MV1SearchFrame(m_modelHandle, "mixamorig:RightForeArm");
 
             // テクスチャ抜け防止および自動復旧
             int texNum = MV1GetTextureNum(m_modelHandle);
@@ -208,11 +233,33 @@ void Player3D::InitModel()
         }
     }
 
-    // バーベルアクセサリモデルの読み込み
+    // トレーニング器具アクセサリモデルの読み込み
     int barbellBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::BARBELL_MODEL_PATH);
     if (barbellBase != -1)
     {
         m_barbellModelHandle = MV1DuplicateModel(barbellBase);
+    }
+
+    int dumbbellBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::DUMBBELL_MODEL_PATH);
+    if (dumbbellBase != -1)
+    {
+        m_dumbbellModelHandle = MV1DuplicateModel(dumbbellBase);
+    }
+
+    int flatBenchBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::FLAT_BENCH_MODEL_PATH);
+    if (flatBenchBase != -1)
+    {
+        m_flatBenchModelHandle = MV1DuplicateModel(flatBenchBase);
+        MV1SetDifColorScale(m_flatBenchModelHandle, GetColorF(3.5f, 3.8f, 4.2f, 1.0f));
+        MV1SetAmbColorScale(m_flatBenchModelHandle, GetColorF(2.8f, 3.0f, 3.5f, 1.0f));
+    }
+
+    int inclineBenchBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::INCLINE_BENCH_MODEL_PATH);
+    if (inclineBenchBase != -1)
+    {
+        m_inclineBenchModelHandle = MV1DuplicateModel(inclineBenchBase);
+        MV1SetDifColorScale(m_inclineBenchModelHandle, GetColorF(3.5f, 3.8f, 4.2f, 1.0f));
+        MV1SetAmbColorScale(m_inclineBenchModelHandle, GetColorF(2.8f, 3.0f, 3.5f, 1.0f));
     }
 }
 
@@ -256,11 +303,16 @@ void Player3D::UpdateAnimation(bool isMoving)
         // メニューでONにされている筋トレモーションのうち、今回選択されたモーションを再生
         switch (m_activeWorkoutMotion)
         {
-        case WorkoutMotionType::PushUp: targetAnim = m_animIndexPushUp; break; // 05_PushUp (腕立て伏せ)
-        case WorkoutMotionType::SitUp:  targetAnim = m_animIndexSitUp;  break; // 06_Situp (腹筋)
-        case WorkoutMotionType::PullUp: targetAnim = m_animIndexPullUp; break; // 07_PullUp (懸垂)
+        case WorkoutMotionType::PushUp:          targetAnim = m_animIndexPushUp; break;          // 05_PushUp (腕立て伏せ)
+        case WorkoutMotionType::SitUp:           targetAnim = m_animIndexSitUp;  break;          // 06_Situp (腹筋)
+        case WorkoutMotionType::PullUp:          targetAnim = m_animIndexPullUp; break;          // 07_PullUp (懸垂)
+        case WorkoutMotionType::SideRaise:       targetAnim = m_animIndexSideRaise; break;       // 08_SideRaise (サイドレイズ)
+        case WorkoutMotionType::DumbbellCurl:    targetAnim = m_animIndexDumbbellCurl; break;    // 10_Dumbbell curl (ダンベルカール)
+        case WorkoutMotionType::InclineBench:    targetAnim = m_animIndexInclineBench; break;    // 11_InClineBenti (インクラインベンチ)
+        case WorkoutMotionType::BenchPress:      targetAnim = m_animIndexBenchPress; break;      // 12_BenchPress (ベンチプレス)
+        case WorkoutMotionType::InOverHeadPress: targetAnim = m_animIndexInOverHeadPress; break; // 13_InOverHeadPress (インクラインOHP)
         case WorkoutMotionType::Squat:
-        default:                        targetAnim = m_animIndexSquat;  break; // 03_squat (スクワット)
+        default:                                 targetAnim = m_animIndexSquat;  break;          // 03_squat (スクワット)
         }
         playSpeed = 1.0f;
     }
@@ -282,6 +334,31 @@ void Player3D::UpdateAnimation(bool isMoving)
     else if (m_isTitlePullUp)
     {
         targetAnim = m_animIndexPullUp;    // Armature|07_PullUp (懸垂)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleSideRaise)
+    {
+        targetAnim = m_animIndexSideRaise; // Armature|08_SideRaise (サイドレイズ)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleDumbbellCurl)
+    {
+        targetAnim = m_animIndexDumbbellCurl; // Armature|10_Dumbbell curl (ダンベルカール)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleInclineBench)
+    {
+        targetAnim = m_animIndexInclineBench; // Armature|11_InClineBenti (インクラインベンチ)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleBenchPress)
+    {
+        targetAnim = m_animIndexBenchPress; // Armature|12_BenchPress (ベンチプレス)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleInOverHeadPress)
+    {
+        targetAnim = m_animIndexInOverHeadPress; // Armature|13_InOverHeadPress (インクラインOHP)
         playSpeed = 1.0f;
     }
     else if (isMoving)
@@ -331,10 +408,15 @@ void Player3D::Update()
 
 void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& targetPositions)
 {
-    m_isTitleSquat  = false;
-    m_isTitlePushUp = false;
-    m_isTitleSitUp  = false;
-    m_isTitlePullUp = false;
+    m_isTitleSquat           = false;
+    m_isTitlePushUp          = false;
+    m_isTitleSitUp           = false;
+    m_isTitlePullUp          = false;
+    m_isTitleSideRaise       = false;
+    m_isTitleDumbbellCurl    = false;
+    m_isTitleInclineBench    = false;
+    m_isTitleBenchPress      = false;
+    m_isTitleInOverHeadPress = false;
     m_prevPos = m_pos;
     m_animFrame++;
     m_animTime += 1.0f / 60.0f;
@@ -1001,7 +1083,7 @@ void Player3D::Draw3D()
     {
         float scaleRatio = scale / ModelConfig::CAT_MODEL_SCALE;
         float baseRadius = 24.0f * scaleRatio;
-        bool isPronePose = ((m_isSkillChecking && (m_activeWorkoutMotion == WorkoutMotionType::PushUp || m_activeWorkoutMotion == WorkoutMotionType::SitUp)) || m_isTitlePushUp || m_isTitleSitUp);
+        bool isPronePose = ((m_isSkillChecking && (m_activeWorkoutMotion == WorkoutMotionType::PushUp || m_activeWorkoutMotion == WorkoutMotionType::SitUp || m_activeWorkoutMotion == WorkoutMotionType::BenchPress)) || m_isTitlePushUp || m_isTitleSitUp || m_isTitleBenchPress);
         float shadowRx = isPronePose ? (baseRadius * 0.90f) : baseRadius;
         float shadowRz = isPronePose ? (baseRadius * 1.65f) : (baseRadius * 1.10f);
         float jumpH = (m_pos.y > m_groundY) ? (m_pos.y - m_groundY) : 0.0f;
@@ -1074,7 +1156,7 @@ void Player3D::Draw3D()
         );
     }
 
-    // スクワットアニメーション中のみ両手でバーベルを保持・描画（腕立て伏せ・腹筋・懸垂および筋肉痛時は持たない）
+    // 1. スクワット: バーベルを描画
     bool isPlayingSquatAnim = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexSquat) &&
                               ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::Squat) || m_isTitleSquat);
     if (!isSoreness && isPlayingSquatAnim)
@@ -1082,12 +1164,55 @@ void Player3D::Draw3D()
         DrawBarbell(scale);
     }
 
-    // 懸垂（プルアップ）アニメーション中のみ懸垂バー＆スタンドラックを描画
+    // 2. 懸垂（プルアップ）: 懸垂バー＆スタンドラックを描画
     bool isPlayingPullUpAnim = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexPullUp) &&
                                ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::PullUp) || m_isTitlePullUp);
     if (!isSoreness && isPlayingPullUpAnim)
     {
         DrawPullUpBar(scale);
+    }
+
+    // 3. ベンチプレス (BenchPress): FlatBench + バーベル
+    bool isPlayingBenchPress = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexBenchPress) &&
+                               ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::BenchPress) || m_isTitleBenchPress);
+    if (!isSoreness && isPlayingBenchPress)
+    {
+        DrawFlatBench(scale);
+        DrawBarbell(scale);
+    }
+
+    // 4. サイドレイズ (SideRaise): ダンベルのみ
+    bool isPlayingSideRaise = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexSideRaise) &&
+                              ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::SideRaise) || m_isTitleSideRaise);
+    if (!isSoreness && isPlayingSideRaise)
+    {
+        DrawDumbbells(scale);
+    }
+
+    // 5. ダンベルカール (DumbbellCurl): ダンベルのみ
+    bool isPlayingDumbbellCurl = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexDumbbellCurl) &&
+                                 ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::DumbbellCurl) || m_isTitleDumbbellCurl);
+    if (!isSoreness && isPlayingDumbbellCurl)
+    {
+        DrawDumbbells(scale);
+    }
+
+    // 6. インクラインベンチ (InclineBench): InclineBench + ダンベル
+    bool isPlayingInclineBench = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexInclineBench) &&
+                                 ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::InclineBench) || m_isTitleInclineBench);
+    if (!isSoreness && isPlayingInclineBench)
+    {
+        DrawInclineBench(scale);
+        DrawDumbbells(scale);
+    }
+
+    // 7. インクラインオーバーヘッドプレス (InOverHeadPress): InclineBench + ダンベル
+    bool isPlayingInOverHeadPress = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexInOverHeadPress) &&
+                                    ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::InOverHeadPress) || m_isTitleInOverHeadPress);
+    if (!isSoreness && isPlayingInOverHeadPress)
+    {
+        DrawInclineBench(scale);
+        DrawDumbbells(scale);
     }
 
     // 3. バカゲー風コミカル・マッスル湯気＆マッチョオーラ（3D）
@@ -1643,4 +1768,81 @@ void Player3D::DrawPullUpBar(float catScale)
     VECTOR rightBackBase = VAdd(VGet(barCenter.x, groundY + postRadius * 0.6f, barCenter.z),
                                 VAdd(VScale(barDir,  halfSpan), VScale(frameFwd, -baseHalfLen * 0.85f)));
     DrawCapsule3D(leftBackBase, rightBackBase, postRadius * 0.75f, 8, colFrame, colFrameSpec, TRUE);
+}
+
+
+void Player3D::DrawFlatBench(float catScale)
+{
+    if (m_flatBenchModelHandle == -1) return;
+    MV1SetPosition(m_flatBenchModelHandle, m_pos);
+    MV1SetRotationXYZ(m_flatBenchModelHandle, VGet(0.0f, m_rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
+    MV1SetScale(m_flatBenchModelHandle, VGet(catScale, catScale, catScale));
+    MV1DrawModel(m_flatBenchModelHandle);
+}
+
+void Player3D::DrawInclineBench(float catScale)
+{
+    if (m_inclineBenchModelHandle == -1) return;
+    float ratio = catScale / ModelConfig::CAT_MODEL_SCALE;
+    float sinR = std::sin(m_rotY);
+    float cosR = std::cos(m_rotY);
+    // 猫の後方へ 24.0f * ratio シフト
+    VECTOR benchPos = VGet(
+        m_pos.x - sinR * (24.0f * ratio),
+        m_pos.y,
+        m_pos.z - cosR * (24.0f * ratio)
+    );
+    // インクラインベンチの背もたれはローカル+Zに向かって上がるため、
+    // 猫の進行方向 m_rotY と同じ回転に設定すると背もたれが猫の背中側に来る
+    MV1SetPosition(m_inclineBenchModelHandle, benchPos);
+    MV1SetRotationXYZ(m_inclineBenchModelHandle, VGet(0.0f, m_rotY, 0.0f));
+    MV1SetScale(m_inclineBenchModelHandle, VGet(catScale, catScale, catScale));
+    MV1DrawModel(m_inclineBenchModelHandle);
+}
+
+void Player3D::DrawDumbbells(float catScale)
+{
+    if (m_dumbbellModelHandle == -1 || m_modelHandle == -1) return;
+    DrawSingleDumbbell(catScale, false); // 左手
+    DrawSingleDumbbell(catScale, true);  // 右手
+}
+
+void Player3D::DrawSingleDumbbell(float catScale, bool isRight)
+{
+    int handFrame    = isRight ? m_rHandFrame : m_lHandFrame;
+    int knuckleFrame = isRight ? m_rHandKnuckleFrame : m_lHandKnuckleFrame;
+    if (handFrame == -1) return;
+
+    VECTOR posHand = MV1GetFramePosition(m_modelHandle, handFrame);
+    VECTOR gripPos = posHand;
+
+    if (knuckleFrame != -1)
+    {
+        VECTOR posKnuckle = MV1GetFramePosition(m_modelHandle, knuckleFrame);
+        gripPos = VAdd(posHand, VScale(VSub(posKnuckle, posHand), 0.55f));
+    }
+
+    // 正面カメラ側へダンベルを向ける（猫の前方ベクトル基準）
+    // 猫の進行方向・正面方向（+fwd）にシャフト軸（Z）を一致させることで、正面カメラから両手とも綺麗に向く
+    VECTOR fwd   = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+    VECTOR up    = VGet(0.0f, 1.0f, 0.0f);
+    VECTOR right = VGet(-std::cos(m_rotY), 0.0f, std::sin(m_rotY));
+
+    VECTOR basisZ = fwd;   // 正面カメラ側へ向ける
+    VECTOR basisY = up;
+    VECTOR basisX = right;
+
+    float s = 2.4f * (catScale / ModelConfig::CAT_MODEL_SCALE);
+    VECTOR sx = VScale(basisX, s);
+    VECTOR sy = VScale(basisY, s);
+    VECTOR sz = VScale(basisZ, s);
+
+    MATRIX mat = {};
+    mat.m[0][0] = sx.x; mat.m[0][1] = sx.y; mat.m[0][2] = sx.z; mat.m[0][3] = 0.0f;
+    mat.m[1][0] = sy.x; mat.m[1][1] = sy.y; mat.m[1][2] = sy.z; mat.m[1][3] = 0.0f;
+    mat.m[2][0] = sz.x; mat.m[2][1] = sz.y; mat.m[2][2] = sz.z; mat.m[2][3] = 0.0f;
+    mat.m[3][0] = gripPos.x; mat.m[3][1] = gripPos.y; mat.m[3][2] = gripPos.z; mat.m[3][3] = 1.0f;
+
+    MV1SetMatrix(m_dumbbellModelHandle, mat);
+    MV1DrawModel(m_dumbbellModelHandle);
 }

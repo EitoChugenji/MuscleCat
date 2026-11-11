@@ -230,15 +230,49 @@ namespace
 
         switch (s_chosenTitleMotion)
         {
-        case WorkoutMotionType::Squat:  return Player3D::TitleWorkoutType::Squat;
-        case WorkoutMotionType::PushUp: return Player3D::TitleWorkoutType::PushUp;
-        case WorkoutMotionType::SitUp:  return Player3D::TitleWorkoutType::SitUp;
-        case WorkoutMotionType::PullUp: return Player3D::TitleWorkoutType::PullUp;
-        default:                        return Player3D::TitleWorkoutType::Squat;
+        case WorkoutMotionType::Squat:           return Player3D::TitleWorkoutType::Squat;
+        case WorkoutMotionType::PushUp:          return Player3D::TitleWorkoutType::PushUp;
+        case WorkoutMotionType::SitUp:           return Player3D::TitleWorkoutType::SitUp;
+        case WorkoutMotionType::PullUp:          return Player3D::TitleWorkoutType::PullUp;
+        case WorkoutMotionType::SideRaise:       return Player3D::TitleWorkoutType::SideRaise;
+        case WorkoutMotionType::DumbbellCurl:    return Player3D::TitleWorkoutType::DumbbellCurl;
+        case WorkoutMotionType::InclineBench:    return Player3D::TitleWorkoutType::InclineBench;
+        case WorkoutMotionType::BenchPress:      return Player3D::TitleWorkoutType::BenchPress;
+        case WorkoutMotionType::InOverHeadPress: return Player3D::TitleWorkoutType::InOverHeadPress;
+        default:                                 return Player3D::TitleWorkoutType::Squat;
         }
     }
 
-    // 筋トレアニメーション選択カード＆4種ON/OFFトグルボタン共通描画ヘルパー
+    // 筋トレアニメーション選択ボタン（9種・2段グリッド）の座標算出ヘルパー
+    void GetWorkoutBtnRect(int cardX, int cardY, int cardW, int cardH, int index, int& outX, int& outY, int& outW, int& outH)
+    {
+        const int padX = 8;
+        const int gapX = 5;
+        const int gapY = 5;
+        const int headerH = 25;
+        const int btnH = (cardH - headerH - 8 - gapY) / 2;
+
+        if (index < 5)
+        {
+            int col = index;
+            int btnW = (cardW - padX * 2 - gapX * 4) / 5;
+            outX = cardX + padX + col * (btnW + gapX);
+            outY = cardY + headerH;
+            outW = btnW;
+            outH = btnH;
+        }
+        else
+        {
+            int col = index - 5;
+            int btnW = (cardW - padX * 2 - gapX * 3) / 4;
+            outX = cardX + padX + col * (btnW + gapX);
+            outY = cardY + headerH + btnH + gapY;
+            outW = btnW;
+            outH = btnH;
+        }
+    }
+
+    // 筋トレアニメーション選択カード＆9種ON/OFFトグルボタン共通描画ヘルパー
     void DrawWorkoutMotionSelectorCard(
         int x, int y, int w, int h,
         bool isRowSelected,
@@ -258,23 +292,21 @@ namespace
         DrawStringToHandle(x + 12, y + 6, titleStr, isRowSelected ? GetColor(255, 235, 90) : GetColor(215, 235, 255), font13);
 
         char countStr[32];
-        snprintf(countStr, sizeof(countStr), "%d / 4 ON", Player3D::GetEnabledWorkoutMotionCount());
+        snprintf(countStr, sizeof(countStr), "%d / %d ON",
+                 Player3D::GetEnabledWorkoutMotionCount(),
+                 static_cast<int>(WorkoutMotionType::Count));
         int cW = GetDrawStringWidthToHandle(countStr, static_cast<int>(strlen(countStr)), font13);
         DrawStringToHandle(x + w - cW - 12, y + 6, countStr, GetColor(110, 245, 150), font13);
 
-        // 3. 4つのモーションON/OFFトグルボタン（スクワット / 腕立て伏せ / 腹筋 / 懸垂）
-        int padX   = 8;
-        int gap    = 6;
-        int btnW   = (w - padX * 2 - gap * 3) / 4;
-        int btnH   = h - 30;
-        int btnY   = y + 24;
-
-        for (int i = 0; i < 4; ++i)
+        // 3. 9つのモーションON/OFFトグルボタン（上段5種 / 下段4種）
+        for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
         {
             auto mType   = static_cast<WorkoutMotionType>(i);
             bool isOn    = Player3D::IsWorkoutMotionEnabled(mType);
-            int  bx      = x + padX + i * (btnW + gap);
-            bool isHover = (mx >= bx && mx <= bx + btnW && my >= btnY && my <= btnY + btnH);
+            int  bx = 0, by = 0, bw = 0, bh = 0;
+            GetWorkoutBtnRect(x, y, w, h, i, bx, by, bw, bh);
+
+            bool isHover = (mx >= bx && mx <= bx + bw && my >= by && my <= by + bh);
             bool isFocus = (isRowSelected && focusedBtnIdx == i) || isHover;
 
             unsigned int bgCol     = isOn ? (isFocus ? GetColor(42, 115, 72) : GetColor(28, 88, 54))
@@ -282,7 +314,7 @@ namespace
             unsigned int borderCol = isFocus ? GetColor(255, 230, 80)
                                              : (isOn ? GetColor(90, 235, 135) : GetColor(75, 85, 110));
 
-            SoftUI::DrawSoftCard(bx, btnY, btnW, btnH, 10,
+            SoftUI::DrawSoftCard(bx, by, bw, bh, 8,
                                  bgCol, 245, borderCol, isFocus ? 2 : 1,
                                  isFocus || isOn, isFocus ? GetColor(255, 220, 70) : GetColor(70, 210, 115));
 
@@ -290,25 +322,25 @@ namespace
             const char* mName = Player3D::GetWorkoutMotionName(mType);
             int nameW = GetDrawStringWidthToHandle(mName, static_cast<int>(strlen(mName)), font13);
             unsigned int nameCol = isOn ? GetColor(255, 255, 255) : GetColor(150, 160, 180);
-            DrawStringToHandle(bx + (btnW - nameW) / 2, btnY + 4, mName, nameCol, font13);
+            DrawStringToHandle(bx + (bw - nameW) / 2, by + 3, mName, nameCol, font13);
 
             // ON / OFF ステータスバッジ（下段中央ピル）
-            int pillW = btnW - 14;
-            int pillH = 16;
-            int pillX = bx + 7;
-            int pillY = btnY + btnH - pillH - 4;
+            int pillW = bw - 10;
+            int pillH = 12;
+            int pillX = bx + 5;
+            int pillY = by + bh - pillH - 3;
             unsigned int pillBg = isOn ? GetColor(55, 205, 95) : GetColor(20, 24, 34);
-            DrawRoundRect(pillX, pillY, pillX + pillW, pillY + pillH, 6, 6, pillBg, TRUE);
-            DrawRoundRect(pillX, pillY, pillX + pillW, pillY + pillH, 6, 6,
+            DrawRoundRect(pillX, pillY, pillX + pillW, pillY + pillH, 4, 4, pillBg, TRUE);
+            DrawRoundRect(pillX, pillY, pillX + pillW, pillY + pillH, 4, 4,
                           isOn ? GetColor(180, 255, 200) : GetColor(65, 75, 95), FALSE);
 
             const char* stateTxt = isOn ? "● ON" : "○ OFF";
             int stW = GetDrawStringWidthToHandle(stateTxt, static_cast<int>(strlen(stateTxt)), font13);
-            DrawStringToHandle(pillX + (pillW - stW) / 2, pillY + 1, stateTxt,
+            DrawStringToHandle(pillX + (pillW - stW) / 2, pillY, stateTxt,
                                isOn ? GetColor(15, 30, 20) : GetColor(130, 140, 160), font13);
         }
     }
-}
+} // namespace
 
 void GameManager::Init()
 {
@@ -820,7 +852,7 @@ void GameManager::Update()
             auto player = m_objManager.GetPlayer();
             float catY = (player) ? player->GetPos().y : 0.0f;
             Player3D::TitleWorkoutType workout = CalcActiveTitleWorkout(m_titleAnimTimer);
-            bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp);
+            bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
             bool isPullUpWorkout = (workout == Player3D::TitleWorkoutType::PullUp);
             float camDist = isPullUpWorkout ? 260.0f : 240.0f;
             float targetY = isFloorWorkout ? (catY + 14.0f) : (isPullUpWorkout ? (catY + 42.0f) : (catY + 20.0f));
@@ -869,7 +901,7 @@ void GameManager::Update()
         float catY = (player) ? player->GetPos().y : 0.0f;
         // 猫のアニメーション：メニューでONになっている筋トレモーションを順番にトレーニング！
         Player3D::TitleWorkoutType workout = CalcActiveTitleWorkout(m_titleAnimTimer);
-        bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp);
+        bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
         bool isPullUpWorkout = (workout == Player3D::TitleWorkoutType::PullUp);
         float camDist = isPullUpWorkout ? 260.0f : 240.0f;
         float targetY = isFloorWorkout ? (catY + 14.0f) : (isPullUpWorkout ? (catY + 42.0f) : (catY + 20.0f));
@@ -973,25 +1005,30 @@ void GameManager::Update()
         }
 
         // メニュー項目の上下移動 (0: START, 1: STAGE, 2: ゲーム説明, 3: サウンド設定, 4: 筋トレモーション選択)
-        if (triggerUp)   { m_selectedMenuItem = (m_selectedMenuItem + 4) % 5; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
-        if (triggerDown) { m_selectedMenuItem = (m_selectedMenuItem + 1) % 5; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+        if (m_selectedMenuItem != 4)
+        {
+            if (triggerUp)   { m_selectedMenuItem = (m_selectedMenuItem + 4) % 5; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+            if (triggerDown) { m_selectedMenuItem = (m_selectedMenuItem + 1) % 5; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+        }
 
         // ボタンの当たり判定座標
         int btnW = 420;
         int btnH = 44;
         int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-        int startBtnY   = 328;
-        int stageBtnY   = 378;
-        int howBtnY     = 428;
-        int soundBtnY   = 478;
-        int workoutCardY = 528;
-        int workoutCardH = 74;
+        int startBtnY    = 308;
+        int stageBtnY    = 358;
+        int howBtnY      = 408;
+        int soundBtnY    = 458;
+        int workoutCardW = 460;
+        int workoutCardX = (Config::SCREEN_WIDTH - workoutCardW) / 2;
+        int workoutCardY = 510;
+        int workoutCardH = 100;
 
         bool hoverStart   = (mx >= btnX && mx <= btnX + btnW && my >= startBtnY && my <= startBtnY + btnH);
         bool hoverStage   = (mx >= btnX && mx <= btnX + btnW && my >= stageBtnY && my <= stageBtnY + btnH);
         bool hoverHow     = (mx >= btnX && mx <= btnX + btnW && my >= howBtnY && my <= howBtnY + btnH);
         bool hoverSound   = (mx >= btnX && mx <= btnX + btnW && my >= soundBtnY && my <= soundBtnY + btnH);
-        bool hoverWorkout = (mx >= btnX && mx <= btnX + btnW && my >= workoutCardY && my <= workoutCardY + workoutCardH);
+        bool hoverWorkout = (mx >= workoutCardX && mx <= workoutCardX + workoutCardW && my >= workoutCardY && my <= workoutCardY + workoutCardH);
 
         if (hoverStart)   m_selectedMenuItem = 0;
         if (hoverStage)   m_selectedMenuItem = 1;
@@ -999,17 +1036,12 @@ void GameManager::Update()
         if (hoverSound)   m_selectedMenuItem = 3;
         if (hoverWorkout) m_selectedMenuItem = 4;
 
-        // 筋トレモーション選択ボタン（4種）の個別ホバー＆クリック・キー操作
-        int wPadX = 8;
-        int wGap  = 6;
-        int wBtnW = (btnW - wPadX * 2 - wGap * 3) / 4;
-        int wBtnH = workoutCardH - 30;
-        int wBtnY = workoutCardY + 24;
-
-        for (int i = 0; i < 4; ++i)
+        // 筋トレモーション選択ボタン（9種・2段）の個別ホバー＆クリック・キー操作
+        for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
         {
-            int bx = btnX + wPadX + i * (wBtnW + wGap);
-            if (mx >= bx && mx <= bx + wBtnW && my >= wBtnY && my <= wBtnY + wBtnH)
+            int bx = 0, by = 0, bw = 0, bh = 0;
+            GetWorkoutBtnRect(workoutCardX, workoutCardY, workoutCardW, workoutCardH, i, bx, by, bw, bh);
+            if (mx >= bx && mx <= bx + bw && my >= by && my <= by + bh)
             {
                 m_selectedMenuItem   = 4;
                 m_selectedWorkoutBtn = i;
@@ -1026,13 +1058,39 @@ void GameManager::Update()
         {
             if (triggerLeft)
             {
-                m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 3) % 4;
+                m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 8) % 9;
                 SoundManager::GetInstance().PlaySE(SeType::Cursor);
             }
             if (triggerRight)
             {
-                m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 1) % 4;
+                m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 1) % 9;
                 SoundManager::GetInstance().PlaySE(SeType::Cursor);
+            }
+            if (triggerUp)
+            {
+                if (m_selectedWorkoutBtn >= 5)
+                {
+                    m_selectedWorkoutBtn -= 5;
+                    SoundManager::GetInstance().PlaySE(SeType::Cursor);
+                }
+                else
+                {
+                    m_selectedMenuItem = 3;
+                    SoundManager::GetInstance().PlaySE(SeType::Cursor);
+                }
+            }
+            if (triggerDown)
+            {
+                if (m_selectedWorkoutBtn < 5)
+                {
+                    m_selectedWorkoutBtn = (std::min)(8, m_selectedWorkoutBtn + 5);
+                    SoundManager::GetInstance().PlaySE(SeType::Cursor);
+                }
+                else
+                {
+                    m_selectedMenuItem = 0;
+                    SoundManager::GetInstance().PlaySE(SeType::Cursor);
+                }
             }
             if (triggerEnter || triggerSpace)
             {
@@ -1343,7 +1401,7 @@ void GameManager::Update()
             VECTOR pPos = player->GetPos();
             float pRot = player->GetRotY();
 
-            bool isFloorWorkout  = (clearWorkout == Player3D::TitleWorkoutType::PushUp || clearWorkout == Player3D::TitleWorkoutType::SitUp);
+            bool isFloorWorkout  = (clearWorkout == Player3D::TitleWorkoutType::PushUp || clearWorkout == Player3D::TitleWorkoutType::SitUp || clearWorkout == Player3D::TitleWorkoutType::BenchPress);
             bool isPullUpWorkout = (clearWorkout == Player3D::TitleWorkoutType::PullUp);
 
             // 猫の斜め前方から撮影しつつ、画面左側（X ≈ 280〜310）に猫の全身＆筋トレ器具が収まるようカメラと注視点を右へオフセット
@@ -1922,6 +1980,11 @@ void GameManager::DrawGameClearScreen()
         if (clearWorkout == Player3D::TitleWorkoutType::PushUp) motionName = "腕立て伏せ";
         else if (clearWorkout == Player3D::TitleWorkoutType::SitUp) motionName = "腹筋";
         else if (clearWorkout == Player3D::TitleWorkoutType::PullUp) motionName = "懸垂";
+        else if (clearWorkout == Player3D::TitleWorkoutType::SideRaise) motionName = "サイドレイズ";
+        else if (clearWorkout == Player3D::TitleWorkoutType::DumbbellCurl) motionName = "ダンベルカール";
+        else if (clearWorkout == Player3D::TitleWorkoutType::InclineBench) motionName = "インクラインベンチ";
+        else if (clearWorkout == Player3D::TitleWorkoutType::BenchPress) motionName = "ベンチプレス";
+        else if (clearWorkout == Player3D::TitleWorkoutType::InOverHeadPress) motionName = "インクラインOHP";
 
         char showcaseBuf[96];
         snprintf(showcaseBuf, sizeof(showcaseBuf), "💪 WORKOUT SHOWCASE : %s", motionName);
@@ -2296,7 +2359,7 @@ void GameManager::DrawTitle3DScene()
     float catY = catPos.y;
 
     Player3D::TitleWorkoutType workout = CalcActiveTitleWorkout(m_titleAnimTimer);
-    bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp);
+    bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
     bool isPushUp   = isFloorWorkout;
     bool isTraining = (workout != Player3D::TitleWorkoutType::Idle);
 
@@ -2799,6 +2862,61 @@ void GameManager::DrawTitleScreen()
             activePool = pullUpShouts;
             activeCount = sizeof(pullUpShouts) / sizeof(pullUpShouts[0]);
         }
+        else if (curWorkout == Player3D::TitleWorkoutType::SideRaise)
+        {
+            static const char* sideShouts[] = {
+                "肩メロン！！巨大メロン！",
+                "三角筋が羽ばたいてる！",
+                "サイドレイズで翼を授ける！",
+                "横への広がりが凄まじい！"
+            };
+            activePool = sideShouts;
+            activeCount = sizeof(sideShouts) / sizeof(sideShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::DumbbellCurl)
+        {
+            static const char* curlShouts[] = {
+                "上腕二頭筋がチョモランマ！",
+                "二頭筋が山脈！",
+                "力こぶチョモランマ！",
+                "腕が太くて毛づくろい不可！"
+            };
+            activePool = curlShouts;
+            activeCount = sizeof(curlShouts) / sizeof(curlShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::InclineBench)
+        {
+            static const char* incShouts[] = {
+                "大胸筋上部が爆発！",
+                "インクラインで盛り上がる！",
+                "鎖骨の下が分厚い！",
+                "角度がいい！最高だ！"
+            };
+            activePool = incShouts;
+            activeCount = sizeof(incShouts) / sizeof(incShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::BenchPress)
+        {
+            static const char* bpShouts[] = {
+                "大胸筋がまな板！",
+                "胸が分厚すぎて前が見えねえ！",
+                "ベンチプレス最高！",
+                "バーベルが軽すぎる！"
+            };
+            activePool = bpShouts;
+            activeCount = sizeof(bpShouts) / sizeof(bpShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::InOverHeadPress)
+        {
+            static const char* ohpShouts[] = {
+                "肩にキャノン砲！",
+                "天を突く肩幅！",
+                "天井に届くプレス！",
+                "ダンベルが空を飛ぶ！"
+            };
+            activePool = ohpShouts;
+            activeCount = sizeof(ohpShouts) / sizeof(ohpShouts[0]);
+        }
 
         // --- 6個の掛け声吹き出し（左右3箇所ずつ配置、約3秒スパンでリズミカルに入れ替え） ---
         const int SHOUT_SPAN = 180; // 約3秒スパン (60fps * 3s)
@@ -2857,12 +2975,14 @@ void GameManager::DrawTitleScreen()
     int btnW = 420;
     int btnH = 44;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-    int startBtnY    = 328;
-    int stageBtnY    = 378;
-    int howBtnY      = 428;
-    int soundBtnY    = 478;
-    int workoutCardY = 528;
-    int workoutCardH = 74;
+int startBtnY    = 308;
+    int stageBtnY    = 358;
+    int howBtnY      = 408;
+    int soundBtnY    = 458;
+    int workoutCardW = 460;
+    int workoutCardX = (Config::SCREEN_WIDTH - workoutCardW) / 2;
+    int workoutCardY = 510;
+    int workoutCardH = 100;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
@@ -3018,7 +3138,7 @@ void GameManager::DrawTitleScreen()
         GetMousePoint(&mx, &my);
         bool isWorkoutRowSelected = (m_selectedMenuItem == 4);
         DrawWorkoutMotionSelectorCard(
-            btnX, workoutCardY, btnW, workoutCardH,
+            workoutCardX, workoutCardY, workoutCardW, workoutCardH,
             isWorkoutRowSelected, m_selectedWorkoutBtn,
             mx, my, font16, font13
         );
@@ -3030,7 +3150,7 @@ void GameManager::DrawTitleScreen()
         : "★ [ ← / → ] またはクリックで MAP 1: 通常ハウス に切替";
     int hintW = GetDrawStringWidthToHandle(stageHint, static_cast<int>(strlen(stageHint)), font13);
     int hintX = (Config::SCREEN_WIDTH - hintW) / 2;
-    int hintY = 612;
+    int hintY = 618;
 
     SoftUI::DrawSoftCard(hintX - 18, hintY - 4, hintW + 36, 26, 13, GetColor(18, 24, 40), 200, GetColor(255, 215, 60), 1);
     DrawStringToHandle(hintX, hintY, stageHint, GetColor(255, 235, 120), font13);
@@ -3800,48 +3920,53 @@ void GameManager::UpdatePause(bool triggerEsc)
     }
 
     // 上下キーで選択切り替え (0: リトライ, 1: タイトル, 2: マウス感度, 3: BGM音量, 4: SE音量, 5: 筋トレモーション選択)
-    if (triggerUp)
+    if (m_pauseMenuItem != 5)
     {
-        m_pauseMenuItem = (m_pauseMenuItem + 5) % 6;
-        SoundManager::GetInstance().PlaySE(SeType::Cursor);
-    }
-    if (triggerDown)
-    {
-        m_pauseMenuItem = (m_pauseMenuItem + 1) % 6;
-        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+        if (triggerUp)
+        {
+            m_pauseMenuItem = (m_pauseMenuItem + 5) % 6;
+            SoundManager::GetInstance().PlaySE(SeType::Cursor);
+        }
+        if (triggerDown)
+        {
+            m_pauseMenuItem = (m_pauseMenuItem + 1) % 6;
+            SoundManager::GetInstance().PlaySE(SeType::Cursor);
+        }
     }
 
     // モーダルレイアウト寸法
     int modalW = 500;
-    int modalH = 590;
+    int modalH = 516;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
     int btnW = 380;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
 
-    int retryBtnY = modalY + 58;
-    int retryBtnH = 44;
+    int retryBtnY = modalY + 44;
+    int retryBtnH = 40;
 
-    int titleBtnY = modalY + 108;
-    int titleBtnH = 44;
+    int titleBtnY = modalY + 90;
+    int titleBtnH = 40;
 
-    int sensRowY  = modalY + 158;
-    int sensRowH  = 66;
+    int sensRowY  = modalY + 136;
+    int sensRowH  = 60;
 
-    int bgmRowY   = modalY + 230;
-    int bgmRowH   = 66;
+    int bgmRowY   = modalY + 202;
+    int bgmRowH   = 60;
 
-    int seRowY    = modalY + 302;
-    int seRowH    = 66;
+    int seRowY    = modalY + 268;
+    int seRowH    = 60;
 
-    int workoutCardY = modalY + 374;
-    int workoutCardH = 74;
+    int workoutCardW = 460;
+    int workoutCardX = (Config::SCREEN_WIDTH - workoutCardW) / 2;
+    int workoutCardY = modalY + 334;
+    int workoutCardH = 100;
 
     int resumeBtnW = 280;
-    int resumeBtnH = 36;
+    int resumeBtnH = 34;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 462;
+    int resumeBtnY = modalY + 440;
 
     int minusBtnX  = btnX + 10;
     int minusBtnW  = 46;
@@ -3859,7 +3984,7 @@ void GameManager::UpdatePause(bool triggerEsc)
     bool hoverSens    = (mx >= btnX && mx <= btnX + btnW && my >= sensRowY && my <= sensRowY + sensRowH);
     bool hoverBgm     = (mx >= btnX && mx <= btnX + btnW && my >= bgmRowY && my <= bgmRowY + bgmRowH);
     bool hoverSe      = (mx >= btnX && mx <= btnX + btnW && my >= seRowY && my <= seRowY + seRowH);
-    bool hoverWorkout = (mx >= btnX && mx <= btnX + btnW && my >= workoutCardY && my <= workoutCardY + workoutCardH);
+    bool hoverWorkout = (mx >= workoutCardX && mx <= workoutCardX + workoutCardW && my >= workoutCardY && my <= workoutCardY + workoutCardH);
     bool hoverResume  = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW && my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
     if (hoverRetry)   m_pauseMenuItem = 0;
@@ -3869,17 +3994,12 @@ void GameManager::UpdatePause(bool triggerEsc)
     if (hoverSe)      m_pauseMenuItem = 4;
     if (hoverWorkout) m_pauseMenuItem = 5;
 
-    // 筋トレモーション選択ボタン（4種）の個別ホバー＆クリック・キー操作
-    int wPadX = 8;
-    int wGap  = 6;
-    int wBtnW = (btnW - wPadX * 2 - wGap * 3) / 4;
-    int wBtnH = workoutCardH - 30;
-    int wBtnY = workoutCardY + 24;
-
-    for (int i = 0; i < 4; ++i)
+    // 筋トレモーション選択ボタン（9種・2段）の個別ホバー＆クリック・キー操作
+    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
     {
-        int bx = btnX + wPadX + i * (wBtnW + wGap);
-        if (mx >= bx && mx <= bx + wBtnW && my >= wBtnY && my <= wBtnY + wBtnH)
+        int bx = 0, by = 0, bw = 0, bh = 0;
+        GetWorkoutBtnRect(workoutCardX, workoutCardY, workoutCardW, workoutCardH, i, bx, by, bw, bh);
+        if (mx >= bx && mx <= bx + bw && my >= by && my <= by + bh)
         {
             m_pauseMenuItem           = 5;
             m_pauseSelectedWorkoutBtn = i;
@@ -3896,13 +4016,39 @@ void GameManager::UpdatePause(bool triggerEsc)
     {
         if (triggerLeft)
         {
-            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 3) % 4;
+            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 8) % 9;
             SoundManager::GetInstance().PlaySE(SeType::Cursor);
         }
         if (triggerRight)
         {
-            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 1) % 4;
+            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 1) % 9;
             SoundManager::GetInstance().PlaySE(SeType::Cursor);
+        }
+        if (triggerUp)
+        {
+            if (m_pauseSelectedWorkoutBtn >= 5)
+            {
+                m_pauseSelectedWorkoutBtn -= 5;
+                SoundManager::GetInstance().PlaySE(SeType::Cursor);
+            }
+            else
+            {
+                m_pauseMenuItem = 4;
+                SoundManager::GetInstance().PlaySE(SeType::Cursor);
+            }
+        }
+        if (triggerDown)
+        {
+            if (m_pauseSelectedWorkoutBtn < 5)
+            {
+                m_pauseSelectedWorkoutBtn = (std::min)(8, m_pauseSelectedWorkoutBtn + 5);
+                SoundManager::GetInstance().PlaySE(SeType::Cursor);
+            }
+            else
+            {
+                m_pauseMenuItem = 0;
+                SoundManager::GetInstance().PlaySE(SeType::Cursor);
+            }
         }
         if (triggerEnter || triggerSpace)
         {
@@ -4060,7 +4206,7 @@ void GameManager::DrawPauseModal()
 
     // 2. モーダル本体
     int modalW = 500;
-    int modalH = 590;
+    int modalH = 516;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
@@ -4079,18 +4225,20 @@ void GameManager::DrawPauseModal()
     int btnW = 380;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
 
-    int retryBtnY    = modalY + 58;
-    int retryBtnH    = 44;
-    int titleBtnY    = modalY + 108;
-    int titleBtnH    = 44;
-    int sensRowY     = modalY + 158;
-    int sensRowH     = 66;
-    int bgmRowY      = modalY + 230;
-    int bgmRowH      = 66;
-    int seRowY       = modalY + 302;
-    int seRowH       = 66;
-    int workoutCardY = modalY + 374;
-    int workoutCardH = 74;
+    int retryBtnY    = modalY + 44;
+    int retryBtnH    = 40;
+    int titleBtnY    = modalY + 90;
+    int titleBtnH    = 40;
+    int sensRowY     = modalY + 136;
+    int sensRowH     = 60;
+    int bgmRowY      = modalY + 202;
+    int bgmRowH      = 60;
+    int seRowY       = modalY + 268;
+    int seRowH       = 60;
+    int workoutCardW = 460;
+    int workoutCardX = (Config::SCREEN_WIDTH - workoutCardW) / 2;
+    int workoutCardY = modalY + 334;
+    int workoutCardH = 100;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
@@ -4194,19 +4342,19 @@ void GameManager::DrawPauseModal()
         hoverSeMinus, hoverSePlus, font16, font13
     );
 
-    // --- コントロール6: 筋トレ時アニメーション選択 (4つのモーションON/OFFボタン) ---
+    // --- コントロール6: 筋トレ時アニメーション選択 (9つのモーションON/OFFボタン) ---
     bool isWorkoutRowSelected = (m_pauseMenuItem == 5);
     DrawWorkoutMotionSelectorCard(
-        btnX, workoutCardY, btnW, workoutCardH,
+        workoutCardX, workoutCardY, workoutCardW, workoutCardH,
         isWorkoutRowSelected, m_pauseSelectedWorkoutBtn,
         mx, my, font16, font13
     );
 
     // --- 下部: ゲームに戻る (ESC) ボタン ---
     int resumeBtnW = 280;
-    int resumeBtnH = 36;
+    int resumeBtnH = 34;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 462;
+    int resumeBtnY = modalY + 440;
     bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW && my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
     SoftUI::DrawSoftCard(resumeBtnX, resumeBtnY, resumeBtnW, resumeBtnH, 18,

@@ -1,4 +1,4 @@
-// ============================================================================
+﻿// ============================================================================
 // @file   Player3D.h
 // @brief  プレイヤー操作キャラクター（マッスルにゃんこ）の制御・アクション・描画クラス定義
 // ============================================================================
@@ -23,11 +23,16 @@ enum class MuscleState
 // ============================================================================
 enum class WorkoutMotionType : int
 {
-    Squat  = 0, // スクワット (03_squat / バーベル保持)
-    PushUp = 1, // 腕立て伏せ (05_PushUp)
-    SitUp  = 2, // 腹筋・シットアップ (06_Situp)
-    PullUp = 3, // 懸垂・プルアップ (07_PullUp)
-    Count  = 4
+    Squat           = 0, // スクワット (03_squat / バーベル保持)
+    PushUp          = 1, // 腕立て伏せ (05_PushUp)
+    SitUp           = 2, // 腹筋・シットアップ (06_Situp)
+    PullUp          = 3, // 懸垂・プルアップ (07_PullUp / 懸垂バー)
+    SideRaise       = 4, // サイドレイズ (08_SideRaise / ダンベルのみ)
+    DumbbellCurl    = 5, // ダンベルカール (10_Dumbbell curl / ダンベルのみ)
+    InclineBench    = 6, // インクラインベンチ (11_InClineBenti / InclineBench + ダンベル)
+    BenchPress      = 7, // ベンチプレス (12_BenchPress / FlatBench + バーベル)
+    InOverHeadPress = 8, // オーバーヘッドプレス (13_InOverHeadPress / InclineBench + ダンベル)
+    Count           = 9
 };
 
 // ============================================================================
@@ -83,10 +88,15 @@ private:
     // 筋トレQTE（スキルチェック）＆ レベル（Rep）管理メンバ
     // ------------------------------------------------------------------------
     bool  m_isSkillChecking    = false; // 現在筋トレQTE中かどうか
-    bool  m_isTitleSquat       = false; // タイトル/リザルト画面でのスクワット演出フラグ
-    bool  m_isTitlePushUp      = false; // タイトル画面での腕立て伏せ（プッシュアップ）演出フラグ
-    bool  m_isTitleSitUp       = false; // タイトル画面での腹筋（シットアップ）演出フラグ
-    bool  m_isTitlePullUp      = false; // タイトル画面での懸垂（プルアップ）演出フラグ
+    bool  m_isTitleSquat           = false; // タイトル/リザルト画面でのスクワット演出フラグ
+    bool  m_isTitlePushUp          = false; // タイトル画面での腕立て伏せ（プッシュアップ）演出フラグ
+    bool  m_isTitleSitUp           = false; // タイトル画面での腹筋（シットアップ）演出フラグ
+    bool  m_isTitlePullUp          = false; // タイトル画面での懸垂（プルアップ）演出フラグ
+    bool  m_isTitleSideRaise       = false; // タイトル画面でのサイドレイズ演出フラグ
+    bool  m_isTitleDumbbellCurl    = false; // タイトル画面でのダンベルカール演出フラグ
+    bool  m_isTitleInclineBench    = false; // タイトル画面でのインクラインベンチ演出フラグ
+    bool  m_isTitleBenchPress      = false; // タイトル画面でのベンチプレス演出フラグ
+    bool  m_isTitleInOverHeadPress = false; // タイトル画面でのインクラインOHP演出フラグ
     WorkoutMotionType m_activeWorkoutMotion = WorkoutMotionType::Squat; // 今回の筋トレで再生中のアニメーション種別
     float m_scCursor           = 0.0f;  // QTEゲージ内の針の現在位置 (0.0f 〜 1.0f)
     float m_scCursorDir        = 1.0f;  // 針の往復移動方向 (+1.0f: 右進, -1.0f: 左進)
@@ -143,36 +153,50 @@ private:
     float m_animPlayTime         = 0.0f;  // 現在のアニメーション再生時刻
 
     // cat.mv1 / cat_soreness.mv1 内の各モーションインデックス（InitModel で名前検索して自動取得）
-    int   m_animIndexRun         = 0;     // 01_Run: 走行モーション
-    int   m_animIndexAttack      = 1;     // 02_Attack: 飛びつき跳躍モーション
-    int   m_animIndexSquat       = 2;     // 03_squat: スクワット（筋トレQTE）モーション
-    int   m_animIndexIdol        = 3;     // 04_Idol: 待機モーション
-    int   m_animIndexPush        = 4;     // 05_Push / Attack: タックル突進モーション
-    int   m_animIndexPushUp      = 4;     // 05_PushUp: 腕立て伏せモーション
-    int   m_animIndexSitUp       = 5;     // 06_Situp: 腹筋（シットアップ）モーション
-    int   m_animIndexPullUp      = 6;     // 07_PullUp: 懸垂（プルアップ）モーション
-    int   m_animIndexSoreness    = 5;     // 06_MuscleSoreness: 筋肉痛モーション
-    bool  m_pushFromSubModel     = false; // Pushアニメーションを補助モデルから参照するか
-    bool  m_sorenessFromSubModel = false; // 筋肉痛アニメーションを補助モデルから参照するか
+    int   m_animIndexRun             = 0;     // 01_Run: 走行モーション
+    int   m_animIndexAttack          = 1;     // 02_Attack: 飛びつき跳躍モーション
+    int   m_animIndexSquat           = 2;     // 03_squat: スクワット（筋トレQTE）モーション
+    int   m_animIndexIdol            = 3;     // 04_Idol: 待機モーション
+    int   m_animIndexPush            = 4;     // 05_Push / Attack: タックル突進モーション
+    int   m_animIndexPushUp          = 4;     // 05_PushUp: 腕立て伏せモーション
+    int   m_animIndexSitUp           = 5;     // 06_Situp: 腹筋（シットアップ）モーション
+    int   m_animIndexPullUp          = 6;     // 07_PullUp: 懸垂（プルアップ）モーション
+    int   m_animIndexSideRaise       = 7;     // 08_SideRaise: サイドレイズモーション
+    int   m_animIndexDumbbellCurl    = 8;     // 10_Dumbbell curl: ダンベルカールモーション
+    int   m_animIndexInclineBench    = 9;     // 11_InClineBenti: インクラインベンチモーション
+    int   m_animIndexBenchPress      = 10;    // 12_BenchPress: ベンチプレスモーション
+    int   m_animIndexInOverHeadPress = 11;    // 13_InOverHeadPress: インクラインOHPモーション
+    int   m_animIndexSoreness        = 5;     // 06_MuscleSoreness: 筋肉痛モーション
+    bool  m_pushFromSubModel         = false; // Pushアニメーションを補助モデルから参照するか
+    bool  m_sorenessFromSubModel     = false; // 筋肉痛アニメーションを補助モデルから参照するか
 
     // 筋トレアニメーション各モーションのON/OFF設定（メニュー画面のトグルボタンと連動）
     static bool s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)];
     static int  s_workoutSequenceIndex;
 
-    // バーベルを両手に追従させるためのMixamoボーンフレーム番号キャッシュ
-    int   m_lHandFrame         = -1;    // 左手首ボーン (mixamorig:LeftHand)
-    int   m_rHandFrame         = -1;    // 右手首ボーン (mixamorig:RightHand)
-    int   m_lHandKnuckleFrame  = -1;    // 左中指付け根ボーン (mixamorig:LeftHandMiddle1)
-    int   m_rHandKnuckleFrame  = -1;    // 右中指付け根ボーン (mixamorig:RightHandMiddle1)
+    // トレーニング器具配置用のMixamoボーンフレーム番号キャッシュ
+    int   m_lHandFrame              = -1;    // 左手首ボーン (mixamorig:LeftHand)
+    int   m_rHandFrame              = -1;    // 右手首ボーン (mixamorig:RightHand)
+    int   m_lHandKnuckleFrame       = -1;    // 左中指付け根ボーン (mixamorig:LeftHandMiddle1)
+    int   m_rHandKnuckleFrame       = -1;    // 右中指付け根ボーン (mixamorig:RightHandMiddle1)
+    int   m_lForeArmFrame           = -1;    // 左前腕ボーン (mixamorig:LeftForeArm)
+    int   m_rForeArmFrame           = -1;    // 右前腕ボーン (mixamorig:RightForeArm)
 
-    // スクワット中に両手に持つバーベルの3Dモデルハンドル
-    int   m_barbellModelHandle = -1;
+    // トレーニング器具3Dモデルハンドル
+    int   m_barbellModelHandle      = -1;    // スクワット / ベンチプレス用バーベル
+    int   m_dumbbellModelHandle     = -1;    // サイドレイズ / カール / インクライン用ダンベル
+    int   m_flatBenchModelHandle    = -1;    // ベンチプレス用フラットベンチ
+    int   m_inclineBenchModelHandle = -1;    // インクラインベンチ / OHP用インクラインベンチ
 
     // 内部ヘルパーメソッド
     void InitModel();                   // モデル・アニメーション・ボーンフレームの初期化
     void UpdateAnimation(bool isMoving);// 現在の行動状態に応じたアニメーション切り替え・再生進行
     void DrawBarbell(float catScale);   // 両手ボーン座標から変換行列を構築してバーベルを描画
     void DrawPullUpBar(float catScale); // 懸垂モーション時に両手位置に合わせた懸垂バー＆支柱ラックを描画
+    void DrawFlatBench(float catScale); // ベンチプレス時に猫の下に敷くフラットベンチを描画
+    void DrawInclineBench(float catScale); // インクラインベンチ＆OHP時に猫の後方に配置するインクラインベンチを描画
+    void DrawDumbbells(float catScale); // 両手にダンベルを描画
+    void DrawSingleDumbbell(float catScale, bool isRight);
 
 public:
     Player3D(const VECTOR& pos);
@@ -303,11 +327,16 @@ public:
     {
         switch (type)
         {
-        case WorkoutMotionType::Squat:  return "スクワット";
-        case WorkoutMotionType::PushUp: return "腕立て伏せ";
-        case WorkoutMotionType::SitUp:  return "腹筋";
-        case WorkoutMotionType::PullUp: return "懸垂";
-        default:                        return "スクワット";
+        case WorkoutMotionType::Squat:           return "スクワット";
+        case WorkoutMotionType::PushUp:          return "腕立て伏せ";
+        case WorkoutMotionType::SitUp:           return "腹筋";
+        case WorkoutMotionType::PullUp:          return "懸垂";
+        case WorkoutMotionType::SideRaise:       return "サイドレイズ";
+        case WorkoutMotionType::DumbbellCurl:    return "ダンベルカール";
+        case WorkoutMotionType::InclineBench:    return "インクライン";
+        case WorkoutMotionType::BenchPress:      return "ベンチプレス";
+        case WorkoutMotionType::InOverHeadPress: return "インクラインOHP";
+        default:                                 return "スクワット";
         }
     }
 
@@ -318,21 +347,31 @@ public:
     // ------------------------------------------------------------------------
     enum class TitleWorkoutType
     {
-        Idle = 0, // 待機・ポージング
-        Squat,    // バーベルスクワット
-        PushUp,   // 腕立て伏せ（プッシュアップ）
-        SitUp,    // 腹筋（シットアップ）
-        PullUp    // 懸垂（プルアップ）
+        Idle = 0,        // 待機・ポージング
+        Squat,           // バーベルスクワット
+        PushUp,          // 腕立て伏せ（プッシュアップ）
+        SitUp,           // 腹筋（シットアップ）
+        PullUp,          // 懸垂（プルアップ）
+        SideRaise,       // サイドレイズ
+        DumbbellCurl,    // ダンベルカール
+        InclineBench,    // インクラインベンチ
+        BenchPress,      // ベンチプレス
+        InOverHeadPress  // インクラインOHP
     };
 
     void UpdateTitleAnimation(TitleWorkoutType workoutType)
     {
         m_animFrame++;
         m_animTime += 1.0f / 60.0f;
-        m_isTitleSquat    = (workoutType == TitleWorkoutType::Squat);
-        m_isTitlePushUp   = (workoutType == TitleWorkoutType::PushUp);
-        m_isTitleSitUp    = (workoutType == TitleWorkoutType::SitUp);
-        m_isTitlePullUp   = (workoutType == TitleWorkoutType::PullUp);
+        m_isTitleSquat           = (workoutType == TitleWorkoutType::Squat);
+        m_isTitlePushUp          = (workoutType == TitleWorkoutType::PushUp);
+        m_isTitleSitUp           = (workoutType == TitleWorkoutType::SitUp);
+        m_isTitlePullUp          = (workoutType == TitleWorkoutType::PullUp);
+        m_isTitleSideRaise       = (workoutType == TitleWorkoutType::SideRaise);
+        m_isTitleDumbbellCurl    = (workoutType == TitleWorkoutType::DumbbellCurl);
+        m_isTitleInclineBench    = (workoutType == TitleWorkoutType::InclineBench);
+        m_isTitleBenchPress      = (workoutType == TitleWorkoutType::BenchPress);
+        m_isTitleInOverHeadPress = (workoutType == TitleWorkoutType::InOverHeadPress);
         m_isSkillChecking = false;
         m_isPouncing      = false;
         m_isTackling      = false;
@@ -357,11 +396,16 @@ public:
         // 有効になっている筋トレモーションの中から選択して再生
         switch (m_activeWorkoutMotion)
         {
-        case WorkoutMotionType::PushUp: UpdateTitleAnimation(TitleWorkoutType::PushUp); break;
-        case WorkoutMotionType::SitUp:  UpdateTitleAnimation(TitleWorkoutType::SitUp);  break;
-        case WorkoutMotionType::PullUp: UpdateTitleAnimation(TitleWorkoutType::PullUp); break;
+        case WorkoutMotionType::PushUp:          UpdateTitleAnimation(TitleWorkoutType::PushUp); break;
+        case WorkoutMotionType::SitUp:           UpdateTitleAnimation(TitleWorkoutType::SitUp); break;
+        case WorkoutMotionType::PullUp:          UpdateTitleAnimation(TitleWorkoutType::PullUp); break;
+        case WorkoutMotionType::SideRaise:       UpdateTitleAnimation(TitleWorkoutType::SideRaise); break;
+        case WorkoutMotionType::DumbbellCurl:    UpdateTitleAnimation(TitleWorkoutType::DumbbellCurl); break;
+        case WorkoutMotionType::InclineBench:    UpdateTitleAnimation(TitleWorkoutType::InclineBench); break;
+        case WorkoutMotionType::BenchPress:      UpdateTitleAnimation(TitleWorkoutType::BenchPress); break;
+        case WorkoutMotionType::InOverHeadPress: UpdateTitleAnimation(TitleWorkoutType::InOverHeadPress); break;
         case WorkoutMotionType::Squat:
-        default:                        UpdateTitleAnimation(TitleWorkoutType::Squat);  break;
+        default:                                 UpdateTitleAnimation(TitleWorkoutType::Squat); break;
         }
     }
 
