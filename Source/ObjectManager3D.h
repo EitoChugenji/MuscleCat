@@ -40,7 +40,7 @@ private:
         VECTOR       worldPos   = VGet(0.0f, 0.0f, 0.0f); // 捕獲発生地点のワールド座標
         int          timer      = 55;                     // 残り表示フレーム数
         int          maxTimer   = 55;                     // 最大表示フレーム数（進行度算出用）
-        std::string  titleText;                           // メイン見出し ("★ CATCH!! ★", "🔥 2 COMBO!! 🔥" 等)
+        std::string  titleText;                           // メイン見出し ("★ CATCH!! ★", "★ 2 COMBO!! ★" 等)
         std::string  subText;                             // サブテキスト ("+1 POINT!", "NICE CATCH! +1" 等)
         unsigned int titleColor = 0;                      // メイン文字カラー
         unsigned int badgeColor = 0;                      // カード外枠カラー

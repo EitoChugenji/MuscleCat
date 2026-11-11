@@ -1185,7 +1185,7 @@ bool Stage3D::ClampToBounds(VECTOR& outPos, float radius) const
 
 // ============================================================================
 // マップ1（House）専用の接地高さ判定
-// （不要なpCube55(Y=50)や壁の上面(Y=200)を誤検出せず、室内床面(Y≈5)のみを正確に検出）
+// （不要なpCube55(Y=50)や壁の上面(Y=200)を誤検出せず、室内床面(Y~5)のみを正確に検出）
 // ============================================================================
 bool Stage3D::GetHouseGroundHeight(const VECTOR& pos, float& outGroundY, VECTOR* outGroundNormal) const
 {
@@ -1195,7 +1195,7 @@ bool Stage3D::GetHouseGroundHeight(const VECTOR& pos, float& outGroundY, VECTOR*
         return false;
     }
 
-    // Houseの床（Mesh[2], Y≈5.0f）のみを探索するため、Y=30.0f 〜 -30.0f の範囲でレイキャスト
+    // Houseの床（Mesh[2], Y~5.0f）のみを探索するため、Y=30.0f 〜 -30.0f の範囲でレイキャスト
     VECTOR start = VGet(pos.x, 30.0f, pos.z);
     VECTOR end   = VGet(pos.x, -30.0f, pos.z);
 
@@ -1216,7 +1216,7 @@ bool Stage3D::GetHouseGroundHeight(const VECTOR& pos, float& outGroundY, VECTOR*
 
 // ============================================================================
 // マップ2（NewMap）専用の接地高さ判定
-// （坂道・通路床(Y≈0〜120)を正確に追跡し、外壁や中央円柱の屋上(Y=200)への誤ワープを防止）
+// （坂道・通路床(Y~0〜120)を正確に追跡し、外壁や中央円柱の屋上(Y=200)への誤ワープを防止）
 // ============================================================================
 bool Stage3D::GetNewMapGroundHeight(const VECTOR& pos, float& outGroundY, VECTOR* outGroundNormal) const
 {

@@ -398,7 +398,7 @@ void ObjectManager3D::Draw2D()
         float comboRatio = static_cast<float>(m_comboTimer) / 210.0f;
 
         char comboBuf[64];
-        snprintf(comboBuf, sizeof(comboBuf), "🔥 %d COMBO RUSH! 🔥", m_comboCount);
+        snprintf(comboBuf, sizeof(comboBuf), "★ %d COMBO RUSH! ★", m_comboCount);
         int strW = GetDrawStringWidthToHandle(comboBuf, static_cast<int>(std::strlen(comboBuf)), font24);
 
         int bW = strW + 36;
@@ -532,28 +532,28 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
 
                     if (m_comboCount >= 5)
                     {
-                        cp.titleText = "👑 " + std::to_string(m_comboCount) + " COMBO!! 👑";
+                        cp.titleText = "★ " + std::to_string(m_comboCount) + " COMBO!! ★";
                         cp.subText = "GODLIKE CAT!! +1";
                         cp.titleColor = GetColor(255, 220, 50);
                         cp.badgeColor = GetColor(180, 40, 255); // ロイヤルパープル
                     }
                     else if (m_comboCount == 4)
                     {
-                        cp.titleText = "💥 4 COMBO!! 💥";
+                        cp.titleText = "★ 4 COMBO!! ★";
                         cp.subText = "MUSCLE FEVER!! +1";
                         cp.titleColor = GetColor(255, 80, 180);
                         cp.badgeColor = GetColor(255, 30, 80);
                     }
                     else if (m_comboCount == 3)
                     {
-                        cp.titleText = "⚡ 3 COMBO!! ⚡";
+                        cp.titleText = "★ 3 COMBO!! ★";
                         cp.subText = "EXCELLENT!! +1";
                         cp.titleColor = GetColor(255, 240, 60);
                         cp.badgeColor = GetColor(255, 120, 0);
                     }
                     else if (m_comboCount == 2)
                     {
-                        cp.titleText = "🔥 2 COMBO!! 🔥";
+                        cp.titleText = "★ 2 COMBO!! ★";
                         cp.subText = "NICE CATCH! +1";
                         cp.titleColor = GetColor(255, 150, 40);
                         cp.badgeColor = GetColor(220, 80, 10);
@@ -562,7 +562,7 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     {
                         if (isFast)
                         {
-                            cp.titleText = "⚡ FAST CATCH!! ⚡";
+                            cp.titleText = "★ FAST CATCH!! ★";
                             cp.subText = "SPEED GET! +1";
                             cp.titleColor = GetColor(70, 235, 255);
                             cp.badgeColor = GetColor(20, 120, 240);
