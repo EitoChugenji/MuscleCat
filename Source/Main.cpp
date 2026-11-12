@@ -10,6 +10,7 @@
 #include "CustomEffectManager.h"
 #include "CsvManager.h"
 #include "SoundManager.h"
+#include "WorkoutCollectionManager.h"
 #include "GameManager.h"
 #include <ctime>
 #include <cstdlib>
@@ -75,6 +76,7 @@ int WINAPI WinMain(HINSTANCE, HINSTANCE, LPSTR, int)
     EffectManager::GetInstance().Init();        // Effekseerエフェクトの初期化・リソース読み込み
     CustomEffectManager::GetInstance().Init();  // 3Dプロシージャル炎・煙・雷撃・地面えぐりエフェクトの初期化
     SoundManager::GetInstance().Init();         // 全BGM・SEリソースの初期化
+    WorkoutCollectionManager::GetInstance().Initialize(); // 筋トレコレクション初期化
 
     // GameManager（および内部のStage3D/Player3D等のMV1モデル）が DxLib_End() より前に破棄されるようスコープで囲む
     {

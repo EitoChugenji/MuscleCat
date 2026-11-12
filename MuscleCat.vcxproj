@@ -148,6 +148,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="Source\Camera3D.h" />
+    <ClInclude Include="Source\WorkoutCollectionManager.h" />
     <ClInclude Include="Source\Common.h" />
     <ClInclude Include="Source\Config.h" />
     <ClInclude Include="Source\CsvManager.h" />
@@ -168,6 +169,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Source\Camera3D.cpp" />
+    <ClCompile Include="Source\WorkoutCollectionManager.cpp" />
     <ClCompile Include="Source\CsvManager.cpp" />
     <ClCompile Include="Source\CustomEffectManager.cpp" />
     <ClCompile Include="Source\EffectManager.cpp" />
