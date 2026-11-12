@@ -111,12 +111,17 @@ public:
     // ------------------------------------------------------------------------
     virtual float GetCatchRadius() const
     {
-        float r = m_radius * 1.55f;
+        float r = m_radius * 1.0f;
         if (IsStunned())
         {
             r += 5.0f;
         }
         return r;
+    }
+
+    virtual float GetWallCollisionRadius() const
+    {
+        return 48.0f;
     }
 
     // スタン中の3D頭上ピヨピヨ星＆リング描画

@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   ObjectManager3D.cpp
 // @brief  ObjectManager3D クラスの実装（更新・描画・捕獲コンボ判定・壁/床衝突解決）
 // ============================================================================
@@ -29,6 +29,7 @@ void ObjectManager3D::Clear()
     m_isTimeFrozen = false;
     m_hitStopFrames = 0;
     m_comboCount = 0;
+    m_maxComboCount = 0;
     m_comboTimer = 0;
     m_catchFlashTimer = 0;
     m_catchPopups.clear();
@@ -397,7 +398,7 @@ void ObjectManager3D::Draw2D()
         float comboRatio = static_cast<float>(m_comboTimer) / 210.0f;
 
         char comboBuf[64];
-        snprintf(comboBuf, sizeof(comboBuf), "🔥 %d COMBO RUSH! 🔥", m_comboCount);
+        snprintf(comboBuf, sizeof(comboBuf), "★ %d COMBO RUSH! ★", m_comboCount);
         int strW = GetDrawStringWidthToHandle(comboBuf, static_cast<int>(std::strlen(comboBuf)), font24);
 
         int bW = strW + 36;
@@ -496,6 +497,7 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     {
                         m_comboCount = 1;
                     }
+                    if (m_comboCount > m_maxComboCount) { m_maxComboCount = m_comboCount; }
                     m_comboTimer = 210; // 約3.5秒のコンボ猶予
                     m_catchFlashTimer = 16; // 画面端インパクトゴールドフラッシュ
 
@@ -530,28 +532,28 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
 
                     if (m_comboCount >= 5)
                     {
-                        cp.titleText = "👑 " + std::to_string(m_comboCount) + " COMBO!! 👑";
+                        cp.titleText = "★ " + std::to_string(m_comboCount) + " COMBO!! ★";
                         cp.subText = "GODLIKE CAT!! +1";
                         cp.titleColor = GetColor(255, 220, 50);
                         cp.badgeColor = GetColor(180, 40, 255); // ロイヤルパープル
                     }
                     else if (m_comboCount == 4)
                     {
-                        cp.titleText = "💥 4 COMBO!! 💥";
+                        cp.titleText = "★ 4 COMBO!! ★";
                         cp.subText = "MUSCLE FEVER!! +1";
                         cp.titleColor = GetColor(255, 80, 180);
                         cp.badgeColor = GetColor(255, 30, 80);
                     }
                     else if (m_comboCount == 3)
                     {
-                        cp.titleText = "⚡ 3 COMBO!! ⚡";
+                        cp.titleText = "★ 3 COMBO!! ★";
                         cp.subText = "EXCELLENT!! +1";
                         cp.titleColor = GetColor(255, 240, 60);
                         cp.badgeColor = GetColor(255, 120, 0);
                     }
                     else if (m_comboCount == 2)
                     {
-                        cp.titleText = "🔥 2 COMBO!! 🔥";
+                        cp.titleText = "★ 2 COMBO!! ★";
                         cp.subText = "NICE CATCH! +1";
                         cp.titleColor = GetColor(255, 150, 40);
                         cp.badgeColor = GetColor(220, 80, 10);
@@ -560,7 +562,7 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     {
                         if (isFast)
                         {
-                            cp.titleText = "⚡ FAST CATCH!! ⚡";
+                            cp.titleText = "★ FAST CATCH!! ★";
                             cp.subText = "SPEED GET! +1";
                             cp.titleColor = GetColor(70, 235, 255);
                             cp.badgeColor = GetColor(20, 120, 240);
@@ -673,7 +675,7 @@ void ObjectManager3D::CheckObstacleAndStageCollisions(Camera3D& camera)
 
         auto mouse = std::dynamic_pointer_cast<MouseBase3D>(obj);
         VECTOR mPos = obj->GetPos();
-        float mRadius = obj->GetRadius();
+        float mRadius = mouse ? mouse->GetWallCollisionRadius() : obj->GetRadius();
         VECTOR prevPos = mouse ? mouse->GetPrevPos() : mPos;
         bool collided = false;
 
@@ -691,6 +693,30 @@ void ObjectManager3D::CheckObstacleAndStageCollisions(Camera3D& camera)
         if (m_stage.ResolveWallCollision(mPos, mRadius, &pushNormal))
         {
             collided = true;
+        }
+
+        if (mouse)
+        {
+            float rotY = mouse->GetRotY();
+            constexpr float END_OFFSET = 38.0f;
+            constexpr float END_RADIUS = 36.0f;
+            const float signs[2] = { -1.0f, 1.0f };
+            for (float s : signs)
+            {
+                VECTOR endPos = VGet(mPos.x + std::sin(rotY) * (END_OFFSET * s), mPos.y, mPos.z + std::cos(rotY) * (END_OFFSET * s));
+                VECTOR prevEndPos = endPos;
+                VECTOR endPush = VGet(0.0f, 0.0f, 0.0f);
+                if (m_stage.ResolveWallCollision(endPos, END_RADIUS, &endPush))
+                {
+                    mPos.x += (endPos.x - prevEndPos.x);
+                    mPos.z += (endPos.z - prevEndPos.z);
+                    collided = true;
+                    if (pushNormal.x == 0.0f && pushNormal.z == 0.0f)
+                    {
+                        pushNormal = endPush;
+                    }
+                }
+            }
         }
 
         // セーフティネット：外周境界ボックスによる制限

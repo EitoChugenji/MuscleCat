@@ -392,7 +392,7 @@ void MouseBase3D::CalculateMovementVector(const VECTOR& playerPos, float fleeDis
 NormalMouse3D::NormalMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
     : MouseBase3D(
         pos,
-        16.0f,
+        36.0f,
         ObjectType::NormalMouse,
         CsvManager::GetInstance().GetMouseStatus().baseSpeed,
         CsvManager::GetInstance().GetMouseStatus().speedGrowthPerUnit,
@@ -453,6 +453,12 @@ void NormalMouse3D::Draw3D()
 {
     MouseAnimTransform t = GetAnimTransform(ModelConfig::MOUSE_NORMAL_MODEL_SCALE, ModelConfig::MOUSE_NORMAL_MODEL_ROT_Y);
 
+    {
+        float hopH = (t.drawPos.y > m_pos.y) ? (t.drawPos.y - m_pos.y) : 0.0f;
+        float atten = 1.0f / (1.0f + hopH * 0.025f);
+        MathHelper::DrawFakeShadow3D(m_pos, 16.0f * atten, 28.0f * atten, m_rotY, static_cast<int>(135.0f * atten));
+    }
+
     if (!ModelManager::GetInstance().DrawModelWithTransform
         (
         ModelConfig::MOUSE_NORMAL_MODEL_PATH,
@@ -473,7 +479,7 @@ void NormalMouse3D::Draw3D()
 FastMouse3D::FastMouse3D(const VECTOR& pos, std::shared_ptr<Player3D> player)
     : MouseBase3D(
         pos,
-        14.5f,
+        34.0f,
         ObjectType::FastMouse,
         CsvManager::GetInstance().GetFastMouseStatus().baseSpeed,
         CsvManager::GetInstance().GetFastMouseStatus().speedGrowthPerUnit,
@@ -536,6 +542,12 @@ void FastMouse3D::Update()
 void FastMouse3D::Draw3D()
 {
     MouseAnimTransform t = GetAnimTransform(ModelConfig::MOUSE_FAST_MODEL_SCALE, ModelConfig::MOUSE_FAST_MODEL_ROT_Y);
+
+    {
+        float hopH = (t.drawPos.y > m_pos.y) ? (t.drawPos.y - m_pos.y) : 0.0f;
+        float atten = 1.0f / (1.0f + hopH * 0.025f);
+        MathHelper::DrawFakeShadow3D(m_pos, 16.0f * atten, 28.0f * atten, m_rotY, static_cast<int>(135.0f * atten));
+    }
 
     if (!ModelManager::GetInstance().DrawModelWithTransform
         (

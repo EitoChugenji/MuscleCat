@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   Player3D.cpp
 // @brief  Player3D クラスの実装（移動・筋トレQTE・飛びつき・スタン攻撃・3D描画）
 // ============================================================================
@@ -19,6 +19,10 @@
 #include <vector>
 #include <cctype>
 #include <algorithm>
+
+// 筋トレアニメーション各モーションの初期設定（デフォルトは4種すべてON）
+bool Player3D::s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)] = { true, true, true, true, true, true, true, true, true };
+int  Player3D::s_workoutSequenceIndex = 0;
 
 float Player3D::CalculateSpeedForRep(int effectiveRep) const
 {
@@ -41,8 +45,7 @@ Player3D::Player3D(const VECTOR& pos)
 {
     m_speed = CalculateSpeedForRep(0);
     m_rotY = 0.0f;
-    m_prevPounceKey = ((GetMouseInput() & MOUSE_INPUT_LEFT) != 0);
-    m_prevTackleKey = ((GetMouseInput() & MOUSE_INPUT_RIGHT) != 0);
+    SyncInputState();
 
     // 3Dモデルおよびアニメーションの初期化
     InitModel();
@@ -60,6 +63,24 @@ Player3D::~Player3D()
     {
         MV1DeleteModel(m_barbellModelHandle);
         m_barbellModelHandle = -1;
+    }
+
+    if (m_dumbbellModelHandle != -1)
+    {
+        MV1DeleteModel(m_dumbbellModelHandle);
+        m_dumbbellModelHandle = -1;
+    }
+
+    if (m_flatBenchModelHandle != -1)
+    {
+        MV1DeleteModel(m_flatBenchModelHandle);
+        m_flatBenchModelHandle = -1;
+    }
+
+    if (m_inclineBenchModelHandle != -1)
+    {
+        MV1DeleteModel(m_inclineBenchModelHandle);
+        m_inclineBenchModelHandle = -1;
     }
 }
 
@@ -124,11 +145,18 @@ void Player3D::InitModel()
                 return idx;
             };
 
-            m_animIndexRun      = findAnim({ "01_run", "run" }, 0);
-            m_animIndexAttack   = findAnim({ "02_attack", "attack" }, 1);
-            m_animIndexSquat    = findAnim({ "03_squat", "squat" }, 2);
-            m_animIndexIdol     = findAnim({ "04_idol", "idol", "idle" }, 3);
-            m_animIndexPushUp   = findAnim({ "05_pushup", "pushup", "push_up" }, 4);
+            m_animIndexRun             = findAnim({ "01_run", "01_ru", "run" }, 0);
+            m_animIndexAttack          = findAnim({ "02_attack", "2_attack", "attack" }, 1);
+            m_animIndexSquat           = findAnim({ "03_squat", "3_squat", "squat" }, 2);
+            m_animIndexIdol            = findAnim({ "04_idol", "4_idol", "74_ido", "idol", "idle" }, 3);
+            m_animIndexPushUp          = findAnim({ "05_pushup", "5_pushup", "pushup", "push_up" }, 4);
+            m_animIndexSitUp           = findAnim({ "06_situp", "6_situp", "situp", "sit_up" }, 5);
+            m_animIndexPullUp          = findAnim({ "07_pullup", "7_pullup", "77_pullup", "pullup", "pull_up" }, 6);
+            m_animIndexSideRaise       = findAnim({ "08_sideraise", "sideraise", "78_siderai" }, 7);
+            m_animIndexDumbbellCurl    = findAnim({ "10_dumbbell curl", "10_dumbbell", "dumbbell curl", "curl" }, 8);
+            m_animIndexInclineBench    = findAnim({ "11_inclinebenti", "inclinebenti", "incline" }, 9);
+            m_animIndexBenchPress      = findAnim({ "12_benchpress", "benchpress" }, 10);
+            m_animIndexInOverHeadPress = findAnim({ "13_inoverheadpress", "inoverheadpress", "overhead" }, 11);
 
             // タックル（スタン攻撃）用：pushup以外の独立したパンチ/プッシュがあれば使用。無ければ補助モデルまたはAttackを使用
             m_pushFromSubModel  = false;
@@ -170,11 +198,13 @@ void Player3D::InitModel()
             m_attachAnimIndex      = MV1AttachAnim(m_modelHandle, m_currentAnimIndex, m_currentAnimSrcHandle, FALSE);
             m_animPlayTime         = 0.0f;
 
-            // バーベル配置用の両手ボーンフレームを検索・キャッシュ
-            m_lHandFrame = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHand");
-            m_rHandFrame = MV1SearchFrame(m_modelHandle, "mixamorig:RightHand");
+            // 器具配置用の手・指・前腕ボーンフレームを検索・キャッシュ
+            m_lHandFrame        = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHand");
+            m_rHandFrame        = MV1SearchFrame(m_modelHandle, "mixamorig:RightHand");
             m_lHandKnuckleFrame = MV1SearchFrame(m_modelHandle, "mixamorig:LeftHandMiddle1");
             m_rHandKnuckleFrame = MV1SearchFrame(m_modelHandle, "mixamorig:RightHandMiddle1");
+            m_lForeArmFrame     = MV1SearchFrame(m_modelHandle, "mixamorig:LeftForeArm");
+            m_rForeArmFrame     = MV1SearchFrame(m_modelHandle, "mixamorig:RightForeArm");
 
             // テクスチャ抜け防止および自動復旧
             int texNum = MV1GetTextureNum(m_modelHandle);
@@ -203,11 +233,33 @@ void Player3D::InitModel()
         }
     }
 
-    // バーベルアクセサリモデルの読み込み
+    // トレーニング器具アクセサリモデルの読み込み
     int barbellBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::BARBELL_MODEL_PATH);
     if (barbellBase != -1)
     {
         m_barbellModelHandle = MV1DuplicateModel(barbellBase);
+    }
+
+    int dumbbellBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::DUMBBELL_MODEL_PATH);
+    if (dumbbellBase != -1)
+    {
+        m_dumbbellModelHandle = MV1DuplicateModel(dumbbellBase);
+    }
+
+    int flatBenchBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::FLAT_BENCH_MODEL_PATH);
+    if (flatBenchBase != -1)
+    {
+        m_flatBenchModelHandle = MV1DuplicateModel(flatBenchBase);
+        MV1SetDifColorScale(m_flatBenchModelHandle, GetColorF(3.5f, 3.8f, 4.2f, 1.0f));
+        MV1SetAmbColorScale(m_flatBenchModelHandle, GetColorF(2.8f, 3.0f, 3.5f, 1.0f));
+    }
+
+    int inclineBenchBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::INCLINE_BENCH_MODEL_PATH);
+    if (inclineBenchBase != -1)
+    {
+        m_inclineBenchModelHandle = MV1DuplicateModel(inclineBenchBase);
+        MV1SetDifColorScale(m_inclineBenchModelHandle, GetColorF(3.5f, 3.8f, 4.2f, 1.0f));
+        MV1SetAmbColorScale(m_inclineBenchModelHandle, GetColorF(2.8f, 3.0f, 3.5f, 1.0f));
     }
 }
 
@@ -246,7 +298,25 @@ void Player3D::UpdateAnimation(bool isMoving)
         targetSrcHandle = m_sorenessFromSubModel ? m_sorenessModelHandle : -1;
         playSpeed = 0.75f;
     }
-    else if (m_isSkillChecking || m_isTitleSquat)
+    else if (m_isSkillChecking)
+    {
+        // メニューでONにされている筋トレモーションのうち、今回選択されたモーションを再生
+        switch (m_activeWorkoutMotion)
+        {
+        case WorkoutMotionType::PushUp:          targetAnim = m_animIndexPushUp; break;          // 05_PushUp (腕立て伏せ)
+        case WorkoutMotionType::SitUp:           targetAnim = m_animIndexSitUp;  break;          // 06_Situp (腹筋)
+        case WorkoutMotionType::PullUp:          targetAnim = m_animIndexPullUp; break;          // 07_PullUp (懸垂)
+        case WorkoutMotionType::SideRaise:       targetAnim = m_animIndexSideRaise; break;       // 08_SideRaise (サイドレイズ)
+        case WorkoutMotionType::DumbbellCurl:    targetAnim = m_animIndexDumbbellCurl; break;    // 10_Dumbbell curl (ダンベルカール)
+        case WorkoutMotionType::InclineBench:    targetAnim = m_animIndexInclineBench; break;    // 11_InClineBenti (インクラインベンチ)
+        case WorkoutMotionType::BenchPress:      targetAnim = m_animIndexBenchPress; break;      // 12_BenchPress (ベンチプレス)
+        case WorkoutMotionType::InOverHeadPress: targetAnim = m_animIndexInOverHeadPress; break; // 13_InOverHeadPress (インクラインOHP)
+        case WorkoutMotionType::Squat:
+        default:                                 targetAnim = m_animIndexSquat;  break;          // 03_squat (スクワット)
+        }
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleSquat)
     {
         targetAnim = m_animIndexSquat;     // Armature|03_squat
         playSpeed = 1.0f;
@@ -254,6 +324,41 @@ void Player3D::UpdateAnimation(bool isMoving)
     else if (m_isTitlePushUp)
     {
         targetAnim = m_animIndexPushUp;    // Armature|05_PushUp (腕立て伏せ)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleSitUp)
+    {
+        targetAnim = m_animIndexSitUp;     // Armature|06_Situp (腹筋)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitlePullUp)
+    {
+        targetAnim = m_animIndexPullUp;    // Armature|07_PullUp (懸垂)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleSideRaise)
+    {
+        targetAnim = m_animIndexSideRaise; // Armature|08_SideRaise (サイドレイズ)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleDumbbellCurl)
+    {
+        targetAnim = m_animIndexDumbbellCurl; // Armature|10_Dumbbell curl (ダンベルカール)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleInclineBench)
+    {
+        targetAnim = m_animIndexInclineBench; // Armature|11_InClineBenti (インクラインベンチ)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleBenchPress)
+    {
+        targetAnim = m_animIndexBenchPress; // Armature|12_BenchPress (ベンチプレス)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleInOverHeadPress)
+    {
+        targetAnim = m_animIndexInOverHeadPress; // Armature|13_InOverHeadPress (インクラインOHP)
         playSpeed = 1.0f;
     }
     else if (isMoving)
@@ -303,8 +408,15 @@ void Player3D::Update()
 
 void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& targetPositions)
 {
-    m_isTitleSquat = false;
-    m_isTitlePushUp = false;
+    m_isTitleSquat           = false;
+    m_isTitlePushUp          = false;
+    m_isTitleSitUp           = false;
+    m_isTitlePullUp          = false;
+    m_isTitleSideRaise       = false;
+    m_isTitleDumbbellCurl    = false;
+    m_isTitleInclineBench    = false;
+    m_isTitleBenchPress      = false;
+    m_isTitleInOverHeadPress = false;
     m_prevPos = m_pos;
     m_animFrame++;
     m_animTime += 1.0f / 60.0f;
@@ -489,10 +601,9 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
             m_isPouncing = false;
             m_pos.y = m_groundY;
             m_pounceCooldown = GetPounceCooldownMax();
+            CustomEffectManager::GetInstance().FinishPounceGroundGouge(groundPos, m_pounceDir, m_repCount);
+            camera.TriggerShake(4.5f, 7);
         }
-
-        CustomEffectManager::GetInstance().FinishPounceGroundGouge(groundPos, m_pounceDir, m_repCount);
-        camera.TriggerShake(4.5f, 7);
     }
     
     else
@@ -733,6 +844,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                 if (isTriggerJustPressed)
                 {
                     m_isSkillChecking = true;
+                    // メニュー画面でONになっている筋トレモーションの中から今回のモーションを選択
+                    m_activeWorkoutMotion = PickNextEnabledWorkoutMotion();
                     SoundManager::GetInstance().PlaySE(SeType::SquatStart);
                     m_scCursor = 0.0f;
                     m_scCursorDir = 1.0f; // 初期方向: 右進
@@ -869,6 +982,8 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         {
                             // 【成功】Rep追加 & 15秒タイマーリセット
                             m_repCount++;
+                            m_workoutSuccessCount++;
+                            if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
                             SoundManager::GetInstance().PlaySE(SeType::SquatSuccess);
                             m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒
                             m_lastResultSuccess = true;
@@ -964,6 +1079,20 @@ void Player3D::Draw3D()
     // 足元接地高さ補正（モデル原点が足元にあるためオフセット0で地面接地）
     float offsetY = 0.0f;
 
+    // Fake Shadow under cat
+    {
+        float scaleRatio = scale / ModelConfig::CAT_MODEL_SCALE;
+        float baseRadius = 24.0f * scaleRatio;
+        bool isPronePose = ((m_isSkillChecking && (m_activeWorkoutMotion == WorkoutMotionType::PushUp || m_activeWorkoutMotion == WorkoutMotionType::SitUp || m_activeWorkoutMotion == WorkoutMotionType::BenchPress)) || m_isTitlePushUp || m_isTitleSitUp || m_isTitleBenchPress);
+        float shadowRx = isPronePose ? (baseRadius * 0.90f) : baseRadius;
+        float shadowRz = isPronePose ? (baseRadius * 1.65f) : (baseRadius * 1.10f);
+        float jumpH = (m_pos.y > m_groundY) ? (m_pos.y - m_groundY) : 0.0f;
+        float atten = 1.0f / (1.0f + jumpH * 0.010f);
+        int shadowAlpha = static_cast<int>(155.0f * atten);
+        VECTOR shadowPos = VGet(m_pos.x, m_groundY, m_pos.z);
+        MathHelper::DrawFakeShadow3D(shadowPos, shadowRx * atten, shadowRz * atten, m_rotY, shadowAlpha);
+    }
+
     // 1. 飛びつき・タックル残像の描画
     for (const auto& trail : m_trails)
     {
@@ -1027,10 +1156,63 @@ void Player3D::Draw3D()
         );
     }
 
-    // スクワット中（筋トレQTE中またはスクワットアニメーション中）に両手でバーベルを保持・描画（腕立て伏せ中および筋肉痛時は持たない）
-    if (!isSoreness && (m_isSkillChecking || m_currentAnimIndex == m_animIndexSquat) && !m_isTitlePushUp && m_currentAnimIndex != m_animIndexPushUp)
+    // 1. スクワット: バーベルを描画
+    bool isPlayingSquatAnim = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexSquat) &&
+                              ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::Squat) || m_isTitleSquat);
+    if (!isSoreness && isPlayingSquatAnim)
     {
         DrawBarbell(scale);
+    }
+
+    // 2. 懸垂（プルアップ）: 懸垂バー＆スタンドラックを描画
+    bool isPlayingPullUpAnim = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexPullUp) &&
+                               ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::PullUp) || m_isTitlePullUp);
+    if (!isSoreness && isPlayingPullUpAnim)
+    {
+        DrawPullUpBar(scale);
+    }
+
+    // 3. ベンチプレス (BenchPress): FlatBench + バーベル
+    bool isPlayingBenchPress = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexBenchPress) &&
+                               ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::BenchPress) || m_isTitleBenchPress);
+    if (!isSoreness && isPlayingBenchPress)
+    {
+        DrawFlatBench(scale);
+        DrawBarbell(scale);
+    }
+
+    // 4. サイドレイズ (SideRaise): ダンベルのみ
+    bool isPlayingSideRaise = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexSideRaise) &&
+                              ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::SideRaise) || m_isTitleSideRaise);
+    if (!isSoreness && isPlayingSideRaise)
+    {
+        DrawDumbbells(scale);
+    }
+
+    // 5. ダンベルカール (DumbbellCurl): ダンベルのみ
+    bool isPlayingDumbbellCurl = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexDumbbellCurl) &&
+                                 ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::DumbbellCurl) || m_isTitleDumbbellCurl);
+    if (!isSoreness && isPlayingDumbbellCurl)
+    {
+        DrawDumbbells(scale);
+    }
+
+    // 6. インクラインベンチ (InclineBench): InclineBench + ダンベル
+    bool isPlayingInclineBench = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexInclineBench) &&
+                                 ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::InclineBench) || m_isTitleInclineBench);
+    if (!isSoreness && isPlayingInclineBench)
+    {
+        DrawInclineBench(scale);
+        DrawDumbbells(scale);
+    }
+
+    // 7. インクラインオーバーヘッドプレス (InOverHeadPress): InclineBench + ダンベル
+    bool isPlayingInOverHeadPress = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexInOverHeadPress) &&
+                                    ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::InOverHeadPress) || m_isTitleInOverHeadPress);
+    if (!isSoreness && isPlayingInOverHeadPress)
+    {
+        DrawInclineBench(scale);
+        DrawDumbbells(scale);
     }
 
     // 3. バカゲー風コミカル・マッスル湯気＆マッチョオーラ（3D）
@@ -1333,6 +1515,8 @@ void Player3D::Draw2D()
 void Player3D::AddRep(int amount)
 {
     m_repCount += amount;
+    if (amount > 0) { m_workoutSuccessCount += amount; }
+    if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
     m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒リセット
     m_state = MuscleState::Muscular;
     m_speed = CalculateSpeedForRep(GetEffectiveRep());
@@ -1438,4 +1622,227 @@ void Player3D::DrawBarbell(float catScale)
         DrawSphere3D(p1, 8.0f * (catScale / 0.12f), 8, GetColor(40, 45, 50), GetColor(60, 65, 75), TRUE);
         DrawSphere3D(p2, 8.0f * (catScale / 0.12f), 8, GetColor(40, 45, 50), GetColor(60, 65, 75), TRUE);
     }
+}
+
+void Player3D::DrawPullUpBar(float catScale)
+{
+    float ratio = catScale / ModelConfig::CAT_MODEL_SCALE;
+    float groundY = m_pos.y;
+
+    // 猫の正面ベクトル・右方向ベクトル
+    float sinR = std::sin(m_rotY);
+    float cosR = std::cos(m_rotY);
+    VECTOR forward = VGet(sinR, 0.0f, cosR);
+    VECTOR right   = VGet(cosR, 0.0f, -sinR);
+
+    // デフォルトのバー中心座標・左右軸（モデルボーン未取得時のフォールバック値）
+    VECTOR barCenter = VGet(
+        m_pos.x + forward.x * (6.0f * ratio),
+        groundY + 115.0f * ratio,
+        m_pos.z + forward.z * (6.0f * ratio)
+    );
+    VECTOR barDir = right;
+    float handDist = 42.0f * ratio;
+
+    // 3Dモデルの両手フレーム（手首＆中指付け根）から実際の握り位置を取得して懸垂バーの位置を完全一致させる
+    if (m_modelHandle != -1 && m_lHandFrame != -1 && m_rHandFrame != -1)
+    {
+        VECTOR posL = MV1GetFramePosition(m_modelHandle, m_lHandFrame);
+        VECTOR posR = MV1GetFramePosition(m_modelHandle, m_rHandFrame);
+
+        VECTOR gripL = posL;
+        VECTOR gripR = posR;
+
+        if (m_lHandKnuckleFrame != -1 && m_rHandKnuckleFrame != -1)
+        {
+            VECTOR knuckleL = MV1GetFramePosition(m_modelHandle, m_lHandKnuckleFrame);
+            VECTOR knuckleR = MV1GetFramePosition(m_modelHandle, m_rHandKnuckleFrame);
+            // 手首から中指付け根へ85%進んだ位置（指でバーを握り込む中心）に合わせる
+            gripL = VAdd(posL, VScale(VSub(knuckleL, posL), 0.85f));
+            gripR = VAdd(posR, VScale(VSub(knuckleR, posR), 0.85f));
+        }
+
+        barCenter = VScale(VAdd(gripL, gripR), 0.5f);
+        // 指の腹にしっかり引っかかるよう微調整オフセット
+        barCenter.y += 1.2f * ratio;
+
+        VECTOR diff = VSub(gripR, gripL);
+        diff.y = 0.0f; // 懸垂バー自体は地面と水平に保つ
+        float lenXZ = VSize(diff);
+        if (lenXZ > 1.0f)
+        {
+            barDir = VScale(diff, 1.0f / lenXZ);
+            handDist = lenXZ;
+        }
+    }
+
+    // 水平軸と直交する前後ベクトル（土台脚の配置用）
+    VECTOR frameFwd = VGet(-barDir.z, 0.0f, barDir.x);
+    if (VDot(frameFwd, forward) < 0.0f)
+    {
+        frameFwd = VScale(frameFwd, -1.0f);
+    }
+
+    // 寸法設定（猫の体格・両手間隔に合わせて自動スケーリング）
+    float halfSpan     = (std::max)(handDist * 0.85f, 36.0f * ratio); // 左右支柱の中心距離（片側）
+    float barOverhang  = 9.0f * ratio;                                // 支柱から外側へ突き出るバー端の長さ
+    float barRadius    = 1.85f * ratio;                               // メイン懸垂シャフトの太さ
+    float gripRadius   = 2.35f * ratio;                               // 両手が握るラバーグリップ部分の太さ
+    float postRadius   = 2.6f * ratio;                                // 左右の垂直支柱の太さ
+    float baseHalfLen  = 26.0f * ratio;                               // 足元の前後スタビライザー脚の長さ（片側）
+
+    // カラーパレット（ジム仕様の重厚アイアンフレーム＆クロームシャフト＆オレンジアクセント）
+    unsigned int colChrome     = GetColor(220, 228, 240);
+    unsigned int colChromeSpec = GetColor(255, 255, 255);
+    unsigned int colGrip       = GetColor(35, 38, 46);
+    unsigned int colGripRing   = GetColor(255, 140, 30);
+    unsigned int colFrame      = GetColor(45, 50, 62);
+    unsigned int colFrameSpec  = GetColor(90, 100, 120);
+    unsigned int colCap        = GetColor(235, 75, 35);
+
+    // 1. メイン水平懸垂バー（クロームメッキ鋼管）
+    VECTOR barLeftEnd  = VAdd(barCenter, VScale(barDir, -(halfSpan + barOverhang)));
+    VECTOR barRightEnd = VAdd(barCenter, VScale(barDir,  (halfSpan + barOverhang)));
+    DrawCapsule3D(barLeftEnd, barRightEnd, barRadius, 12, colChrome, colChromeSpec, TRUE);
+
+    // バー両端のストッパーキャップ
+    DrawSphere3D(barLeftEnd,  barRadius * 1.35f, 10, colCap, colChromeSpec, TRUE);
+    DrawSphere3D(barRightEnd, barRadius * 1.35f, 10, colCap, colChromeSpec, TRUE);
+
+    // 2. 両手の握り位置に合わせたラバーグリップ＆オレンジリング装飾
+    float gripHalfW = 7.5f * ratio;
+    float gripOffset = handDist * 0.5f;
+    for (int side = -1; side <= 1; side += 2)
+    {
+        VECTOR gCenter = VAdd(barCenter, VScale(barDir, static_cast<float>(side) * gripOffset));
+        VECTOR gIn     = VAdd(gCenter, VScale(barDir, -gripHalfW));
+        VECTOR gOut    = VAdd(gCenter, VScale(barDir,  gripHalfW));
+        DrawCapsule3D(gIn, gOut, gripRadius, 10, colGrip, colFrameSpec, TRUE);
+        DrawSphere3D(gIn,  gripRadius * 1.08f, 8, colGripRing, colChromeSpec, TRUE);
+        DrawSphere3D(gOut, gripRadius * 1.08f, 8, colGripRing, colChromeSpec, TRUE);
+    }
+
+    // 3. 左右の垂直支柱（バー高さから地面まで伸びるパワーラック柱）＆ 足元スタビライザー
+    for (int side = -1; side <= 1; side += 2)
+    {
+        VECTOR postTop = VAdd(barCenter, VScale(barDir, static_cast<float>(side) * halfSpan));
+        VECTOR postBot = VGet(postTop.x, groundY + postRadius * 0.6f, postTop.z);
+
+        // 上部ジョイント金具（ブラケット）
+        DrawSphere3D(postTop, postRadius * 1.35f, 10, colGripRing, colChromeSpec, TRUE);
+
+        // 垂直メイン支柱
+        DrawCapsule3D(postBot, postTop, postRadius, 10, colFrame, colFrameSpec, TRUE);
+
+        // 上部斜め補強ガセット（支柱から内側バーへ向かう斜めブレース）
+        VECTOR gussetPost = VGet(postTop.x, postTop.y - 18.0f * ratio, postTop.z);
+        VECTOR gussetBar  = VAdd(postTop, VScale(barDir, static_cast<float>(-side) * (14.0f * ratio)));
+        if (gussetPost.y > groundY + 10.0f)
+        {
+            DrawCapsule3D(gussetPost, gussetBar, postRadius * 0.65f, 8, colFrame, colFrameSpec, TRUE);
+        }
+
+        // 足元の前後T字スタビライザーベース脚
+        VECTOR baseFront = VAdd(postBot, VScale(frameFwd,  baseHalfLen));
+        VECTOR baseBack  = VAdd(postBot, VScale(frameFwd, -baseHalfLen));
+        DrawCapsule3D(baseBack, baseFront, postRadius * 0.95f, 10, colFrame, colFrameSpec, TRUE);
+
+        // ベース脚両端のラバーエンドキャップ
+        DrawSphere3D(baseFront, postRadius * 1.2f, 8, colCap, colFrameSpec, TRUE);
+        DrawSphere3D(baseBack,  postRadius * 1.2f, 8, colCap, colFrameSpec, TRUE);
+
+        // 足元の斜めサポートブレース（前後の脚から支柱へ）
+        VECTOR braceTop = VGet(postBot.x, groundY + 18.0f * ratio, postBot.z);
+        if (braceTop.y < postTop.y - 8.0f)
+        {
+            VECTOR braceFrontPt = VAdd(postBot, VScale(frameFwd,  baseHalfLen * 0.65f));
+            VECTOR braceBackPt  = VAdd(postBot, VScale(frameFwd, -baseHalfLen * 0.65f));
+            DrawCapsule3D(braceFrontPt, braceTop, postRadius * 0.55f, 8, colFrame, colFrameSpec, TRUE);
+            DrawCapsule3D(braceBackPt,  braceTop, postRadius * 0.55f, 8, colFrame, colFrameSpec, TRUE);
+        }
+    }
+
+    // 4. 足元奥側の左右連結クロスメンバー（フレーム全体の剛性を高める下部横バー）
+    VECTOR leftBackBase  = VAdd(VGet(barCenter.x, groundY + postRadius * 0.6f, barCenter.z),
+                                VAdd(VScale(barDir, -halfSpan), VScale(frameFwd, -baseHalfLen * 0.85f)));
+    VECTOR rightBackBase = VAdd(VGet(barCenter.x, groundY + postRadius * 0.6f, barCenter.z),
+                                VAdd(VScale(barDir,  halfSpan), VScale(frameFwd, -baseHalfLen * 0.85f)));
+    DrawCapsule3D(leftBackBase, rightBackBase, postRadius * 0.75f, 8, colFrame, colFrameSpec, TRUE);
+}
+
+
+void Player3D::DrawFlatBench(float catScale)
+{
+    if (m_flatBenchModelHandle == -1) return;
+    MV1SetPosition(m_flatBenchModelHandle, m_pos);
+    MV1SetRotationXYZ(m_flatBenchModelHandle, VGet(0.0f, m_rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
+    MV1SetScale(m_flatBenchModelHandle, VGet(catScale, catScale, catScale));
+    MV1DrawModel(m_flatBenchModelHandle);
+}
+
+void Player3D::DrawInclineBench(float catScale)
+{
+    if (m_inclineBenchModelHandle == -1) return;
+    float ratio = catScale / ModelConfig::CAT_MODEL_SCALE;
+    float sinR = std::sin(m_rotY);
+    float cosR = std::cos(m_rotY);
+    // 猫の後方へ 24.0f * ratio シフト
+    VECTOR benchPos = VGet(
+        m_pos.x - sinR * (24.0f * ratio),
+        m_pos.y,
+        m_pos.z - cosR * (24.0f * ratio)
+    );
+    // インクラインベンチの背もたれはローカル+Zに向かって上がるため、
+    // 猫の進行方向 m_rotY と同じ回転に設定すると背もたれが猫の背中側に来る
+    MV1SetPosition(m_inclineBenchModelHandle, benchPos);
+    MV1SetRotationXYZ(m_inclineBenchModelHandle, VGet(0.0f, m_rotY, 0.0f));
+    MV1SetScale(m_inclineBenchModelHandle, VGet(catScale, catScale, catScale));
+    MV1DrawModel(m_inclineBenchModelHandle);
+}
+
+void Player3D::DrawDumbbells(float catScale)
+{
+    if (m_dumbbellModelHandle == -1 || m_modelHandle == -1) return;
+    DrawSingleDumbbell(catScale, false); // 左手
+    DrawSingleDumbbell(catScale, true);  // 右手
+}
+
+void Player3D::DrawSingleDumbbell(float catScale, bool isRight)
+{
+    int handFrame    = isRight ? m_rHandFrame : m_lHandFrame;
+    int knuckleFrame = isRight ? m_rHandKnuckleFrame : m_lHandKnuckleFrame;
+    if (handFrame == -1) return;
+
+    VECTOR posHand = MV1GetFramePosition(m_modelHandle, handFrame);
+    VECTOR gripPos = posHand;
+
+    if (knuckleFrame != -1)
+    {
+        VECTOR posKnuckle = MV1GetFramePosition(m_modelHandle, knuckleFrame);
+        gripPos = VAdd(posHand, VScale(VSub(posKnuckle, posHand), 0.55f));
+    }
+
+    // 正面カメラ側へダンベルを向ける（猫の前方ベクトル基準）
+    // 猫の進行方向・正面方向（+fwd）にシャフト軸（Z）を一致させることで、正面カメラから両手とも綺麗に向く
+    VECTOR fwd   = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
+    VECTOR up    = VGet(0.0f, 1.0f, 0.0f);
+    VECTOR right = VGet(-std::cos(m_rotY), 0.0f, std::sin(m_rotY));
+
+    VECTOR basisZ = fwd;   // 正面カメラ側へ向ける
+    VECTOR basisY = up;
+    VECTOR basisX = right;
+
+    float s = 2.4f * (catScale / ModelConfig::CAT_MODEL_SCALE);
+    VECTOR sx = VScale(basisX, s);
+    VECTOR sy = VScale(basisY, s);
+    VECTOR sz = VScale(basisZ, s);
+
+    MATRIX mat = {};
+    mat.m[0][0] = sx.x; mat.m[0][1] = sx.y; mat.m[0][2] = sx.z; mat.m[0][3] = 0.0f;
+    mat.m[1][0] = sy.x; mat.m[1][1] = sy.y; mat.m[1][2] = sy.z; mat.m[1][3] = 0.0f;
+    mat.m[2][0] = sz.x; mat.m[2][1] = sz.y; mat.m[2][2] = sz.z; mat.m[2][3] = 0.0f;
+    mat.m[3][0] = gripPos.x; mat.m[3][1] = gripPos.y; mat.m[3][2] = gripPos.z; mat.m[3][3] = 1.0f;
+
+    MV1SetMatrix(m_dumbbellModelHandle, mat);
+    MV1DrawModel(m_dumbbellModelHandle);
 }

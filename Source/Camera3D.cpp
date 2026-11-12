@@ -26,7 +26,7 @@ Camera3D::Camera3D()
 void Camera3D::Init(const VECTOR& targetPos, float targetRotY)
 {
     m_angleH = targetRotY;
-    m_angleV = 0.28f; // 少し見下ろす快適なTPS視点角度
+    m_angleV = 0.08f; // 少し見下ろす快適なTPS視点角度
     m_frontViewBlend = 0.0f;
     m_targetPos = VGet(targetPos.x, targetPos.y + m_heightOffset, targetPos.z);
 
@@ -42,6 +42,7 @@ void Camera3D::Init(const VECTOR& targetPos, float targetRotY)
 
     // マウスカーソルを画面中心に初期化
     SetMousePoint(Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+    m_warmupFrames = 5;
 }
 
 // ============================================================================
@@ -67,6 +68,7 @@ void Camera3D::AdjustMouseSensitivity(float delta)
 void Camera3D::ResetMouseToCenter() const
 {
     SetMousePoint(Config::SCREEN_WIDTH / 2, Config::SCREEN_HEIGHT / 2);
+    m_warmupFrames = 5;
 }
 
 // ============================================================================
@@ -79,7 +81,8 @@ void Camera3D::Update(
     bool isFrontView,
     int stageModelHandle,
     const VECTOR* minBounds,
-    const VECTOR* maxBounds
+    const VECTOR* maxBounds,
+    bool isPullUpView
 )
 {
     // ------------------------------------------------------------------------
@@ -101,7 +104,12 @@ void Camera3D::Update(
         int dx = mx - centerX;
         int dy = my - centerY;
 
-        if (dx != 0 || dy != 0)
+        if (m_warmupFrames > 0)
+        {
+            SetMousePoint(centerX, centerY);
+            m_warmupFrames--;
+        }
+        else if (dx != 0 || dy != 0)
         {
             m_angleH += static_cast<float>(dx) * mouseRotSpeed;
             m_angleV += static_cast<float>(dy) * mouseRotSpeed;
@@ -116,7 +124,7 @@ void Camera3D::Update(
     if (CheckHitKey(KEY_INPUT_DOWN))  m_angleV -= keyRotSpeed * 0.7f;
 
     // 垂直角度（ピッチ）を制限し、地面下への潜り込みや真上でのジンバルロックを防止
-    m_angleV = MathHelper::Clamp(m_angleV, 0.08f, 1.15f);
+    m_angleV = MathHelper::Clamp(m_angleV, -0.20f, 0.78f);
 
     // [F]キーが押された瞬間、プレイヤーの向いている正面方向へカメラを即座にリセット
     bool resetKey = (CheckHitKey(KEY_INPUT_F) != 0);
@@ -134,14 +142,16 @@ void Camera3D::Update(
 
     // 通常時の背後アングル(m_angleH)と、筋トレ中の正面アングル(targetRotY + π)を補間
     float frontAngleH = targetRotY + MathHelper::PI;
+    float frontTargetDist = isPullUpView ? 175.0f : 145.0f;
     float renderAngleH = MathHelper::LerpAngle(m_angleH, frontAngleH, m_frontViewBlend);
-    float renderAngleV = MathHelper::Lerp(m_angleV, 0.22f, m_frontViewBlend);
-    float renderDist   = MathHelper::Lerp(m_distance, 145.0f, m_frontViewBlend);
+    float renderAngleV = MathHelper::Lerp(m_angleV, isPullUpView ? 0.18f : 0.22f, m_frontViewBlend);
+    float renderDist   = MathHelper::Lerp(m_distance, frontTargetDist, m_frontViewBlend);
 
     // ------------------------------------------------------------------------
     // 3. 注視点のスムーズ追従および理想カメラ座標の算出
     // ------------------------------------------------------------------------
-    VECTOR desiredTarget = VGet(targetPos.x, targetPos.y + m_heightOffset, targetPos.z);
+    float targetHeightOffset = (isFrontView && isPullUpView) ? (m_heightOffset + 22.0f) : m_heightOffset;
+    VECTOR desiredTarget = VGet(targetPos.x, targetPos.y + targetHeightOffset, targetPos.z);
     m_targetPos.x = MathHelper::Lerp(m_targetPos.x, desiredTarget.x, 0.25f);
     m_targetPos.y = MathHelper::Lerp(m_targetPos.y, desiredTarget.y, 0.25f);
     m_targetPos.z = MathHelper::Lerp(m_targetPos.z, desiredTarget.z, 0.25f);

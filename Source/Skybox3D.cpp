@@ -1,6 +1,6 @@
-// ============================================================================
+﻿// ============================================================================
 // @file   Skybox3D.cpp
-// @brief  3D森のスカイボックス・スカイドーム描画および森林環境パーティクル実装
+// @brief  3D???????????????????????????????
 // ============================================================================
 #include "Skybox3D.h"
 #include <cmath>
@@ -10,7 +10,6 @@ namespace
 {
     constexpr float PI_F = 3.1415926535f;
 
-    // 線形補間ヘルパー
     inline int LerpColor(int c0, int c1, float t)
     {
         if (t <= 0.0f) return c0;
@@ -48,7 +47,7 @@ void Skybox3D::Init()
 }
 
 // ============================================================================
-// 高精細・森のパノラマテクスチャ生成 (2048 x 1024)
+// ????????????????????????????? (2048 x 1024)
 // ============================================================================
 void Skybox3D::GenerateForestTexture()
 {
@@ -65,15 +64,13 @@ void Skybox3D::GenerateForestTexture()
     SetDrawScreen(m_textureHandle);
     ClearDrawScreen();
 
-    // ------------------------------------------------------------------------
-    // 1. 背景空・大気グラデーション (天頂 〜 地平線 〜 大地)
-    // ------------------------------------------------------------------------
-    int colZenith   = GetColor(18, 55, 135);   // 天頂: 深く澄んだコバルトブルー
-    int colMidSky   = GetColor(45, 120, 215);  // 中空: 爽快なスカイブルー
-    int colLowerSky = GetColor(105, 185, 235); // 下空: 明るいシアンブルー
-    int colHorizon  = GetColor(165, 222, 215); // 地平線: 朝霧と光が交わる淡いミントシアン
-    int colMist     = GetColor(135, 195, 170); // 森林大気層: 木漏れ日に煙るエメラルドミント
-    int colGround   = GetColor(16, 38, 22);    // 最下部: 深い森の大地・下草
+    // 1. ????????? (?? y=0 ? ??? y=740 ? ?? y=1024)
+    int colZenith   = GetColor(24, 92, 210);   // ??: ??????????????
+    int colUpperSky = GetColor(52, 138, 238);  // ??: ???????????
+    int colMidSky   = GetColor(98, 178, 248);  // ??: ?????????
+    int colLowerSky = GetColor(156, 214, 252); // ??: ?????????????
+    int colHorizon  = GetColor(212, 238, 252); // ???: ????????????????????
+    int colGround   = GetColor(56, 108, 64);   // ????: ??????
 
     for (int y = 0; y < texH; y += 2)
     {
@@ -81,190 +78,125 @@ void Skybox3D::GenerateForestTexture()
         if (y < 220)
         {
             float t = static_cast<float>(y) / 220.0f;
-            col = LerpColor(colZenith, colMidSky, t);
+            col = LerpColor(colZenith, colUpperSky, t);
         }
-        else if (y < 420)
+        else if (y < 460)
         {
-            float t = static_cast<float>(y - 220) / 200.0f;
+            float t = static_cast<float>(y - 220) / 240.0f;
+            col = LerpColor(colUpperSky, colMidSky, t);
+        }
+        else if (y < 640)
+        {
+            float t = static_cast<float>(y - 460) / 180.0f;
             col = LerpColor(colMidSky, colLowerSky, t);
         }
-        else if (y < 530)
+        else if (y < 740)
         {
-            float t = static_cast<float>(y - 420) / 110.0f;
+            float t = static_cast<float>(y - 640) / 100.0f;
             col = LerpColor(colLowerSky, colHorizon, t);
-        }
-        else if (y < 680)
-        {
-            float t = static_cast<float>(y - 530) / 150.0f;
-            col = LerpColor(colHorizon, colMist, t);
         }
         else
         {
-            float t = static_cast<float>(y - 680) / 344.0f;
-            col = LerpColor(colMist, colGround, t);
+            float t = static_cast<float>(y - 740) / 284.0f;
+            col = LerpColor(colHorizon, colGround, t);
         }
         DrawBox(0, y, texW, y + 2, col, TRUE);
     }
 
-    // ------------------------------------------------------------------------
-    // 2. 太陽と木漏れ日の光芒（サンシャフト / God Rays）
-    // ------------------------------------------------------------------------
-    int sunX = 1380;
-    int sunY = 280;
+    // 2. ????????????????????
+    int sunX = 1420;
+    int sunY = 340;
 
-    // 太陽の外部光彩・ブルーム
-    SetDrawBlendMode(DX_BLENDMODE_ADD, 35);
-    DrawCircle(sunX, sunY, 320, GetColor(255, 230, 160), TRUE);
-    SetDrawBlendMode(DX_BLENDMODE_ADD, 65);
-    DrawCircle(sunX, sunY, 180, GetColor(255, 240, 180), TRUE);
-    SetDrawBlendMode(DX_BLENDMODE_ADD, 120);
-    DrawCircle(sunX, sunY, 90,  GetColor(255, 250, 210), TRUE);
-    SetDrawBlendMode(DX_BLENDMODE_ADD, 220);
-    DrawCircle(sunX, sunY, 40,  GetColor(255, 255, 245), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 40);
+    DrawCircle(sunX, sunY, 340, GetColor(255, 235, 175), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 75);
+    DrawCircle(sunX, sunY, 190, GetColor(255, 245, 200), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 140);
+    DrawCircle(sunX, sunY, 95,  GetColor(255, 252, 225), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_ADD, 235);
+    DrawCircle(sunX, sunY, 44,  GetColor(255, 255, 250), TRUE);
 
-    // 木漏れ日の光条（太陽から斜め下に降り注ぐ光の帯）
-    for (int i = 0; i < 18; ++i)
+    for (int i = 0; i < 16; ++i)
     {
-        float angle = (45.0f + i * 4.2f + (i % 3) * 1.5f) * (PI_F / 180.0f);
-        float len = 700.0f + (i % 5) * 80.0f;
-        int alpha = 16 + (i % 4) * 8;
-        SetDrawBlendMode(DX_BLENDMODE_ADD, alpha);
-
-        int ex1 = sunX + static_cast<int>(std::cos(angle - 0.025f) * len);
-        int ey1 = sunY + static_cast<int>(std::sin(angle - 0.025f) * len);
-        int ex2 = sunX + static_cast<int>(std::cos(angle + 0.025f) * len);
-        int ey2 = sunY + static_cast<int>(std::sin(angle + 0.025f) * len);
-
-        DrawTriangle(sunX, sunY, ex1, ey1, ex2, ey2, GetColor(255, 240, 180), TRUE);
+        float angle = (i * 22.5f) * (PI_F / 180.0f);
+        float len = 480.0f + (i % 3) * 90.0f;
+        SetDrawBlendMode(DX_BLENDMODE_ADD, 22);
+        int ex1 = sunX + static_cast<int>(std::cos(angle - 0.03f) * len);
+        int ey1 = sunY + static_cast<int>(std::sin(angle - 0.03f) * len);
+        int ex2 = sunX + static_cast<int>(std::cos(angle + 0.03f) * len);
+        int ey2 = sunY + static_cast<int>(std::sin(angle + 0.03f) * len);
+        DrawTriangle(sunX, sunY, ex1, ey1, ex2, ey2, GetColor(255, 248, 210), TRUE);
     }
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // ------------------------------------------------------------------------
-    // 3. 遠くに浮かぶ白い雲
-    // ------------------------------------------------------------------------
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 140);
-    int cloudPositions[][2] = {
-        { 250, 310 }, { 600, 240 }, { 950, 330 }, { 1750, 270 }, { 1980, 320 }
+    // 3. ????????????????????TPS???????? y=320?640 ???????
+    auto drawFluffyCloud = [](int cx, int cy, float scale)
+    {
+        int colShadow = GetColor(188, 212, 238);
+        int colMain   = GetColor(246, 250, 255);
+        int colPure   = GetColor(255, 255, 255);
+
+        int rMain = static_cast<int>(56.0f * scale);
+        int rSub1 = static_cast<int>(44.0f * scale);
+        int rSub2 = static_cast<int>(48.0f * scale);
+        int rSide = static_cast<int>(34.0f * scale);
+        int ox1   = static_cast<int>(46.0f * scale);
+        int ox2   = static_cast<int>(82.0f * scale);
+        int oy    = static_cast<int>(12.0f * scale);
+
+        // ?????????
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 195);
+        DrawOval(cx, cy + oy + 8, ox2 + rSide / 2, rSide / 2 + 6, colShadow, TRUE);
+
+        // ???????????????
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 235);
+        DrawCircle(cx - ox2, cy + oy + 4, rSide, colMain, TRUE);
+        DrawCircle(cx + ox2, cy + oy + 4, rSide, colMain, TRUE);
+        DrawCircle(cx - ox1, cy + 4,      rSub1, colMain, TRUE);
+        DrawCircle(cx + ox1, cy + 2,      rSub2, colMain, TRUE);
+        DrawCircle(cx,       cy - 6,      rMain, colPure, TRUE);
+
+        // ??????????
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 250);
+        DrawCircle(cx - ox1 / 2, cy - 12, static_cast<int>(rMain * 0.72f), colPure, TRUE);
+        DrawCircle(cx + ox1 / 2, cy - 10, static_cast<int>(rSub2 * 0.72f), colPure, TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     };
-    for (const auto& cp : cloudPositions)
-    {
-        int cx = cp[0], cy = cp[1];
-        int colCloud = GetColor(255, 255, 255);
-        DrawCircle(cx, cy, 45, colCloud, TRUE);
-        DrawCircle(cx - 35, cy + 8, 32, colCloud, TRUE);
-        DrawCircle(cx + 38, cy + 6, 35, colCloud, TRUE);
-        DrawCircle(cx + 65, cy + 12, 24, colCloud, TRUE);
-        DrawCircle(cx - 58, cy + 14, 20, colCloud, TRUE);
-        DrawBox(cx - 55, cy + 10, cx + 65, cy + 32, colCloud, TRUE);
-    }
-    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // ------------------------------------------------------------------------
-    // 4. 最遠景の山並み（青緑の山影）
-    // ------------------------------------------------------------------------
-    int colMnt = GetColor(80, 145, 155);
+    struct CloudDef { int x; int y; float s; };
+    const CloudDef clouds[] = {
+        {  140, 520, 1.25f }, {  380, 410, 0.95f }, {  640, 540, 1.35f },
+        {  920, 440, 1.10f }, { 1180, 530, 1.20f }, { 1540, 490, 1.05f },
+        { 1790, 420, 1.30f }, { 1960, 535, 1.10f },
+        {  260, 290, 0.80f }, {  780, 270, 0.85f }, { 1310, 260, 0.75f }, { 1680, 285, 0.85f }
+    };
+    for (const auto& c : clouds)
+    {
+        drawFluffyCloud(c.x, c.y, c.s);
+    }
+
+    // 4. ??????y=680?780????????????????
+    int colFarMnt  = GetColor(132, 184, 214);
+    int colNearMnt = GetColor(96, 156, 148);
     for (int x = 0; x < texW; ++x)
     {
         float fx = static_cast<float>(x);
-        float h = std::sin(fx * 0.004f) * 45.0f
-                + std::sin(fx * 0.012f + 1.2f) * 22.0f
-                + std::sin(fx * 0.025f + 2.5f) * 12.0f;
-        int mntY = 475 + static_cast<int>(h);
-        DrawBox(x, mntY, x + 1, 620, colMnt, TRUE);
+        float h1 = std::sin(fx * 0.006f) * 28.0f + std::sin(fx * 0.015f + 1.1f) * 14.0f;
+        int mntY1 = 695 + static_cast<int>(h1);
+        DrawBox(x, mntY1, x + 1, 780, colFarMnt, TRUE);
+
+        float h2 = std::sin(fx * 0.009f + 2.0f) * 20.0f + std::sin(fx * 0.022f + 0.5f) * 10.0f;
+        int mntY2 = 725 + static_cast<int>(h2);
+        DrawBox(x, mntY2, x + 1, 820, colNearMnt, TRUE);
     }
 
-    // ------------------------------------------------------------------------
-    // 5. 遠景の針葉樹林（モミ・スギの稜線）
-    // ------------------------------------------------------------------------
-    int colConifer = GetColor(38, 92, 65);
-    for (int x = 0; x < texW; x += 14)
+    // ??????????????
+    for (int y = 700; y < 770; y += 2)
     {
-        float fx = static_cast<float>(x);
-        float baseH = std::sin(fx * 0.006f + 0.8f) * 30.0f;
-        int treeH = 50 + (x * 17) % 35;
-        int tipY = 490 + static_cast<int>(baseH) - treeH;
-        int bottomY = 620;
-
-        DrawTriangle(x, tipY, x - 12, bottomY, x + 12, bottomY, colConifer, TRUE);
-    }
-
-    // ------------------------------------------------------------------------
-    // 6. 中景の豊かな広葉樹林（大樹・豊かな樹冠の重なり）
-    // ------------------------------------------------------------------------
-    unsigned int forestColors[] = {
-        GetColor(22, 68, 40),
-        GetColor(32, 88, 52),
-        GetColor(45, 115, 66),
-        GetColor(58, 138, 78),
-        GetColor(28, 76, 44)
-    };
-    int colorCount = sizeof(forestColors) / sizeof(forestColors[0]);
-
-    // 木々の幹を描画
-    for (int x = 10; x < texW; x += 38)
-    {
-        int trunkW = 6 + (x % 5);
-        int trunkTopY = 560 + (x * 11) % 40;
-        DrawBox(x - trunkW / 2, trunkTopY, x + trunkW / 2, 780, GetColor(45, 34, 24), TRUE);
-    }
-
-    // 樹冠（丸みのある豊かな葉の塊）を重層配置
-    for (int layer = 0; layer < 3; ++layer)
-    {
-        int step = (layer == 0) ? 32 : ((layer == 1) ? 26 : 20);
-        int yOffset = (layer == 0) ? 555 : ((layer == 1) ? 590 : 635);
-
-        for (int x = -20; x < texW + 40; x += step)
-        {
-            int seed = x * 37 + layer * 101;
-            int radiusX = 28 + (seed % 28);
-            int radiusY = 22 + (seed % 20);
-            int cy = yOffset + (seed % 35);
-            int cIndex = (seed % colorCount);
-
-            DrawOval(x, cy, radiusX, radiusY, forestColors[cIndex], TRUE);
-            // 木漏れ日のハイライト
-            SetDrawBlendMode(DX_BLENDMODE_ADD, 30);
-            DrawOval(x - radiusX / 4, cy - radiusY / 4, radiusX / 2, radiusY / 2, GetColor(120, 220, 100), TRUE);
-            SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-        }
-    }
-
-    // ------------------------------------------------------------------------
-    // 7. 近中景の鬱蒼とした手前の木立・下草
-    // ------------------------------------------------------------------------
-    int colForeground = GetColor(15, 48, 28);
-    for (int x = -10; x < texW + 20; x += 18)
-    {
-        int r = 24 + (x * 13) % 22;
-        int cy = 680 + (x * 7) % 25;
-        DrawCircle(x, cy, r, colForeground, TRUE);
-    }
-    // 地表の塗りつぶし
-    DrawBox(0, 710, texW, texH, colGround, TRUE);
-
-    // ------------------------------------------------------------------------
-    // 8. 木々の足元に漂う朝霧（フォグ・ミストレイヤー）
-    // ------------------------------------------------------------------------
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 70);
-    for (int y = 580; y < 690; y += 4)
-    {
-        float t = static_cast<float>(y - 580) / 110.0f;
-        int alpha = static_cast<int>(std::sin(t * PI_F) * 75.0f);
+        float t = static_cast<float>(y - 700) / 70.0f;
+        int alpha = static_cast<int>(std::sin(t * PI_F) * 90.0f);
         SetDrawBlendMode(DX_BLENDMODE_ALPHA, alpha);
-        DrawBox(0, y, texW, y + 4, GetColor(180, 230, 210), TRUE);
-    }
-    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-
-    // ------------------------------------------------------------------------
-    // 9. 天頂の樹冠キャノピー（上を見上げたときに包み込む木々の梢）
-    // ------------------------------------------------------------------------
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 230);
-    int colCanopy = GetColor(12, 42, 24);
-    for (int x = 0; x < texW; x += 40)
-    {
-        int branchLen = 35 + (x * 23) % 65;
-        DrawOval(x, 0, 38 + (x % 20), branchLen, colCanopy, TRUE);
+        DrawBox(0, y, texW, y + 2, GetColor(215, 240, 252), TRUE);
     }
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
@@ -272,7 +204,7 @@ void Skybox3D::GenerateForestTexture()
 }
 
 // ============================================================================
-// スカイドームメッシュの構築
+// ?????????????
 // ============================================================================
 void Skybox3D::BuildDomeMesh()
 {
@@ -282,26 +214,24 @@ void Skybox3D::BuildDomeMesh()
 
     const int slices = m_sliceCount; // 48
     const int rings  = m_ringCount;  // 16
-    const float R    = m_radius;     // 45000.0f
+    const float R    = m_radius;     // 12000.0f
 
-    // 頂点配列の生成
-    // 緯度: 天頂 (phi = +PI/2) 〜 地平線 (phi = 0) 〜 地下 (phi = -PI/4)
     for (int j = 0; j <= rings; ++j)
     {
         float v = static_cast<float>(j) / static_cast<float>(rings);
-        // v = 0.0 -> phi = +PI/2 (天頂)
-        // v = 0.55 -> phi = 0 (地平線)
-        // v = 1.0 -> phi = -PI/4 (地下)
+        // v = 0.0  -> phi = +PI/2 (??)
+        // v = 0.72 -> phi = 0     (???: ????? y=737 ??)
+        // v = 1.0  -> phi = -PI/5 (????)
         float phi = 0.0f;
-        if (v <= 0.55f)
+        if (v <= 0.72f)
         {
-            float t = v / 0.55f;
+            float t = v / 0.72f;
             phi = (PI_F * 0.5f) * (1.0f - t);
         }
         else
         {
-            float t = (v - 0.55f) / 0.45f;
-            phi = -(PI_F * 0.28f) * t;
+            float t = (v - 0.72f) / 0.28f;
+            phi = -(PI_F * 0.22f) * t;
         }
 
         float cosPhi = std::cos(phi);
@@ -320,13 +250,12 @@ void Skybox3D::BuildDomeMesh()
             float z = R * cosPhi * cosTheta;
 
             VERTEX3D vert{};
-            vert.pos = VGet(x, y, z);
-            // 法線はドーム内部（原点）を向くように設定
+            vert.pos  = VGet(x, y, z);
             vert.norm = VGet(-cosPhi * sinTheta, -sinPhi, -cosPhi * cosTheta);
-            vert.dif = GetColorU8(255, 255, 255, 255);
-            vert.spc = GetColorU8(0, 0, 0, 0);
-            vert.u = u;
-            vert.v = v;
+            vert.dif  = GetColorU8(255, 255, 255, 255);
+            vert.spc  = GetColorU8(0, 0, 0, 0);
+            vert.u    = u;
+            vert.v    = v;
 
             m_baseVertices.push_back(vert);
         }
@@ -334,7 +263,6 @@ void Skybox3D::BuildDomeMesh()
 
     m_drawVertices = m_baseVertices;
 
-    // インデックス配列の生成（内向きに見えるよう頂点順序を調整）
     for (int j = 0; j < rings; ++j)
     {
         for (int i = 0; i < slices; ++i)
@@ -347,12 +275,10 @@ void Skybox3D::BuildDomeMesh()
             int p2 = row2 + i + 1;
             int p3 = row2 + i;
 
-            // 三角形 1: p0 -> p1 -> p2 (内側から見て反時計回り)
             m_indices.push_back(static_cast<unsigned short>(p0));
             m_indices.push_back(static_cast<unsigned short>(p1));
             m_indices.push_back(static_cast<unsigned short>(p2));
 
-            // 三角形 2: p0 -> p2 -> p3
             m_indices.push_back(static_cast<unsigned short>(p0));
             m_indices.push_back(static_cast<unsigned short>(p2));
             m_indices.push_back(static_cast<unsigned short>(p3));
@@ -360,18 +286,15 @@ void Skybox3D::BuildDomeMesh()
     }
 }
 
-// ============================================================================
-// 木の葉パーティクル初期化
-// ============================================================================
 void Skybox3D::InitLeaves()
 {
     m_leaves.resize(m_leafCount);
     unsigned int leafColors[] = {
-        GetColor(90, 200, 70),   // 明るい黄緑
-        GetColor(50, 165, 55),   // 鮮やかな新緑
-        GetColor(35, 125, 45),   // 深緑
-        GetColor(170, 215, 60),  // 若葉色
-        GetColor(115, 185, 80)   // オリーブグリーン
+        GetColor(90, 200, 70),
+        GetColor(50, 165, 55),
+        GetColor(35, 125, 45),
+        GetColor(170, 215, 60),
+        GetColor(115, 185, 80)
     };
 
     for (size_t i = 0; i < m_leaves.size(); ++i)
@@ -406,9 +329,6 @@ void Skybox3D::InitLeaves()
     }
 }
 
-// ============================================================================
-// 木の葉パーティクル更新
-// ============================================================================
 void Skybox3D::UpdateLeaves(const VECTOR& centerPos)
 {
     for (auto& leaf : m_leaves)
@@ -425,7 +345,6 @@ void Skybox3D::UpdateLeaves(const VECTOR& centerPos)
         leaf.rot.y += leaf.rotSpeed.y;
         leaf.rot.z += leaf.rotSpeed.z;
 
-        // プレイヤー周辺の一定範囲外に出たら再配置
         float dx = leaf.pos.x - centerPos.x;
         float dz = leaf.pos.z - centerPos.z;
         float distSq = dx * dx + dz * dz;
@@ -446,9 +365,6 @@ void Skybox3D::Update(const VECTOR& centerPos)
     UpdateLeaves(centerPos);
 }
 
-// ============================================================================
-// 木の葉パーティクル描画
-// ============================================================================
 void Skybox3D::DrawLeaves()
 {
     SetUseLighting(FALSE);
@@ -457,15 +373,13 @@ void Skybox3D::DrawLeaves()
     for (const auto& leaf : m_leaves)
     {
         float s = leaf.size;
-        // 葉の形状（小さな菱形ポリゴン）
         VECTOR localPts[4] = {
-            VGet(0.0f,  0.0f,  s * 1.5f),  // 先端
-            VGet(-s * 0.7f, 0.0f,  0.0f),  // 左
-            VGet(0.0f,  0.0f, -s * 0.9f),  // 根元
-            VGet( s * 0.7f, 0.0f,  0.0f)   // 右
+            VGet(0.0f,  0.0f,  s * 1.5f),
+            VGet(-s * 0.7f, 0.0f,  0.0f),
+            VGet(0.0f,  0.0f, -s * 0.9f),
+            VGet( s * 0.7f, 0.0f,  0.0f)
         };
 
-        // 3軸回転マトリクス
         MATRIX matRot = MGetRotY(leaf.rot.y);
         matRot = MMult(matRot, MGetRotX(leaf.rot.x));
         matRot = MMult(matRot, MGetRotZ(leaf.rot.z));
@@ -477,7 +391,6 @@ void Skybox3D::DrawLeaves()
             worldPts[i] = VAdd(leaf.pos, r);
         }
 
-        // 葉の2枚の三角形を描画
         DrawTriangle3D(worldPts[0], worldPts[1], worldPts[2], leaf.color, TRUE);
         DrawTriangle3D(worldPts[0], worldPts[2], worldPts[3], leaf.color, TRUE);
     }
@@ -487,7 +400,7 @@ void Skybox3D::DrawLeaves()
 }
 
 // ============================================================================
-// スカイドーム描画（カメラ追従・最奥描画）
+// ???????????????Z???????????????????
 // ============================================================================
 void Skybox3D::Draw(const VECTOR& cameraPos)
 {
@@ -496,16 +409,17 @@ void Skybox3D::Draw(const VECTOR& cameraPos)
         return;
     }
 
-    // 1. レンダリングステート設定
     int prevBlendMode, prevBlendParam;
     GetDrawBlendMode(&prevBlendMode, &prevBlendParam);
 
-    SetUseLighting(FALSE);         // 自発光（ライトに左右されない）
-    SetWriteZBuffer3D(FALSE);      // Zバッファ書き込み無効（最背面に描画）
-    SetUseBackCulling(FALSE);      // 両面描画
+    // ????????????????????????Z????????
+    SetFogEnable(FALSE);
+    SetUseLighting(FALSE);
+    SetUseZBuffer3D(FALSE);
+    SetWriteZBuffer3D(FALSE);
+    SetUseBackCulling(FALSE);
     SetDrawMode(DX_DRAWMODE_BILINEAR);
 
-    // 2. カメラ座標を中心とするように頂点座標をオフセット
     size_t vertCount = m_baseVertices.size();
     for (size_t i = 0; i < vertCount; ++i)
     {
@@ -514,7 +428,6 @@ void Skybox3D::Draw(const VECTOR& cameraPos)
         m_drawVertices[i].pos.z = m_baseVertices[i].pos.z + cameraPos.z;
     }
 
-    // 3. スカイドームメッシュ描画
     int polyCount = static_cast<int>(m_indices.size() / 3);
     DrawPolygonIndexed3D(
         m_drawVertices.data(),
@@ -525,12 +438,12 @@ void Skybox3D::Draw(const VECTOR& cameraPos)
         FALSE
     );
 
-    // 4. レンダリングステート復元
     SetUseBackCulling(TRUE);
     SetUseLighting(TRUE);
+    SetUseZBuffer3D(TRUE);
     SetWriteZBuffer3D(TRUE);
+    SetFogEnable(TRUE);
     SetDrawBlendMode(prevBlendMode, prevBlendParam);
 
-    // 5. 森林環境演出：舞い落ちる木の葉を描画
     DrawLeaves();
 }

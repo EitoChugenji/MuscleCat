@@ -1,4 +1,4 @@
-﻿// ============================================================================
+// ============================================================================
 // @file   ObjectManager3D.h
 // @brief  3D空間内の全オブジェクト（プレイヤー・ネズミ・障害物・ステージ）の統合管理
 // ============================================================================
@@ -34,13 +34,13 @@ private:
 
     // ------------------------------------------------------------------------
     // ネズミ捕獲時に3D座標から浮かび上がるコミック風ポップアップ構造体
-    // ------------------------------------------------------------------------
+    // =================================================================--------
     struct CatchPopup
     {
         VECTOR       worldPos   = VGet(0.0f, 0.0f, 0.0f); // 捕獲発生地点のワールド座標
         int          timer      = 55;                     // 残り表示フレーム数
         int          maxTimer   = 55;                     // 最大表示フレーム数（進行度算出用）
-        std::string  titleText;                           // メイン見出し ("★ CATCH!! ★", "🔥 2 COMBO!! 🔥" 等)
+        std::string  titleText;                           // メイン見出し ("★ CATCH!! ★", "★ 2 COMBO!! ★" 等)
         std::string  subText;                             // サブテキスト ("+1 POINT!", "NICE CATCH! +1" 等)
         unsigned int titleColor = 0;                      // メイン文字カラー
         unsigned int badgeColor = 0;                      // カード外枠カラー
@@ -50,6 +50,7 @@ private:
 
     std::vector<CatchPopup>                    m_catchPopups;           // 現在表示中の捕獲ポップアップ配列
     int                                        m_comboCount      = 0;   // 連続捕獲コンボ数（約3.5秒以内の連続捕獲で加算）
+    int                                        m_maxComboCount   = 0;   // プレイ中の最大連続捕獲コンボ数（リザルトスコア集計用）
     int                                        m_comboTimer      = 0;   // コンボ持続残りフレーム（210F = 3.5秒）
     int                                        m_catchFlashTimer = 0;   // 捕獲瞬間の画面外周ゴールドフラッシュ残りフレーム
 
@@ -118,6 +119,7 @@ public:
     int   GetCaughtNormalCount() const { return m_caughtNormalCount; }
     int   GetCaughtFastCount() const   { return m_caughtFastCount; }
     int   GetComboCount() const        { return m_comboCount; }
+    int   GetMaxComboCount() const     { return m_maxComboCount; }
     int   GetComboTimer() const        { return m_comboTimer; }
 
     // 現在の捕獲数に応じたネズミのスピード算出・反映

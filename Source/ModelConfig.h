@@ -19,10 +19,13 @@ namespace ModelConfig
     constexpr float       CAT_MODEL_ROT_Y = 3.14159265f; // モデル正面方向の補正角（180度反転）
 
     // ------------------------------------------------------------------------
-    // アクセサリモデル（スクワット中に両手で保持するバーベル）設定
+    // アクセサリモデル（トレーニング器具）設定
     // ------------------------------------------------------------------------
-    constexpr const char* BARBELL_MODEL_PATH = "Resource/Models/AccessoryModels/Barbell.mv1";
-    constexpr float       BARBELL_BASE_SCALE = 18.0f;    // 基準スケール（猫の両手ボーン間隔に合わせて自動伸縮）
+    constexpr const char* BARBELL_MODEL_PATH       = "Resource/Models/AccessoryModels/Barbell.mv1";
+    constexpr float       BARBELL_BASE_SCALE       = 18.0f;    // 基準スケール（猫の両手ボーン間隔に合わせて自動伸縮）
+    constexpr const char* DUMBBELL_MODEL_PATH      = "Resource/Models/AccessoryModels/Dumbbell.mv1";
+    constexpr const char* FLAT_BENCH_MODEL_PATH    = "Resource/Models/AccessoryModels/FlatBench.mv1";
+    constexpr const char* INCLINE_BENCH_MODEL_PATH = "Resource/Models/AccessoryModels/Inclinebench.mv1";
 
     // ------------------------------------------------------------------------
     // 通常ネズミモデル設定

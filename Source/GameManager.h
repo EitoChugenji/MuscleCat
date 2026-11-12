@@ -16,6 +16,14 @@ enum class GameState
     GameClear   // リザルト画面（猫へのズームイン演出・S/A/B/Cランクスタンプ・報酬スコア）
 };
 
+// シーン切り替えホワイトフェード遷移先列挙型
+enum class SceneTransitionTarget
+{
+    None = 0,   // 遷移なし
+    ToGame,     // ゲーム開始・リトライ (StartGame)
+    ToTitle     // タイトル画面へ戻る (SetupTitle)
+};
+
 // ============================================================================
 // GameManager クラス
 // シーン遷移制御、ステージ初期化、3Dカメラ演出、各種2D UI（タイトル・プレイHUD・
@@ -79,12 +87,21 @@ private:
     // ------------------------------------------------------------------------
     ModelConfig::MapType m_selectedMap          = ModelConfig::MapType::SlopeHills; // 現在選択中のステージ
     float                m_titleCameraAngle     = 0.0f;  // タイトル画面の3D旋回カメラ角度（ラジアン）
-    bool                 m_showHowToPlay        = false; // ゲーム説明モーダル表示中フラグ
+    bool                 m_showHowToPlay        = false;
+    int                  m_howToPlayPage        = 0;     // ゲーム説明の現在ページ番号 (0〜3)
+    int                  m_howToPlayScreen      = -1;    // ゲーム説明内の実プレイ画面プレビュー用オフスクリーンハンドル
+    static constexpr int HOW_TO_PLAY_PAGE_COUNT = 4;
     bool                 m_showSoundSettings    = false; // サウンド設定モーダル表示中フラグ
     int                  m_titleSoundSettingItem= 0;     // タイトルサウンド設定選択 (0: BGM, 1: SE, 2: 感度)
     int                  m_startTransitionTimer = 0;     // ゲーム開始時のホワイトアウト演出タイマー
+    SceneTransitionTarget m_transitionTarget    = SceneTransitionTarget::None; // 白フェードアウト完了後の遷移先
+    int                  m_fadeOutTimer         = 0;     // 白フェードアウト進行フレーム (0〜FADE_OUT_DURATION)
+    int                  m_fadeInTimer          = 0;     // 画面切替直後の白フェードイン残りフレーム
+    static constexpr int FADE_OUT_DURATION      = 26;    // 白へフェードアウトするフレーム数
+    static constexpr int FADE_IN_DURATION       = 18;    // 白からフェードインするフレーム数
     int                  m_titleAnimTimer       = 0;     // タイトル画面のアニメーション経過フレーム
-    int                  m_selectedMenuItem     = 0;     // 選択中のメニュー項目 (0: START, 1: STAGE, 2: ゲーム説明)
+    int                  m_selectedMenuItem     = 0;     // 選択中のメニュー項目 (0: START, 1: STAGE, 2: ゲーム説明, 3: サウンド設定, 4: 筋トレモーション選択)
+    int                  m_selectedWorkoutBtn   = 0;     // タイトル画面の筋トレモーション選択ボタンのフォーカス番号 (0〜3)
     bool                 m_prevKeyH             = false;
     bool                 m_prevKeyTab           = false;
     bool                 m_prevKeyEsc           = false;
@@ -103,7 +120,8 @@ private:
     // ------------------------------------------------------------------------
     bool  m_isPaused               = false; // ポーズ中フラグ
     int   m_pauseStartTime         = 0;     // ポーズ開始時刻（ポーズ中の経過時間を除外するため記録）
-    int   m_pauseMenuItem          = 0;     // ポーズメニュー選択項目 (0: リトライ, 1: タイトル, 2: マウス感度, 3: BGM音量, 4: SE音量)
+    int   m_pauseMenuItem          = 0;     // ポーズメニュー選択項目 (0: リトライ, 1: タイトル, 2: マウス感度, 3: BGM音量, 4: SE音量, 5: 筋トレモーション選択)
+    int   m_pauseSelectedWorkoutBtn= 0;     // ポーズ画面の筋トレモーション選択ボタンのフォーカス番号 (0〜3)
     bool  m_shouldQuit             = false; // アプリケーション終了要求フラグ
 
     // ------------------------------------------------------------------------
@@ -116,10 +134,13 @@ private:
     // ------------------------------------------------------------------------
     // 内部ヘルパー・画面別描画メソッド
     // ------------------------------------------------------------------------
+    void BeginSceneTransition(SceneTransitionTarget target); // シーン切替ホワイトフェードアウト開始
     void SetupRoomObstacles();           // ステージ内の家具・障害物配置
     void DrawTitleScreen();              // タイトル画面2D UI（ロゴ「マッスルにゃんこ」・吹き出し・メニュー）描画
     void DrawTitle3DScene();             // タイトル画面3D演出（ステージリング・ライト柱・金粉）描画
     void DrawGameClearScreen();          // リザルト画面（アメコミ風ランクスタンプ・スコア・報酬）描画
+    void UpdateHowToPlayModal(int mx, int my, bool isMouseTrigger, bool triggerEsc, bool triggerH, bool triggerTab, bool triggerLeft, bool triggerRight);
+    void RenderHowToPlayPreviewScreen(); // ゲーム説明用の3Dプレイ画面＆HUDプレビュー描画
     void DrawHowToPlayModal();           // ゲーム説明モーダルダイアログ描画
     void DrawSoundSettingsModal();       // サウンド設定モーダルダイアログ描画
     void UpdateTitleSoundSettings(int mx, int my, bool isLeftClick, bool isMouseTrigger,

@@ -16,9 +16,9 @@ private:
     VECTOR m_cameraPos;              // 現在のカメラ視点ワールド座標
     VECTOR m_targetPos;              // 現在のカメラ注視点ワールド座標（プレイヤー胸部付近）
     float  m_angleH         = 0.0f;  // 水平回転角（ヨー角、ラジアン）
-    float  m_angleV         = 0.35f; // 垂直仰角（ピッチ角、ラジアン）
-    float  m_distance       = 190.0f;// 注視点からカメラまでの基準距離
-    float  m_heightOffset   = 28.0f; // プレイヤー足元から注視点までの高さオフセット
+    float  m_angleV         = 0.08f; // 垂直仰角（ピッチ角、ラジアン）
+    float  m_distance       = 215.0f;// 注視点からカメラまでの基準距離
+    float  m_heightOffset   = 58.0f; // プレイヤー足元から注視点までの高さオフセット
 
     // 筋トレQTE時に猫の背後（0.0f）から正面（1.0f）へ滑らかに回り込むブレンド率
     float  m_frontViewBlend = 0.0f;
@@ -31,7 +31,8 @@ private:
     float  m_mouseSensitivity = 1.0f;
 
     // 視点リセットキー（Fキー）の前フレーム押下状態（エッジ検出用）
-    bool   m_prevResetKey   = false;
+    bool   m_prevResetKey       = false;
+    mutable int  m_warmupFrames       = 5;
 
 public:
     Camera3D();
@@ -57,7 +58,8 @@ public:
         bool isFrontView = false,
         int stageModelHandle = -1,
         const VECTOR* minBounds = nullptr,
-        const VECTOR* maxBounds = nullptr
+        const VECTOR* maxBounds = nullptr,
+        bool isPullUpView = false
     );
 
     // 計算されたカメラ座標・注視点（＋シェイクオフセット）をDxLibの3Dカメラへ反映する
