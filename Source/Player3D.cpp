@@ -1872,29 +1872,42 @@ void Player3D::DrawSingleDumbbell(float catScale, bool isRight)
     int knuckleFrame = isRight ? m_rHandKnuckleFrame : m_lHandKnuckleFrame;
     if (handFrame == -1) return;
 
-    VECTOR posHand = MV1GetFramePosition(m_modelHandle, handFrame);
+    // 手首ボーンのワールド変換行列（手の回転・向き・スケールを完全取得）
+    MATRIX hMat = MV1GetFrameLocalWorldMatrix(m_modelHandle, handFrame);
+
+    // ボーン基底ベクトル
+    // 行0: X軸（親指〜小指の握り穴・シャフト方向）
+    // 行1: Y軸（手首〜指先方向）
+    // 行2: Z軸（手のひら法線方向）
+    VECTOR bX = VNorm(VGet(hMat.m[0][0], hMat.m[0][1], hMat.m[0][2]));
+    VECTOR bY = VNorm(VGet(hMat.m[1][0], hMat.m[1][1], hMat.m[1][2]));
+    VECTOR bZ = VNorm(VGet(hMat.m[2][0], hMat.m[2][1], hMat.m[2][2]));
+
+    // グリップ位置：手首から指先方向へ進んだ手のひら・拳の中心に配置（食い込み完全防止）
+    VECTOR posHand = VGet(hMat.m[3][0], hMat.m[3][1], hMat.m[3][2]);
     VECTOR gripPos = posHand;
 
     if (knuckleFrame != -1)
     {
         VECTOR posKnuckle = MV1GetFramePosition(m_modelHandle, knuckleFrame);
+        // 手首と中指付け根の間（約55%の位置が拳の内側の空洞・握り芯）
         gripPos = VAdd(posHand, VScale(VSub(posKnuckle, posHand), 0.55f));
     }
+    else
+    {
+        gripPos = VAdd(posHand, VScale(bY, 2.5f * (catScale / ModelConfig::CAT_MODEL_SCALE)));
+    }
 
-    // 正面カメラ側へダンベルを向ける（猫の前方ベクトル基準）
-    // 猫の進行方向・正面方向（+fwd）にシャフト軸（Z）を一致させることで、正面カメラから両手とも綺麗に向く
-    VECTOR fwd   = VGet(std::sin(m_rotY), 0.0f, std::cos(m_rotY));
-    VECTOR up    = VGet(0.0f, 1.0f, 0.0f);
-    VECTOR right = VGet(-std::cos(m_rotY), 0.0f, std::sin(m_rotY));
+    // ダンベルのシャフト（モデルのローカルZ軸）を手首の握り穴軸（bX）に一致させる
+    VECTOR dZ = bX;
+    VECTOR dY = bZ;
+    VECTOR dX = VCross(dY, dZ);
 
-    VECTOR basisZ = fwd;   // 正面カメラ側へ向ける
-    VECTOR basisY = up;
-    VECTOR basisX = right;
-
-    float s = 2.4f * (catScale / ModelConfig::CAT_MODEL_SCALE);
-    VECTOR sx = VScale(basisX, s);
-    VECTOR sy = VScale(basisY, s);
-    VECTOR sz = VScale(basisZ, s);
+    // ダンベルのスケール（手首や体・太ももに食い込まず、手のひらにジャストフィットするサイズ）
+    float s = 1.45f * (catScale / ModelConfig::CAT_MODEL_SCALE);
+    VECTOR sx = VScale(dX, s);
+    VECTOR sy = VScale(dY, s);
+    VECTOR sz = VScale(dZ, s);
 
     MATRIX mat = {};
     mat.m[0][0] = sx.x; mat.m[0][1] = sx.y; mat.m[0][2] = sx.z; mat.m[0][3] = 0.0f;

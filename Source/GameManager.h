@@ -93,6 +93,7 @@ private:
     static constexpr int HOW_TO_PLAY_PAGE_COUNT = 4;
     bool                 m_showSoundSettings    = false; // サウンド設定モーダル表示中フラグ
     int                  m_titleSoundSettingItem= 0;     // タイトルサウンド設定選択 (0: BGM, 1: SE, 2: 感度)
+    bool                 m_showWorkoutCollection= false; // 筋トレコレクションモーダル表示中フラグ
     int                  m_startTransitionTimer = 0;     // ゲーム開始時のホワイトアウト演出タイマー
     SceneTransitionTarget m_transitionTarget    = SceneTransitionTarget::None; // 白フェードアウト完了後の遷移先
     int                  m_fadeOutTimer         = 0;     // 白フェードアウト進行フレーム (0〜FADE_OUT_DURATION)
@@ -114,6 +115,7 @@ private:
     bool                 m_prevKeyR             = false;
     bool                 m_prevKeyT             = false;
     bool                 m_prevKeyO             = false;
+    bool                 m_prevKeyC             = false;
 
     // ------------------------------------------------------------------------
     // ポーズ（一時停止）画面・終了管理メンバ
@@ -143,6 +145,10 @@ private:
     void RenderHowToPlayPreviewScreen(); // ゲーム説明用の3Dプレイ画面＆HUDプレビュー描画
     void DrawHowToPlayModal();           // ゲーム説明モーダルダイアログ描画
     void DrawSoundSettingsModal();       // サウンド設定モーダルダイアログ描画
+    void DrawWorkoutCollectionModal();   // 筋トレコレクションモーダルダイアログ描画
+    void UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigger,
+                                      bool triggerEsc, bool triggerC, bool triggerEnter, bool triggerSpace,
+                                      bool triggerLeft, bool triggerRight, bool triggerUp, bool triggerDown); // 筋トレコレクションモーダル更新
     void UpdateTitleSoundSettings(int mx, int my, bool isLeftClick, bool isMouseTrigger,
                                   bool triggerEsc, bool triggerUp, bool triggerDown,
                                   bool triggerLeft, bool triggerRight, bool triggerO); // タイトル画面でのサウンド設定更新
