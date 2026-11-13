@@ -265,63 +265,13 @@ public:
     bool IsSkillChecking() const { return m_isSkillChecking; }
 
     // ------------------------------------------------------------------------
-    // 筋トレ時アニメーションのON/OFF選択設定（メニュー画面連動）
+    // 筋トレ時アニメーションのON/OFF選択設定（メニュー画面＆コレクション連動）
     // ------------------------------------------------------------------------
-    static bool IsWorkoutMotionEnabled(WorkoutMotionType type)
-    {
-        int idx = static_cast<int>(type);
-        if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return true;
-        return s_workoutMotionEnabled[idx];
-    }
-
-    static void SetWorkoutMotionEnabled(WorkoutMotionType type, bool enabled)
-    {
-        int idx = static_cast<int>(type);
-        if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return;
-        s_workoutMotionEnabled[idx] = enabled;
-    }
-
-    static void ToggleWorkoutMotionEnabled(WorkoutMotionType type)
-    {
-        int idx = static_cast<int>(type);
-        if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return;
-        // 最低1つはONになるよう保護（最後の1つをOFFにしようとした場合は切り替えないか全ONに戻す）
-        if (s_workoutMotionEnabled[idx] && GetEnabledWorkoutMotionCount() <= 1)
-        {
-            return;
-        }
-        s_workoutMotionEnabled[idx] = !s_workoutMotionEnabled[idx];
-    }
-
-    static int GetEnabledWorkoutMotionCount()
-    {
-        int count = 0;
-        for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
-        {
-            if (s_workoutMotionEnabled[i]) count++;
-        }
-        return count;
-    }
-
-    static WorkoutMotionType PickNextEnabledWorkoutMotion()
-    {
-        std::vector<WorkoutMotionType> enabledList;
-        for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
-        {
-            if (s_workoutMotionEnabled[i])
-            {
-                enabledList.push_back(static_cast<WorkoutMotionType>(i));
-            }
-        }
-        if (enabledList.empty())
-        {
-            return WorkoutMotionType::Squat;
-        }
-        int randIdx = GetRand(static_cast<int>(enabledList.size()) - 1);
-        WorkoutMotionType chosen = enabledList[randIdx];
-        s_workoutSequenceIndex++;
-        return chosen;
-    }
+    static bool              IsWorkoutMotionEnabled(WorkoutMotionType type);
+    static void              SetWorkoutMotionEnabled(WorkoutMotionType type, bool enabled);
+    static void              ToggleWorkoutMotionEnabled(WorkoutMotionType type);
+    static int               GetEnabledWorkoutMotionCount();
+    static WorkoutMotionType PickNextEnabledWorkoutMotion();
 
     static const char* GetWorkoutMotionName(WorkoutMotionType type)
     {

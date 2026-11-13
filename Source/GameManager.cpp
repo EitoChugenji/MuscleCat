@@ -4,6 +4,7 @@
 // ============================================================================
 #include "GameManager.h"
 #include "SoundManager.h"
+#include "WorkoutCollectionManager.h"
 #include "Player3D.h"
 #include "Mouse3D.h"
 #include "Obstacle3D.h"
@@ -247,10 +248,10 @@ namespace
     void GetWorkoutBtnRect(int cardX, int cardY, int cardW, int cardH, int index, int& outX, int& outY, int& outW, int& outH)
     {
         const int padX = 8;
-        const int gapX = 5;
-        const int gapY = 5;
-        const int headerH = 25;
-        const int btnH = (cardH - headerH - 8 - gapY) / 2;
+        const int gapX = 4;
+        const int gapY = 4;
+        const int headerH = 24;
+        const int btnH = 32;
 
         if (index < 5)
         {
@@ -272,7 +273,29 @@ namespace
         }
     }
 
-    // 筋トレアニメーション選択カード＆9種ON/OFFトグルボタン共通描画ヘルパー
+    // 筋トレコレクションアクションボタン（ガチャ・セーブ・ロード・デバッグ削除）の座標算出ヘルパー
+    void GetWorkoutActionBtnRect(int cardX, int cardY, int cardW, int cardH, int actionIdx, int& outX, int& outY, int& outW, int& outH)
+    {
+        const int padX = 8;
+        const int gapX = 6;
+        const int actY = cardY + 24 + 32 * 2 + 4 + 5; // cardY + 97
+        const int actH = 26;
+        outY = actY;
+        outH = actH;
+
+        int totalW = cardW - padX * 2 - gapX * 3;
+        int w0 = (totalW * 14) / 44; // ガチャ
+        int w1 = (totalW * 10) / 44; // セーブ
+        int w2 = (totalW * 10) / 44; // ロード
+        int w3 = totalW - w0 - w1 - w2; // デバッグ削除
+
+        if (actionIdx == 0)      { outX = cardX + padX; outW = w0; }
+        else if (actionIdx == 1) { outX = cardX + padX + w0 + gapX; outW = w1; }
+        else if (actionIdx == 2) { outX = cardX + padX + w0 + gapX + w1 + gapX; outW = w2; }
+        else                     { outX = cardX + padX + w0 + gapX + w1 + gapX + w2 + gapX; outW = w3; }
+    }
+
+    // 筋トレコレクション＆アニメーション選択カード共通描画ヘルパー
     void DrawWorkoutMotionSelectorCard(
         int x, int y, int w, int h,
         bool isRowSelected,
@@ -281,69 +304,162 @@ namespace
         int font16, int font13
     )
     {
-        // 1. 外枠カード（行選択時はゴールド枠＆グロー）
+        auto& collMgr = WorkoutCollectionManager::GetInstance();
+
+        // 1. 外枠カード
         SoftUI::DrawSoftCard(x, y, w, h, 16,
-                             isRowSelected ? GetColor(28, 38, 62) : GetColor(22, 28, 46), 238,
+                             isRowSelected ? GetColor(26, 34, 56) : GetColor(18, 24, 40), 242,
                              isRowSelected ? GetColor(255, 195, 50) : GetColor(55, 75, 110),
                              isRowSelected ? 2 : 1, isRowSelected, GetColor(255, 185, 45));
 
-        // 2. ヘッダーラベル＆有効数表示
-        const char* titleStr = "■ 筋トレ時アニメーション選択 (クリックでON/OFF)";
-        DrawStringToHandle(x + 12, y + 6, titleStr, isRowSelected ? GetColor(255, 235, 90) : GetColor(215, 235, 255), font13);
+        // 2. ヘッダー表示（コレクション所持数 ＆ プロテインポイント）
+        char colTitleBuf[64];
+        snprintf(colTitleBuf, sizeof(colTitleBuf), "★ 筋トレコレクション (%d / %d 所持)",
+                 collMgr.GetUnlockedCount(), collMgr.GetTotalMotionCount());
+        DrawStringToHandle(x + 12, y + 5, colTitleBuf, isRowSelected ? GetColor(255, 235, 90) : GetColor(220, 240, 255), font13);
 
-        char countStr[32];
-        snprintf(countStr, sizeof(countStr), "%d / %d ON",
-                 Player3D::GetEnabledWorkoutMotionCount(),
-                 static_cast<int>(WorkoutMotionType::Count));
-        int cW = GetDrawStringWidthToHandle(countStr, static_cast<int>(strlen(countStr)), font13);
-        DrawStringToHandle(x + w - cW - 12, y + 6, countStr, GetColor(110, 245, 150), font13);
+        char ptBuf[64];
+        snprintf(ptBuf, sizeof(ptBuf), "プロテイン: %d pt", collMgr.GetProteinPoints());
+        int ptW = GetDrawStringWidthToHandle(ptBuf, static_cast<int>(strlen(ptBuf)), font13);
+        DrawStringToHandle(x + w - ptW - 12, y + 5, ptBuf, GetColor(255, 215, 60), font13);
 
-        // 3. 9つのモーションON/OFFトグルボタン（上段5種 / 下段4種）
+        // 3. 9つのモーションボタン（上段5個 / 下段4個）
         for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
         {
-            auto mType   = static_cast<WorkoutMotionType>(i);
-            bool isOn    = Player3D::IsWorkoutMotionEnabled(mType);
-            int  bx = 0, by = 0, bw = 0, bh = 0;
+            auto mType      = static_cast<WorkoutMotionType>(i);
+            bool isUnlocked = collMgr.IsMotionUnlocked(i);
+            bool isOn       = Player3D::IsWorkoutMotionEnabled(mType);
+            std::string aeCode = WorkoutCollectionManager::IdToAeCode(i);
+
+            int bx = 0, by = 0, bw = 0, bh = 0;
             GetWorkoutBtnRect(x, y, w, h, i, bx, by, bw, bh);
 
             bool isHover = (mx >= bx && mx <= bx + bw && my >= by && my <= by + bh);
             bool isFocus = (isRowSelected && focusedBtnIdx == i) || isHover;
 
-            unsigned int bgCol     = isOn ? (isFocus ? GetColor(42, 115, 72) : GetColor(28, 88, 54))
-                                          : (isFocus ? GetColor(55, 62, 82)  : GetColor(32, 36, 50));
-            unsigned int borderCol = isFocus ? GetColor(255, 230, 80)
-                                             : (isOn ? GetColor(90, 235, 135) : GetColor(75, 85, 110));
+            if (isUnlocked)
+            {
+                unsigned int bgCol     = isOn ? (isFocus ? GetColor(38, 110, 68) : GetColor(24, 82, 50))
+                                              : (isFocus ? GetColor(50, 60, 80)  : GetColor(30, 36, 50));
+                unsigned int borderCol = isFocus ? GetColor(255, 230, 80)
+                                                 : (isOn ? GetColor(85, 230, 130) : GetColor(70, 85, 110));
 
-            SoftUI::DrawSoftCard(bx, by, bw, bh, 8,
-                                 bgCol, 245, borderCol, isFocus ? 2 : 1,
-                                 isFocus || isOn, isFocus ? GetColor(255, 220, 70) : GetColor(70, 210, 115));
+                SoftUI::DrawSoftCard(bx, by, bw, bh, 8,
+                                     bgCol, 245, borderCol, isFocus ? 2 : 1,
+                                     isFocus || isOn, isFocus ? GetColor(255, 220, 70) : GetColor(70, 210, 115));
 
-            // モーション名（上段中央）
-            const char* mName = Player3D::GetWorkoutMotionName(mType);
-            int nameW = GetDrawStringWidthToHandle(mName, static_cast<int>(strlen(mName)), font13);
-            unsigned int nameCol = isOn ? GetColor(255, 255, 255) : GetColor(150, 160, 180);
-            DrawStringToHandle(bx + (bw - nameW) / 2, by + 3, mName, nameCol, font13);
+                // モーション名（上段）
+                const char* mName = Player3D::GetWorkoutMotionName(mType);
+                int nameW = GetDrawStringWidthToHandle(mName, static_cast<int>(strlen(mName)), font13);
+                DrawStringToHandle(bx + (bw - nameW) / 2, by + 2, mName, isOn ? GetColor(255, 255, 255) : GetColor(170, 180, 200), font13);
 
-            // ON / OFF ステータスバッジ（下段中央ピル）
-            int pillW = bw - 10;
-            int pillH = 12;
-            int pillX = bx + 5;
-            int pillY = by + bh - pillH - 3;
-            unsigned int pillBg = isOn ? GetColor(55, 205, 95) : GetColor(20, 24, 34);
-            DrawRoundRect(pillX, pillY, pillX + pillW, pillY + pillH, 4, 4, pillBg, TRUE);
-            DrawRoundRect(pillX, pillY, pillX + pillW, pillY + pillH, 4, 4,
-                          isOn ? GetColor(180, 255, 200) : GetColor(65, 75, 95), FALSE);
+                // A/Eコード ＆ ON/OFFバッジ（下段）
+                char badgeBuf[32];
+                snprintf(badgeBuf, sizeof(badgeBuf), "[%s] %s", aeCode.c_str(), isOn ? "ON" : "OFF");
+                int bdW = GetDrawStringWidthToHandle(badgeBuf, static_cast<int>(strlen(badgeBuf)), font13);
+                DrawStringToHandle(bx + (bw - bdW) / 2, by + 17, badgeBuf, isOn ? GetColor(180, 255, 200) : GetColor(140, 150, 170), font13);
+            }
+            else
+            {
+                // 未所持（ロック表示）
+                unsigned int bgCol     = isHover ? GetColor(34, 38, 48) : GetColor(22, 25, 34);
+                unsigned int borderCol = isHover ? GetColor(140, 150, 175) : GetColor(50, 58, 72);
 
-            const char* stateTxt = isOn ? "● ON" : "○ OFF";
-            int stW = GetDrawStringWidthToHandle(stateTxt, static_cast<int>(strlen(stateTxt)), font13);
-            DrawStringToHandle(pillX + (pillW - stW) / 2, pillY, stateTxt,
-                               isOn ? GetColor(15, 30, 20) : GetColor(130, 140, 160), font13);
+                SoftUI::DrawSoftCard(bx, by, bw, bh, 8, bgCol, 240, borderCol, 1);
+
+                const char* lockTxt = "[未所持]";
+                int lW = GetDrawStringWidthToHandle(lockTxt, static_cast<int>(strlen(lockTxt)), font13);
+                DrawStringToHandle(bx + (bw - lW) / 2, by + 2, lockTxt, GetColor(130, 140, 155), font13);
+
+                char codeBuf[32];
+                snprintf(codeBuf, sizeof(codeBuf), "[%s]", aeCode.c_str());
+                int cW = GetDrawStringWidthToHandle(codeBuf, static_cast<int>(strlen(codeBuf)), font13);
+                DrawStringToHandle(bx + (bw - cW) / 2, by + 17, codeBuf, GetColor(100, 110, 130), font13);
+            }
         }
+
+        // 4. アクションボタン（ガチャ・セーブ・ロード・デバッグ削除）
+        for (int act = 0; act < 4; ++act)
+        {
+            int ax = 0, ay = 0, aw = 0, ah = 0;
+            GetWorkoutActionBtnRect(x, y, w, h, act, ax, ay, aw, ah);
+            bool isHover = (mx >= ax && mx <= ax + aw && my >= ay && my <= ay + ah);
+
+            if (act == 0) // ガチャ
+            {
+                bool isAllUnlocked = collMgr.IsAllUnlocked();
+                bool canAfford = (collMgr.GetProteinPoints() >= WorkoutCollectionManager::GACHA_COST);
+
+                unsigned int fillCol = isAllUnlocked ? GetColor(45, 55, 75)
+                    : (canAfford ? (isHover ? GetColor(255, 185, 45) : GetColor(220, 150, 30))
+                                 : (isHover ? GetColor(65, 50, 35) : GetColor(45, 35, 25)));
+                unsigned int borderCol = isAllUnlocked ? GetColor(90, 110, 140)
+                    : (canAfford ? (isHover ? GetColor(255, 240, 140) : GetColor(255, 210, 60))
+                                 : GetColor(130, 95, 45));
+
+                SoftUI::DrawSoftCard(ax, ay, aw, ah, 8, fillCol, 250, borderCol, isHover ? 2 : 1);
+
+                const char* gachaLabel = isAllUnlocked ? "★ コンプリート！"
+                    : (canAfford ? "★ ガチャ (100 pt)" : "ガチャ (100 pt必要)");
+                int gW = GetDrawStringWidthToHandle(gachaLabel, static_cast<int>(strlen(gachaLabel)), font13);
+                unsigned int gTxtCol = isAllUnlocked ? GetColor(180, 200, 230)
+                    : (canAfford ? GetColor(20, 20, 30) : GetColor(210, 170, 120));
+                DrawStringToHandle(ax + (aw - gW) / 2, ay + 6, gachaLabel, gTxtCol, font13);
+            }
+            else if (act == 1) // セーブ
+            {
+                unsigned int fillCol   = isHover ? GetColor(40, 90, 130) : GetColor(25, 60, 95);
+                unsigned int borderCol = isHover ? GetColor(140, 225, 255) : GetColor(65, 150, 210);
+                SoftUI::DrawSoftCard(ax, ay, aw, ah, 8, fillCol, 245, borderCol, isHover ? 2 : 1);
+
+                const char* saveLabel = "セーブ (コピー)";
+                int sW = GetDrawStringWidthToHandle(saveLabel, static_cast<int>(strlen(saveLabel)), font13);
+                DrawStringToHandle(ax + (aw - sW) / 2, ay + 6, saveLabel, GetColor(225, 245, 255), font13);
+            }
+            else if (act == 2) // ロード
+            {
+                unsigned int fillCol   = isHover ? GetColor(40, 90, 130) : GetColor(25, 60, 95);
+                unsigned int borderCol = isHover ? GetColor(140, 225, 255) : GetColor(65, 150, 210);
+                SoftUI::DrawSoftCard(ax, ay, aw, ah, 8, fillCol, 245, borderCol, isHover ? 2 : 1);
+
+                const char* loadLabel = "ロード (読込)";
+                int lW = GetDrawStringWidthToHandle(loadLabel, static_cast<int>(strlen(loadLabel)), font13);
+                DrawStringToHandle(ax + (aw - lW) / 2, ay + 6, loadLabel, GetColor(225, 245, 255), font13);
+            }
+            else if (act == 3) // デバッグ削除
+            {
+                unsigned int fillCol   = isHover ? GetColor(150, 35, 45) : GetColor(95, 25, 35);
+                unsigned int borderCol = isHover ? GetColor(255, 120, 120) : GetColor(180, 50, 60);
+                SoftUI::DrawSoftCard(ax, ay, aw, ah, 8, fillCol, 245, borderCol, isHover ? 2 : 1);
+
+                const char* resetLabel = "【Debug】データ削除";
+                int rW = GetDrawStringWidthToHandle(resetLabel, static_cast<int>(strlen(resetLabel)), font13);
+                DrawStringToHandle(ax + (aw - rW) / 2, ay + 6, resetLabel, GetColor(255, 225, 225), font13);
+            }
+        }
+
+        // 5. フッターステータス ＆ セーブコード表示
+        int footerY = y + h - 20;
+        if (collMgr.GetStatusMessageTimer() > 0)
+        {
+            const auto& msg = collMgr.GetStatusMessage();
+            DrawStringToHandle(x + 12, footerY, msg.c_str(), GetColor(255, 235, 100), font13);
+        }
+        else
+        {
+            std::string codeStr = "CODE: " + collMgr.GenerateSaveCode();
+            DrawStringToHandle(x + 12, footerY, codeStr.c_str(), GetColor(150, 175, 205), font13);
+        }
+
+        const char* hintTxt = "※クリックでON/OFF切替";
+        int hW = GetDrawStringWidthToHandle(hintTxt, static_cast<int>(strlen(hintTxt)), font13);
+        DrawStringToHandle(x + w - hW - 12, footerY, hintTxt, GetColor(130, 150, 175), font13);
     }
 } // namespace
 
 void GameManager::Init()
 {
+    WorkoutCollectionManager::GetInstance().Initialize();
     m_state = GameState::Title;
     m_titleCameraAngle = 0.0f;
     m_frameCount = 0;
@@ -963,6 +1079,37 @@ void GameManager::Update()
         bool isMouseTrigger = isLeftClick && !m_prevMouseLeft;
         m_prevMouseLeft = isLeftClick;
 
+        // 筋トレコレクション確認ダイアログの更新・ガード
+        auto& collMgr = WorkoutCollectionManager::GetInstance();
+        collMgr.Update();
+        if (collMgr.IsConfirmDialogOpen())
+        {
+            if (isMouseTrigger)
+            {
+                int dlgW = 540, dlgH = 250;
+                int dlgX = (Config::SCREEN_WIDTH - dlgW) / 2;
+                int dlgY = (Config::SCREEN_HEIGHT - dlgH) / 2;
+                int yesX = dlgX + 60, yesY = dlgY + 175, yesW = 180, yesH = 46;
+                int noX = dlgX + dlgW - 240, noY = dlgY + 175, noW = 180, noH = 46;
+
+                if (mx >= yesX && mx <= yesX + yesW && my >= yesY && my <= yesY + yesH)
+                {
+                    collMgr.ExecuteConfirmedReset();
+                    return;
+                }
+                if (mx >= noX && mx <= noX + noW && my >= noY && my <= noY + noH)
+                {
+                    collMgr.CloseConfirmDialog();
+                    return;
+                }
+            }
+            if (triggerEsc)
+            {
+                collMgr.CloseConfirmDialog();
+            }
+            return;
+        }
+
         // スタート演出（ホワイトトランジション）中
         if (m_startTransitionTimer > 0)
         {
@@ -1011,18 +1158,18 @@ void GameManager::Update()
             if (triggerDown) { m_selectedMenuItem = (m_selectedMenuItem + 1) % 5; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
         }
 
-        // ボタンの当たり判定座標
-        int btnW = 420;
-        int btnH = 44;
+        // ボタンの当たり判定座標（スリム化・レイアウト整理）
+        int btnW = 380;
+        int btnH = 40;
         int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-        int startBtnY    = 308;
-        int stageBtnY    = 358;
-        int howBtnY      = 408;
-        int soundBtnY    = 458;
-        int workoutCardW = 460;
+        int startBtnY    = 255;
+        int stageBtnY    = 301;
+        int howBtnY      = 347;
+        int soundBtnY    = 393;
+        int workoutCardW = 600;
         int workoutCardX = (Config::SCREEN_WIDTH - workoutCardW) / 2;
-        int workoutCardY = 510;
-        int workoutCardH = 100;
+        int workoutCardY = 494;
+        int workoutCardH = 154;
 
         bool hoverStart   = (mx >= btnX && mx <= btnX + btnW && my >= startBtnY && my <= startBtnY + btnH);
         bool hoverStage   = (mx >= btnX && mx <= btnX + btnW && my >= stageBtnY && my <= stageBtnY + btnH);
@@ -1036,6 +1183,25 @@ void GameManager::Update()
         if (hoverSound)   m_selectedMenuItem = 3;
         if (hoverWorkout) m_selectedMenuItem = 4;
 
+        // コレクションアクションボタン（ガチャ・セーブ・ロード・デバッグ削除）のホバー＆クリック
+        for (int act = 0; act < 4; ++act)
+        {
+            int ax = 0, ay = 0, aw = 0, ah = 0;
+            GetWorkoutActionBtnRect(workoutCardX, workoutCardY, workoutCardW, workoutCardH, act, ax, ay, aw, ah);
+            if (mx >= ax && mx <= ax + aw && my >= ay && my <= ay + ah)
+            {
+                if (isMouseTrigger)
+                {
+                    m_selectedMenuItem = 4;
+                    if (act == 0)      { collMgr.RollGacha(); }
+                    else if (act == 1) { collMgr.CopySaveCodeToClipboard(); }
+                    else if (act == 2) { collMgr.PasteSaveCodeFromClipboard(); }
+                    else if (act == 3) { collMgr.OpenConfirmDialog(); SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+                    return;
+                }
+            }
+        }
+
         // 筋トレモーション選択ボタン（9種・2段）の個別ホバー＆クリック・キー操作
         for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
         {
@@ -1047,8 +1213,16 @@ void GameManager::Update()
                 m_selectedWorkoutBtn = i;
                 if (isMouseTrigger)
                 {
-                    Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(i));
-                    SoundManager::GetInstance().PlaySE(SeType::Decide);
+                    if (collMgr.IsMotionUnlocked(i))
+                    {
+                        Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(i));
+                        SoundManager::GetInstance().PlaySE(SeType::Decide);
+                    }
+                    else
+                    {
+                        collMgr.SetStatusMessage("この筋トレは未所持です。ガチャを引いて解放してください！", 180);
+                        SoundManager::GetInstance().PlaySE(SeType::Cancel);
+                    }
                     return;
                 }
             }
@@ -1094,8 +1268,16 @@ void GameManager::Update()
             }
             if (triggerEnter || triggerSpace)
             {
-                Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(m_selectedWorkoutBtn));
-                SoundManager::GetInstance().PlaySE(SeType::Decide);
+                if (collMgr.IsMotionUnlocked(m_selectedWorkoutBtn))
+                {
+                    Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(m_selectedWorkoutBtn));
+                    SoundManager::GetInstance().PlaySE(SeType::Decide);
+                }
+                else
+                {
+                    collMgr.SetStatusMessage("この筋トレは未所持です。ガチャを引いて解放してください！", 180);
+                    SoundManager::GetInstance().PlaySE(SeType::Cancel);
+                }
                 return;
             }
         }
@@ -1544,11 +1726,11 @@ void GameManager::Update()
 
             // 右パネル下部のアクションボタン当たり判定座標（DrawGameClearScreenと完全一致）
             int btnW   = 322;
-            int btnH   = 60;
+            int btnH   = 58;
             int btnGap = 28;
             int btn1X  = 568;
             int btn2X  = btn1X + btnW + btnGap;
-            int btnY   = 618;
+            int btnY   = 584;
 
             bool hoverRetry = (mx >= btn1X && mx <= btn1X + btnW && my >= btnY && my <= btnY + btnH);
             bool hoverMenu  = (mx >= btn2X && mx <= btn2X + btnW && my >= btnY && my <= btnY + btnH);
@@ -2221,33 +2403,26 @@ void GameManager::DrawGameClearScreen()
     // =========================================================================
     int rowX   = panelX + 18;
     int rowW   = panelW - 36;
-    int rowH   = 76;
-    int rowGap = 10;
-    int startRowY = heroY + heroH + 14;
+    int rowH   = 60;
+    int rowGap = 6;
+    int startRowY = heroY + heroH + 10;
 
     auto DrawScoreBreakdownRow = [&](int rowIndex, const char* title, const char* subFormula,
                                      const char* valueStr, int scorePts, unsigned int accentCol)
     {
         int ry = startRowY + rowIndex * (rowH + rowGap);
 
-        SoftUI::DrawSoftCard(rowX, ry, rowW, rowH, 14, GetColor(12, 15, 26), 238, accentCol, 1);
-        DrawRoundRect(rowX + 3, ry + 4, rowX + 11, ry + rowH - 4, 4, 4, accentCol, TRUE);
+        SoftUI::DrawSoftCard(rowX, ry, rowW, rowH, 12, GetColor(12, 15, 26), 238, accentCol, 1);
+        DrawRoundRect(rowX + 3, ry + 4, rowX + 9, ry + rowH - 4, 3, 3, accentCol, TRUE);
 
-        // 項目タイトル＆計算式サブテキスト
-        DrawStringToHandle(rowX + 22, ry + 12, title, accentCol, font18);
-        DrawStringToHandle(rowX + 22, ry + 42, subFormula, GetColor(175, 192, 220), font13);
-
-        // 記録値（中央右寄り）
-        int valW = GetDrawStringWidthToHandle(valueStr, static_cast<int>(strlen(valueStr)), font36);
-        int valX = rowX + 468 - valW;
-        int valY = ry + 19;
-        DrawStringToHandle(valX + 2, valY + 2, valueStr, colBlack, font36);
-        DrawStringToHandle(valX,     valY,     valueStr, colWhite, font36);
+        // 項目タイトル（左上）＆ 計算式サブテキスト（左下）
+        DrawStringToHandle(rowX + 18, ry + 9,  title, accentCol, font16);
+        DrawStringToHandle(rowX + 18, ry + 34, subFormula, GetColor(170, 190, 215), font13);
 
         // 加算スコアピルバッジ（右端）
-        int pillW = 174;
-        int pillH = 44;
-        int pillX = rowX + rowW - pillW - 14;
+        int pillW = 160;
+        int pillH = 40;
+        int pillX = rowX + rowW - pillW - 12;
         int pillY = ry + (rowH - pillH) / 2;
         SoftUI::DrawSoftCard(pillX, pillY, pillW, pillH, 10, GetColor(24, 30, 48), 245, accentCol, 1);
 
@@ -2256,9 +2431,16 @@ void GameManager::DrawGameClearScreen()
         snprintf(ptsBuf, sizeof(ptsBuf), "+%d PTS", dispPts);
         int pW = GetDrawStringWidthToHandle(ptsBuf, static_cast<int>(strlen(ptsBuf)), font24);
         int pX = pillX + (pillW - pW) / 2;
-        int pY = pillY + 10;
+        int pY = pillY + (pillH - 24) / 2;
         DrawStringToHandle(pX + 2, pY + 2, ptsBuf, colBlack, font24);
         DrawStringToHandle(pX,     pY,     ptsBuf, colYellow, font24);
+
+        // 記録値（ピル左側の空きスペースにゆったり配置、文字衝突を防止）
+        int valW = GetDrawStringWidthToHandle(valueStr, static_cast<int>(strlen(valueStr)), font24);
+        int valX = pillX - 16 - valW;
+        int valY = ry + (rowH - 24) / 2;
+        DrawStringToHandle(valX + 2, valY + 2, valueStr, colBlack, font24);
+        DrawStringToHandle(valX,     valY,     valueStr, colWhite, font24);
     };
 
     // 項目1: 残り時間 (TIME LEFT)
@@ -2269,33 +2451,63 @@ void GameManager::DrawGameClearScreen()
     char timeValStr[32];
     snprintf(timeValStr, sizeof(timeValStr), "%02d:%02d.%02d", minutes, seconds, centisec);
     char timeSubStr[96];
-    snprintf(timeSubStr, sizeof(timeSubStr), "クリアタイム: %.2f秒 / 制限120秒  (残り1秒 × 50 PTS)", m_clearTimeSeconds);
+    snprintf(timeSubStr, sizeof(timeSubStr), "クリアタイム: %.2f秒 (残り1秒 × 50 PTS)", m_clearTimeSeconds);
     DrawScoreBreakdownRow(0, "【TIME】 残り時間 (TIME LEFT)", timeSubStr, timeValStr, timeScore, colYellow);
 
     // 項目2: 最大コンボ数 (MAX COMBO)
     char comboValStr[32];
     snprintf(comboValStr, sizeof(comboValStr), "%d COMBO", maxCombo);
-    DrawScoreBreakdownRow(1, "【COMBO】 最大コンボ数 (MAX COMBO)", "連続ネズミ捕獲の最高コンボ記録  (1コンボ × 500 PTS)", comboValStr, comboScore, colCyan);
+    DrawScoreBreakdownRow(1, "【COMBO】 最大コンボ数 (MAX COMBO)", "ネズミ連続捕獲数 (1コンボ × 500 PTS)", comboValStr, comboScore, colCyan);
 
     // 項目3: 筋トレ成功回数 (WORKOUT SUCCESS)
     char workoutValStr[32];
     snprintf(workoutValStr, sizeof(workoutValStr), "%d 回", workoutSuccess);
-    DrawScoreBreakdownRow(2, "【PUMP】 筋トレ成功回数 (WORKOUT SUCCESS)", "筋トレQTEの累計パンプアップ成功数  (1回 × 300 PTS)", workoutValStr, workoutScore, colGreen);
+    DrawScoreBreakdownRow(2, "【PUMP】 筋トレ成功回数 (WORKOUT SUCCESS)", "筋トレQTE成功 (1回 × 300 PTS)", workoutValStr, workoutScore, colGreen);
 
     // 項目4: 最大レベル (MAX LEVEL)
     char lvValStr[32];
     snprintf(lvValStr, sizeof(lvValStr), "Lv. %d", maxLevel);
-    DrawScoreBreakdownRow(3, "【LEVEL】 最大レベル (MAX LEVEL)", "プレイ中に到達した最高マッスルレベル  (1Lv × 400 PTS)", lvValStr, levelScore, colOrange);
+    DrawScoreBreakdownRow(3, "【LEVEL】 最大レベル (MAX LEVEL)", "最高到達マッスルレベル (1Lv × 400 PTS)", lvValStr, levelScore, colOrange);
+
+    // =========================================================================
+    // 5B. プロテインポイント獲得バナー（独立した専用カードとして配置し重なりを解消）
+    // =========================================================================
+    int earnedPoints = workoutSuccess * WorkoutCollectionManager::POINTS_PER_WORKOUT;
+    int totalPoints  = WorkoutCollectionManager::GetInstance().GetProteinPoints();
+    int ptCardY      = startRowY + 4 * (rowH + rowGap) + 6;
+    int ptCardH      = 44;
+
+    SoftUI::DrawSoftCard(rowX, ptCardY, rowW, ptCardH, 12, GetColor(16, 22, 38), 245, colGold, 1);
+
+    // 左側：アイコンバッジ [ PROTEIN ]
+    int pBadgeW = 96;
+    int pBadgeH = 28;
+    int pBadgeX = rowX + 12;
+    int pBadgeY = ptCardY + (ptCardH - pBadgeH) / 2;
+    SoftUI::DrawSoftCard(pBadgeX, pBadgeY, pBadgeW, pBadgeH, 8, colOrange, 255, colGold, 1);
+    const char* pBadgeText = "PROTEIN";
+    int pbW = GetDrawStringWidthToHandle(pBadgeText, static_cast<int>(strlen(pBadgeText)), font16);
+    DrawStringToHandle(pBadgeX + (pBadgeW - pbW) / 2, pBadgeY + 6, pBadgeText, colBlack, font16);
+
+    // 獲得プロテイン ＆ 総所持プロテイン
+    char earnedText[64];
+    snprintf(earnedText, sizeof(earnedText), "獲得: +%d pt (1回につき+%d pt)", earnedPoints, WorkoutCollectionManager::POINTS_PER_WORKOUT);
+    DrawStringToHandle(pBadgeX + pBadgeW + 16, ptCardY + 13, earnedText, colYellow, font16);
+
+    char totalText[64];
+    snprintf(totalText, sizeof(totalText), "総所持: %d pt", totalPoints);
+    int ttW = GetDrawStringWidthToHandle(totalText, static_cast<int>(strlen(totalText)), font16);
+    DrawStringToHandle(rowX + rowW - ttW - 18, ptCardY + 13, totalText, colGold, font16);
 
     // =========================================================================
     // 6. アクションボタン（右パネル最下部：RETRY / MAIN MENU）
     // =========================================================================
     int btnW   = 322;
-    int btnH   = 60;
+    int btnH   = 58;
     int btnGap = 28;
     int btn1X  = 568;
     int btn2X  = btn1X + btnW + btnGap;
-    int btnY   = 618;
+    int btnY   = 584;
 
     auto DrawArcadeButton = [&](int bx, int by, bool isSelected, const char* label, const char* keyBadge, unsigned int activeMainCol)
     {
@@ -2632,16 +2844,16 @@ void GameManager::DrawTitleScreen()
     DrawStringToHandle(25, 14, "★ THE MOST PUMPED FELINE ADVENTURE! ★", GetColor(255, 230, 60), font16);
     DrawStringToHandle(Config::SCREEN_WIDTH - 280, 14, "★ WORLD MUSCLE LEAGUE 2026 ★", GetColor(100, 230, 255), font16);
 
-    const char* helpStr = "[ ↑ / ↓ ] SELECT   [ ← / → ] CHANGE STAGE   [ ENTER / SPACE ] DECIDE   [ H / TAB ] HOW TO PLAY";
+    const char* helpStr = "[ ↑ / ↓ ] 選択   [ ← / → ] ステージ切替   [ ENTER / SPACE ] 決定   [ H / TAB ] あそびかた   [ O ] 設定";
     int helpW = GetDrawStringWidthToHandle(helpStr, static_cast<int>(strlen(helpStr)), font16);
-    DrawStringToHandle((Config::SCREEN_WIDTH - helpW) / 2, Config::SCREEN_HEIGHT - 32, helpStr, GetColor(255, 255, 255), font16);
-    DrawStringToHandle(Config::SCREEN_WIDTH - 100, Config::SCREEN_HEIGHT - 30, "VER 1.0", GetColor(100, 220, 255), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - helpW) / 2, Config::SCREEN_HEIGHT - 32, helpStr, GetColor(235, 245, 255), font16);
+    DrawStringToHandle(Config::SCREEN_WIDTH - 110, Config::SCREEN_HEIGHT - 30, "VER 1.0", GetColor(100, 220, 255), font13);
 
     // ------------------------------------------------------------------------
-    // 5. タイトルロゴ背面の半透明コミックプレート
+    // 5. タイトルロゴ背面の半透明コミックプレート（コンパクトに収めて背景の視界を確保）
     // ------------------------------------------------------------------------
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 115);
-    DrawBox(0, 65, Config::SCREEN_WIDTH, 275, GetColor(15, 18, 30), TRUE);
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 95);
+    DrawBox(0, 68, Config::SCREEN_WIDTH, 178, GetColor(15, 18, 30), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
     // ------------------------------------------------------------------------
@@ -2918,7 +3130,7 @@ void GameManager::DrawTitleScreen()
             activeCount = sizeof(ohpShouts) / sizeof(ohpShouts[0]);
         }
 
-        // --- 6個の掛け声吹き出し（左右3箇所ずつ配置、約3秒スパンでリズミカルに入れ替え） ---
+        // --- 掛け声吹き出し（左右各1箇所に厳選し、画面のごちゃつきを解消してテンポよく入れ替え） ---
         const int SHOUT_SPAN = 180; // 約3秒スパン (60fps * 3s)
 
         struct BubbleSlot
@@ -2930,19 +3142,14 @@ void GameManager::DrawTitleScreen()
             unsigned int textCol;
         };
 
-        BubbleSlot slots[6] = {
-            // 左側3箇所 (上・中・下) - パステルマシュマロカラー
-            { false, 125,   0, GetColor(255, 240, 140), GetColor(35, 30, 20) }, // クリームバター
-            { false, 280,  60, GetColor(165, 235, 255), GetColor(20, 35, 45) }, // パステルシアン
-            { false, 435, 120, GetColor(175, 245, 195), GetColor(20, 40, 25) }, // ミントグリーン
-
-            // 右側3箇所 (上・中・下) - パステルマシュマロカラー
-            { true,  125,  30, GetColor(255, 185, 215), GetColor(45, 20, 35) }, // サクラピンク
-            { true,  280,  90, GetColor(255, 200, 150), GetColor(45, 30, 20) }, // アプリコットピーチ
-            { true,  435, 150, GetColor(220, 190, 255), GetColor(35, 20, 45) }  // パステルラベンダー
+        BubbleSlot slots[2] = {
+            // 左側（パステルイエロー・バター）
+            { false, 310,   0, GetColor(255, 240, 140), GetColor(35, 30, 20) },
+            // 右側（サクラピンク）
+            { true,  310,  90, GetColor(255, 185, 215), GetColor(45, 20, 35) }
         };
 
-        for (int i = 0; i < 6; ++i)
+        for (int i = 0; i < 2; ++i)
         {
             const auto& slot = slots[i];
             int timer = m_titleAnimTimer + slot.timerOffset;
@@ -2951,17 +3158,16 @@ void GameManager::DrawTitleScreen()
 
             // アニメーション：3秒ごとの切り替え時に弾むポップバウンス
             float bounce = (frame < 18) ? (std::sin((static_cast<float>(frame) / 18.0f) * MathHelper::PI) * -8.0f) : 0.0f;
-            // ふわふわ浮遊アニメーション（スロットごとに独立した周期で優しく揺れる）
+            // ふわふわ浮遊アニメーション
             float floatY = std::sin(m_titleAnimTimer * 0.045f + i * 1.05f) * 3.5f;
 
-            // 6個が被らないようスロットごとのオフセットを付与
-            int idx = (step * 5 + i * 2) % activeCount;
+            int idx = (step * 5 + i * 3) % activeCount;
             const char* shoutText = activePool[idx];
 
             int textW = GetDrawStringWidthToHandle(shoutText, static_cast<int>(strlen(shoutText)), font16);
             int sW = textW + 30;
             int sH = 38;
-            int sX = slot.isRight ? (Config::SCREEN_WIDTH - sW - 32) : 32;
+            int sX = slot.isRight ? (Config::SCREEN_WIDTH - sW - 36) : 36;
             int sY = slot.baseY + static_cast<int>(floatY + bounce);
 
             // ふわふわの雲・マシュマロ吹き出しを描画
@@ -2972,17 +3178,17 @@ void GameManager::DrawTitleScreen()
     // ------------------------------------------------------------------------
     // 8. ふわふわカプセル・メニューボタン（4項目＋筋トレモーション選択パネル）
     // ------------------------------------------------------------------------
-    int btnW = 420;
-    int btnH = 44;
+    int btnW = 380;
+    int btnH = 40;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
-int startBtnY    = 308;
-    int stageBtnY    = 358;
-    int howBtnY      = 408;
-    int soundBtnY    = 458;
-    int workoutCardW = 460;
+    int startBtnY    = 255;
+    int stageBtnY    = 301;
+    int howBtnY      = 347;
+    int soundBtnY    = 393;
+    int workoutCardW = 600;
     int workoutCardX = (Config::SCREEN_WIDTH - workoutCardW) / 2;
-    int workoutCardY = 510;
-    int workoutCardH = 100;
+    int workoutCardY = 494;
+    int workoutCardH = 154;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
@@ -3144,17 +3350,6 @@ int startBtnY    = 308;
         );
     }
 
-    // ステージ切り替えガイドヒント（ふわっとした半透明角丸プレート）
-    const char* stageHint = (m_selectedMap == ModelConfig::MapType::House)
-        ? "★ [ ← / → ] またはクリックで MAP 2: NEW MAP に切替"
-        : "★ [ ← / → ] またはクリックで MAP 1: 通常ハウス に切替";
-    int hintW = GetDrawStringWidthToHandle(stageHint, static_cast<int>(strlen(stageHint)), font13);
-    int hintX = (Config::SCREEN_WIDTH - hintW) / 2;
-    int hintY = 618;
-
-    SoftUI::DrawSoftCard(hintX - 18, hintY - 4, hintW + 36, 26, 13, GetColor(18, 24, 40), 200, GetColor(255, 215, 60), 1);
-    DrawStringToHandle(hintX, hintY, stageHint, GetColor(255, 235, 120), font13);
-
     // ------------------------------------------------------------------------
     // 10. 遊び方モーダルが開いていれば描画
     // ------------------------------------------------------------------------
@@ -3181,6 +3376,9 @@ int startBtnY    = 308;
         DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(255, 255, 255), TRUE);
         SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
     }
+
+    // 筋トレコレクション確認ダイアログ（最前面描画）
+    WorkoutCollectionManager::GetInstance().DrawConfirmDialogModal(font24, font16);
 }
 
 // ============================================================================
@@ -3857,6 +4055,37 @@ void GameManager::UpdatePause(bool triggerEsc)
     bool isMouseTrigger = isLeftClick && !m_prevMouseLeft;
     m_prevMouseLeft = isLeftClick;
 
+    // 筋トレコレクション確認ダイアログの更新・ガード
+    auto& collMgr = WorkoutCollectionManager::GetInstance();
+    collMgr.Update();
+    if (collMgr.IsConfirmDialogOpen())
+    {
+        if (isMouseTrigger)
+        {
+            int dlgW = 540, dlgH = 250;
+            int dlgX = (Config::SCREEN_WIDTH - dlgW) / 2;
+            int dlgY = (Config::SCREEN_HEIGHT - dlgH) / 2;
+            int yesX = dlgX + 60, yesY = dlgY + 175, yesW = 180, yesH = 46;
+            int noX = dlgX + dlgW - 240, noY = dlgY + 175, noW = 180, noH = 46;
+
+            if (mx >= yesX && mx <= yesX + yesW && my >= yesY && my <= yesY + yesH)
+            {
+                collMgr.ExecuteConfirmedReset();
+                return;
+            }
+            if (mx >= noX && mx <= noX + noW && my >= noY && my <= noY + noH)
+            {
+                collMgr.CloseConfirmDialog();
+                return;
+            }
+        }
+        if (triggerEsc)
+        {
+            collMgr.CloseConfirmDialog();
+        }
+        return;
+    }
+
     // キー入力
     bool keyUp    = (CheckHitKey(KEY_INPUT_UP) != 0 || CheckHitKey(KEY_INPUT_W) != 0);
     bool keyDown  = (CheckHitKey(KEY_INPUT_DOWN) != 0 || CheckHitKey(KEY_INPUT_S) != 0);
@@ -3994,6 +4223,25 @@ void GameManager::UpdatePause(bool triggerEsc)
     if (hoverSe)      m_pauseMenuItem = 4;
     if (hoverWorkout) m_pauseMenuItem = 5;
 
+    // コレクションアクションボタン（ガチャ・セーブ・ロード・デバッグ削除）
+    for (int act = 0; act < 4; ++act)
+    {
+        int ax = 0, ay = 0, aw = 0, ah = 0;
+        GetWorkoutActionBtnRect(workoutCardX, workoutCardY, workoutCardW, workoutCardH, act, ax, ay, aw, ah);
+        if (mx >= ax && mx <= ax + aw && my >= ay && my <= ay + ah)
+        {
+            if (isMouseTrigger)
+            {
+                m_pauseMenuItem = 5;
+                if (act == 0)      { collMgr.RollGacha(); }
+                else if (act == 1) { collMgr.CopySaveCodeToClipboard(); }
+                else if (act == 2) { collMgr.PasteSaveCodeFromClipboard(); }
+                else if (act == 3) { collMgr.OpenConfirmDialog(); SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+                return;
+            }
+        }
+    }
+
     // 筋トレモーション選択ボタン（9種・2段）の個別ホバー＆クリック・キー操作
     for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
     {
@@ -4005,8 +4253,16 @@ void GameManager::UpdatePause(bool triggerEsc)
             m_pauseSelectedWorkoutBtn = i;
             if (isMouseTrigger)
             {
-                Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(i));
-                SoundManager::GetInstance().PlaySE(SeType::Decide);
+                if (collMgr.IsMotionUnlocked(i))
+                {
+                    Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(i));
+                    SoundManager::GetInstance().PlaySE(SeType::Decide);
+                }
+                else
+                {
+                    collMgr.SetStatusMessage("この筋トレは未所持です。ガチャを引いて解放してください！", 180);
+                    SoundManager::GetInstance().PlaySE(SeType::Cancel);
+                }
                 return;
             }
         }
@@ -4052,8 +4308,16 @@ void GameManager::UpdatePause(bool triggerEsc)
         }
         if (triggerEnter || triggerSpace)
         {
-            Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(m_pauseSelectedWorkoutBtn));
-            SoundManager::GetInstance().PlaySE(SeType::Decide);
+            if (collMgr.IsMotionUnlocked(m_pauseSelectedWorkoutBtn))
+            {
+                Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(m_pauseSelectedWorkoutBtn));
+                SoundManager::GetInstance().PlaySE(SeType::Decide);
+            }
+            else
+            {
+                collMgr.SetStatusMessage("この筋トレは未所持です。ガチャを引いて解放してください！", 180);
+                SoundManager::GetInstance().PlaySE(SeType::Cancel);
+            }
             return;
         }
     }
@@ -4374,6 +4638,9 @@ void GameManager::DrawPauseModal()
     const char* guideTxt2 = "決定/ON・OFF切替: [ENTER] / [SPACE]  |  ゲーム説明: [H / TAB]  |  閉じる: [ESC]";
     int gW2 = GetDrawStringWidthToHandle(guideTxt2, static_cast<int>(strlen(guideTxt2)), font13);
     DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 538, guideTxt2, GetColor(130, 150, 180), font13);
+
+    // 筋トレコレクション確認ダイアログ（最前面描画）
+    WorkoutCollectionManager::GetInstance().DrawConfirmDialogModal(font24, font16);
 }
 
 // ============================================================================

@@ -4,6 +4,7 @@
 // ============================================================================
 #include "Player3D.h"
 #include "SoundManager.h"
+#include "WorkoutCollectionManager.h"
 #include "Camera3D.h"
 #include "ModelConfig.h"
 #include "ModelManager.h"
@@ -20,9 +21,62 @@
 #include <cctype>
 #include <algorithm>
 
-// 筋トレアニメーション各モーションの初期設定（デフォルトは4種すべてON）
-bool Player3D::s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)] = { true, true, true, true, true, true, true, true, true };
+// 筋トレアニメーション各モーションの初期設定（仕様: 腕立て伏せ [ID 1 / EEEA] のみ初期解放）
+bool Player3D::s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)] = { false, true, false, false, false, false, false, false, false };
 int  Player3D::s_workoutSequenceIndex = 0;
+
+bool Player3D::IsWorkoutMotionEnabled(WorkoutMotionType type)
+{
+    int idx = static_cast<int>(type);
+    if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return false;
+    return s_workoutMotionEnabled[idx];
+}
+
+void Player3D::SetWorkoutMotionEnabled(WorkoutMotionType type, bool enabled)
+{
+    int idx = static_cast<int>(type);
+    if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return;
+    s_workoutMotionEnabled[idx] = enabled;
+}
+
+void Player3D::ToggleWorkoutMotionEnabled(WorkoutMotionType type)
+{
+    int idx = static_cast<int>(type);
+    if (idx < 0 || idx >= static_cast<int>(WorkoutMotionType::Count)) return;
+    // 最低1つはONになるよう保護
+    if (s_workoutMotionEnabled[idx] && GetEnabledWorkoutMotionCount() <= 1) return;
+    s_workoutMotionEnabled[idx] = !s_workoutMotionEnabled[idx];
+}
+
+int Player3D::GetEnabledWorkoutMotionCount()
+{
+    int count = 0;
+    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    {
+        if (s_workoutMotionEnabled[i]) count++;
+    }
+    return count;
+}
+
+WorkoutMotionType Player3D::PickNextEnabledWorkoutMotion()
+{
+    std::vector<WorkoutMotionType> enabledList;
+    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    {
+        if (s_workoutMotionEnabled[i])
+        {
+            enabledList.push_back(static_cast<WorkoutMotionType>(i));
+        }
+    }
+    if (enabledList.empty())
+    {
+        return WorkoutMotionType::PushUp; // 初期解放の腕立て伏せ
+    }
+    int randIdx = GetRand(static_cast<int>(enabledList.size()) - 1);
+    WorkoutMotionType chosen = enabledList[randIdx];
+    s_workoutSequenceIndex++;
+    return chosen;
+}
 
 float Player3D::CalculateSpeedForRep(int effectiveRep) const
 {
@@ -984,6 +1038,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                             m_repCount++;
                             m_workoutSuccessCount++;
                             if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
+                            WorkoutCollectionManager::GetInstance().OnWorkoutCompleted();
                             SoundManager::GetInstance().PlaySE(SeType::SquatSuccess);
                             m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒
                             m_lastResultSuccess = true;
@@ -1515,7 +1570,11 @@ void Player3D::Draw2D()
 void Player3D::AddRep(int amount)
 {
     m_repCount += amount;
-    if (amount > 0) { m_workoutSuccessCount += amount; }
+    if (amount > 0)
+    {
+        m_workoutSuccessCount += amount;
+        WorkoutCollectionManager::GetInstance().OnWorkoutCompleted();
+    }
     if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
     m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒リセット
     m_state = MuscleState::Muscular;
