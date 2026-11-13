@@ -73,6 +73,28 @@ public:
     GachaResult RollGacha();
 
     // ------------------------------------------------------------------------
+    // ガチャ演出管理（筋トレ感大あり演出）
+    // ------------------------------------------------------------------------
+    enum class GachaAnimPhase
+    {
+        None,           // なし
+        ShakeCharge,    // Phase 1: プロテイン注入＆シェイカー激震
+        MusclePump,     // Phase 2: パンプアップ・限界突破（集中線・心拍・筋肉コール）
+        BulkExplosion,  // Phase 3: 白フラッシュ＆大爆発！
+        ResultCard,     // Phase 4: 金色カード登場＆新筋トレ解放発表
+    };
+
+    bool           IsGachaAnimationActive() const { return m_gachaAnimPhase != GachaAnimPhase::None; }
+    GachaAnimPhase GetGachaAnimPhase() const      { return m_gachaAnimPhase; }
+    int            GetGachaObtainedId() const     { return m_gachaObtainedId; }
+    const std::string& GetGachaMotionName() const { return m_gachaMotionName; }
+    void           StartGachaAnimation(int obtainedId, const std::string& name, const std::string& aeCode);
+    void           SkipGachaAnimation();
+    void           CloseGachaAnimation();
+    void           UpdateGachaAnimation(bool triggerEnter, bool triggerSpace, bool triggerClick, bool triggerEsc);
+    void           DrawGachaAnimationModal(int fontTitle, int fontSubtitle, int fontBody, int fontSmall);
+
+    // ------------------------------------------------------------------------
     // セーブ・ロード機能（セーブコード方式）
     // ------------------------------------------------------------------------
     std::string GenerateSaveCode() const;
@@ -83,6 +105,27 @@ public:
     // ローカルファイルへの自動バックアップ（QoL機能）
     void SaveToFile(const char* filePath = "SaveData.txt") const;
     bool LoadFromFile(const char* filePath = "SaveData.txt");
+
+    // ------------------------------------------------------------------------
+    // ★ 筋トレコレクション デバッグモード機能（Debugビルド時のみ有効化）
+    // ------------------------------------------------------------------------
+#ifdef _DEBUG
+    bool IsDebugMode() const { return m_isDebugMode; }
+    void SetDebugMode(bool debug) { m_isDebugMode = debug; }
+    void ToggleDebugMode();
+    void DebugUnlockAll();
+    void DebugAddProtein(int amount = 1000);
+    void DebugEnableAllMotions();
+    void DebugDisableAllMotions();
+#else
+    bool IsDebugMode() const { return false; }
+    void SetDebugMode(bool) {}
+    void ToggleDebugMode() {}
+    void DebugUnlockAll() {}
+    void DebugAddProtein(int = 1000) {}
+    void DebugEnableAllMotions() {}
+    void DebugDisableAllMotions() {}
+#endif
 
     // ------------------------------------------------------------------------
     // デバッグ・確認ダイアログ
@@ -118,10 +161,23 @@ private:
     int                     m_proteinPoints;
     std::unordered_set<int> m_unlockedIds;
     bool                    m_isConfirmDialogOpen;
+    bool                    m_isDebugMode          = false;
 
     // UI演出用
     std::string             m_statusMessage;
     int                     m_statusMessageTimer;
     std::string             m_lastGachaName;
     std::string             m_lastGachaCode;
+
+    // ガチャ演出用メンバ
+    GachaAnimPhase          m_gachaAnimPhase       = GachaAnimPhase::None;
+    int                     m_gachaAnimTimer       = 0;
+    int                     m_gachaObtainedId      = -1;
+    std::string             m_gachaMotionName;
+    std::string             m_gachaAeCode;
+    std::string             m_gachaTargetMuscle;
+    std::string             m_gachaMuscleCall;
+    float                   m_gachaShakeX          = 0.0f;
+    float                   m_gachaShakeY          = 0.0f;
+    float                   m_gachaWhiteFlash      = 0.0f;
 };
