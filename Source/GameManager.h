@@ -88,9 +88,9 @@ private:
     ModelConfig::MapType m_selectedMap          = ModelConfig::MapType::SlopeHills; // 現在選択中のステージ
     float                m_titleCameraAngle     = 0.0f;  // タイトル画面の3D旋回カメラ角度（ラジアン）
     bool                 m_showHowToPlay        = false;
-    int                  m_howToPlayPage        = 0;     // ゲーム説明の現在ページ番号 (0〜3)
+    int                  m_howToPlayPage        = 0;     // ゲーム説明の現在ページ番号 (0〜4)
     int                  m_howToPlayScreen      = -1;    // ゲーム説明内の実プレイ画面プレビュー用オフスクリーンハンドル
-    static constexpr int HOW_TO_PLAY_PAGE_COUNT = 4;
+    static constexpr int HOW_TO_PLAY_PAGE_COUNT = 5;
     bool                 m_showSoundSettings    = false; // サウンド設定モーダル表示中フラグ
     int                  m_titleSoundSettingItem= 0;     // タイトルサウンド設定選択 (0: BGM, 1: SE, 2: 感度)
     bool                 m_showWorkoutCollection= false; // 筋トレコレクションモーダル表示中フラグ
