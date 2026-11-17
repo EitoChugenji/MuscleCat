@@ -3455,11 +3455,11 @@ void GameManager::UpdateHowToPlayModal(int mx, int my, bool isMouseTrigger,
         }
     }
 
-    // 3. 上部ステップタブ（4項目）のクリック判定
+    // 3. 上部ステップタブ（5項目）のクリック判定
     int tabY      = modalY + 58;
     int tabH      = 38;
-    int tabW      = 240;
-    int tabGap    = 10;
+    int tabW      = 192;
+    int tabGap    = 8;
     int tabStartX = modalX + 24;
     if (isMouseTrigger && my >= tabY && my <= tabY + tabH)
     {
@@ -3507,7 +3507,7 @@ void GameManager::RenderHowToPlayPreviewScreen()
 }
 
 // ============================================================================
-// ゲーム説明モーダルダイアログの描画（4ページ切替・文字とキー/マウス図解のみで描画）
+// ゲーム説明モーダルダイアログの描画（5ページ切替・文字とキー/マウス図解のみで描画）
 // ============================================================================
 void GameManager::DrawHowToPlayModal()
 {
@@ -3636,10 +3636,11 @@ void GameManager::DrawHowToPlayModal()
     DrawLine(modalX + 20, modalY + 50, modalX + modalW - 20, modalY + 50, GetColor(255, 140, 45));
 
     const char* pageTitles[HOW_TO_PLAY_PAGE_COUNT] = {
-        "ゲーム説明 [1/4] : ゲームの目的・基本移動・カメラ操作",
-        "ゲーム説明 [2/4] : 筋トレで猫をパワーアップ！ (SPACEキー)",
-        "ゲーム説明 [3/4] : Lv.4で解放！ 2つの必殺アクション",
-        "ゲーム説明 [4/4] : ネズミの種類と高ランク(S)攻略のコツ"
+        "ゲーム説明 [1/5] : ゲームの目的・基本移動・カメラ操作",
+        "ゲーム説明 [2/5] : 筋トレで猫をパワーアップ！ (SPACEキー)",
+        "ゲーム説明 [3/5] : Lv.4で解放！ 2つの必殺アクション",
+        "ゲーム説明 [4/5] : 筋トレコレクション ＆ ガチャで新種目解放！",
+        "ゲーム説明 [5/5] : ネズミの種類と高ランク(S)攻略のコツ"
     };
     DrawCenteredStr(modalX, modalW, modalY + 13, pageTitles[m_howToPlayPage], GetColor(255, 230, 75), font24);
 
@@ -3659,19 +3660,21 @@ void GameManager::DrawHowToPlayModal()
         "① 目的・移動・視点",
         "② 筋トレで強化",
         "③ 必殺アクション",
-        "④ ネズミ・高ランク攻略"
+        "④ 筋トレコレクション",
+        "⑤ ネズミ・攻略"
     };
     unsigned int tabAccentCols[HOW_TO_PLAY_PAGE_COUNT] = {
         GetColor(80, 220, 255),
         GetColor(100, 245, 140),
         GetColor(255, 150, 45),
+        GetColor(255, 120, 240),
         GetColor(255, 220, 60)
     };
 
     int tabY      = modalY + 58;
     int tabH      = 38;
-    int tabW      = 240;
-    int tabGap    = 10;
+    int tabW      = 192;
+    int tabGap    = 8;
     int tabStartX = modalX + 24;
 
     for (int i = 0; i < HOW_TO_PLAY_PAGE_COUNT; ++i)
@@ -3909,6 +3912,105 @@ void GameManager::DrawHowToPlayModal()
         DrawCenteredStr(rightBoxX + 20, boxW - 40, boxY + 254, "・猛スピードで前方へタックル突進！", GetColor(255, 255, 255), font16);
         DrawCenteredStr(rightBoxX + 20, boxW - 40, boxY + 284, "・周囲のネズミをまとめて気絶させ足止め！", GetColor(100, 245, 140), font16);
         DrawCenteredStr(rightBoxX + 20, boxW - 40, boxY + 312, "※壁に激突すると猫が気絶するので注意！", GetColor(255, 120, 120), font13);
+    }
+    else if (m_howToPlayPage == 3)
+    {
+        // --------------------------------------------------------------------
+        // [4/5] 筋トレコレクション ＆ ガチャ解放システム
+        // --------------------------------------------------------------------
+        // --- 上段：コレクション概要 ＆ プロテインptバナー ---
+        int bannerH = 76;
+        SoftUI::DrawSoftCard(contentX, contentY, contentW, bannerH, 14, GetColor(36, 18, 38), 245, GetColor(255, 120, 240), 1);
+        DrawCenteredStr(contentX, contentW, contentY + 13,
+                        "■ 筋トレコレクション ： プロテインを集めて【★ ガチャ】で新種目をアンロック！",
+                        GetColor(255, 230, 90), font18);
+        DrawCenteredStr(contentX, contentW, contentY + 44,
+                        "筋トレ完了やゲームクリアで【プロテインpt】を獲得！ 100ptでガチャを回し、全9種の筋トレをコンプリートしよう！",
+                        GetColor(255, 180, 240), font16);
+
+        // --- 中段左：システム解説カード (ガチャ・ON/OFF設定・自動セーブ) ---
+        int midY = contentY + 86;
+        int leftCardW = 430;
+        int midH = 254;
+        SoftUI::DrawSoftCard(contentX, midY, leftCardW, midH, 14, GetColor(24, 20, 36), 240, GetColor(255, 130, 230), 1);
+        DrawStringToHandle(contentX + 18, midY + 14, "★ コレクションの機能 ＆ 操作方法", GetColor(255, 140, 235), font18);
+
+        // 項目1: いつでも開ける
+        int item1Y = midY + 44;
+        SoftUI::DrawSoftCard(contentX + 16, item1Y, leftCardW - 32, 60, 10, GetColor(34, 26, 48), 235, GetColor(210, 100, 230), 1);
+        DrawStringToHandle(contentX + 28, item1Y + 9, "● タイトル ＆ ポーズ画面からアクセス！", GetColor(255, 235, 90), font16);
+        DrawStringToHandle(contentX + 28, item1Y + 33, "タイトル画面のボタンや、プレイ中の [ESC] で開けるぞ！", GetColor(230, 220, 245), font13);
+
+        // 項目2: ON/OFF切り替え
+        int item2Y = item1Y + 66;
+        SoftUI::DrawSoftCard(contentX + 16, item2Y, leftCardW - 32, 68, 10, GetColor(34, 26, 48), 235, GetColor(210, 100, 230), 1);
+        DrawStringToHandle(contentX + 28, item2Y + 9, "● 筋トレ種目の【ON / OFF】を自由切替！", GetColor(100, 250, 180), font16);
+        DrawStringToHandle(contentX + 28, item2Y + 31, "解放した筋トレはクリックやキーでON/OFF可能。", GetColor(230, 220, 245), font13);
+        DrawStringToHandle(contentX + 28, item2Y + 47, "【ON】の筋トレの中からゲーム中にランダムで実行されるぞ！", GetColor(255, 230, 140), font13);
+
+        // 項目3: 自動セーブ
+        int item3Y = item2Y + 74;
+        SoftUI::DrawSoftCard(contentX + 16, item3Y, leftCardW - 32, 54, 10, GetColor(34, 26, 48), 235, GetColor(210, 100, 230), 1);
+        DrawStringToHandle(contentX + 28, item3Y + 8, "● 自動セーブ ＆ セーブコード対応！", GetColor(100, 220, 255), font16);
+        DrawStringToHandle(contentX + 28, item3Y + 30, "獲得データは自動保存。別のPCへ引き継ぎも可能！", GetColor(230, 220, 245), font13);
+
+        // --- 中段右：登場する全9種目リスト（3×3グリッド） ---
+        int rightCardX = contentX + leftCardW + 14;
+        int rightCardW = contentW - leftCardW - 14; // 992 - 430 - 14 = 548px
+        SoftUI::DrawSoftCard(rightCardX, midY, rightCardW, midH, 14, GetColor(22, 24, 40), 240, GetColor(255, 160, 60), 1);
+        DrawStringToHandle(rightCardX + 18, midY + 14, "■ 解放できる全9種類の本格筋トレ種目", GetColor(255, 185, 75), font18);
+
+        // 種目データ (9種目)
+        struct MotionGuideItem {
+            const char* name;
+            const char* muscle;
+            const char* tag;
+            unsigned int tagCol;
+        };
+        const MotionGuideItem motions[9] = {
+            { "腕立て伏せ",      "胸・上腕三頭筋", "★初期所持", GetColor(100, 255, 150) },
+            { "腹筋 (シット)",   "腹直筋・体幹",   "ガチャ解放", GetColor(255, 190, 80) },
+            { "スクワット",      "脚・大腿四頭筋", "ガチャ解放", GetColor(255, 190, 80) },
+            { "懸垂 (プル)",     "広背筋・背中",   "ガチャ解放", GetColor(255, 190, 80) },
+            { "サイドレイズ",    "肩・三角筋中部", "ガチャ解放", GetColor(255, 190, 80) },
+            { "ダンベルカール",  "力こぶ・前足",   "ガチャ解放", GetColor(255, 190, 80) },
+            { "インクライン",    "胸上部・鎖骨下", "ガチャ解放", GetColor(255, 190, 80) },
+            { "ベンチプレス",    "大胸筋・パワー", "ガチャ解放", GetColor(255, 190, 80) },
+            { "インクラインOHP", "肩前部・僧帽筋", "ガチャ解放", GetColor(255, 190, 80) }
+        };
+
+        int gridCols = 3;
+        int itemGapX = 8;
+        int itemGapY = 8;
+        int gridStartX = rightCardX + 14;
+        int gridStartY = midY + 44;
+        int itemW = (rightCardW - 28 - itemGapX * 2) / gridCols; // 168px
+        int itemH = 62;
+
+        for (int i = 0; i < 9; ++i)
+        {
+            int r = i / gridCols;
+            int c = i % gridCols;
+            int ix = gridStartX + c * (itemW + itemGapX);
+            int iy = gridStartY + r * (itemH + itemGapY);
+
+            bool isInitial = (i == 0);
+            unsigned int cardBg = isInitial ? GetColor(24, 46, 36) : GetColor(28, 30, 48);
+            unsigned int cardBd = isInitial ? GetColor(80, 220, 130) : GetColor(70, 80, 115);
+            SoftUI::DrawSoftCard(ix, iy, itemW, itemH, 8, cardBg, 240, cardBd, 1);
+
+            DrawStringToHandle(ix + 8, iy + 6, motions[i].name, isInitial ? GetColor(120, 255, 170) : GetColor(255, 255, 255), font16);
+            DrawStringToHandle(ix + 8, iy + 26, motions[i].muscle, GetColor(185, 205, 235), font13);
+            DrawStringToHandle(ix + 8, iy + 43, motions[i].tag, motions[i].tagCol, font13);
+        }
+
+        // --- 下段：ワンポイントアドバイスカード ---
+        int botY = midY + midH + 10;
+        int botH = 80;
+        SoftUI::DrawSoftCard(contentX, botY, contentW, botH, 14, GetColor(22, 28, 44), 240, GetColor(100, 245, 140), 1);
+        DrawStringToHandle(contentX + 18, botY + 12, "★ 筋トレマスターへのワンポイントアドバイス！", GetColor(100, 245, 140), font18);
+        DrawStringToHandle(contentX + 18, botY + 36, "・お気に入りの筋トレだけを【ON】にすれば、好きなモーションだけを集中して楽しむことも可能！", GetColor(255, 255, 255), font16);
+        DrawStringToHandle(contentX + 18, botY + 56, "・高ランククリアでプロテインptを大量獲得！ ガチャで全9種目をコンプリートしよう！", GetColor(255, 230, 80), font16);
     }
     else
     {
