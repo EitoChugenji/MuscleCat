@@ -55,6 +55,19 @@ private:
     static constexpr int CLEAR_ZOOM_DURATION = 75;           // クリア時に筋トレする猫へズームインする演出フレーム数（約1.25秒）
 
     // ------------------------------------------------------------------------
+    // ★ コンテスト向け演出：開幕3・2・1・MUSCLE GO!! ＆ ラスト1匹K.O.スロー演出用メンバ
+    // ------------------------------------------------------------------------
+    int    m_introTimer           = 0;                       // 開幕カウントダウン＆カメラ演出の残りフレーム (135F)
+    int    m_finishSlowMoTimer    = 0;                       // ラスト1匹捕獲時のK.O.スロー＆ズーム演出経過フレーム (0:非アクティブ, 1〜FINISH_SLOWMO_DURATION)
+    VECTOR m_finishCamStartPos    = VGet(0.0f, 0.0f, 0.0f);  // K.O.スロー開始時のカメラ座標
+    VECTOR m_finishCamStartTarget = VGet(0.0f, 0.0f, 0.0f);  // K.O.スロー開始時のカメラ注視点
+    VECTOR m_finishCamCurPos      = VGet(0.0f, 0.0f, 0.0f);  // K.O.スロー中の現在カメラ座標（クリア画面へ引き継ぎ用）
+    VECTOR m_finishCamCurTarget   = VGet(0.0f, 0.0f, 0.0f);  // K.O.スロー中の現在カメラ注視点（クリア画面へ引き継ぎ用）
+    static constexpr int INTRO_TOTAL_FRAMES     = 135;       // 開幕演出総フレーム数 (3・2・1: 105F + MUSCLE GO!!: 30F)
+    static constexpr int INTRO_GO_FRAMES        = 30;        // 開幕「MUSCLE GO!!」表示フレーム数（この間は移動可能）
+    static constexpr int FINISH_SLOWMO_DURATION = 72;        // ラスト1匹K.O.スロー演出の総フレーム数（約1.2秒）
+
+    // ------------------------------------------------------------------------
     // パフォーマンス計測（FPS・フレーム処理時間）用メンバ
     // ------------------------------------------------------------------------
     int   m_frameCount         = 0;     // 0.5秒間のフレーム数積算カウンタ

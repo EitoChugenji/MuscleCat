@@ -309,6 +309,9 @@ public:
     // 筋トレ成功時（Rep達成時）の爆炎バースト再生
     void PlayWorkoutSuccessBurst(const VECTOR& playerPos, int repCount);
 
+    // ★ 筋トレQTE「PERFECT（金ゾーン）」成功時の超ド派手3D稲妻＆黄金バースト再生
+    void PlayPerfectWorkoutLightningBurst(const VECTOR& playerPos, int repCount);
+
     // 飛びつき攻撃（Pounce）時の地面えぐりエフェクト（踏み切り開始・飛翔中えぐり・着地フィニッシュ）
     void StartPounceGroundGouge(const VECTOR& groundPos, const VECTOR& dirXZ, int repCount);
     void UpdatePounceGroundGouge(const VECTOR& groundPos, const VECTOR& dirXZ, float progress, int repCount);

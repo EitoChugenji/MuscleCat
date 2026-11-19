@@ -298,6 +298,32 @@ void Player3D::InitModel()
     if (dumbbellBase != -1)
     {
         m_dumbbellModelHandle = MV1DuplicateModel(dumbbellBase);
+        // ダンベルのマテリアル配色を設定（持ち手: シルバー / おもり: 黒）
+        int matNum = MV1GetMaterialNum(m_dumbbellModelHandle);
+        if (matNum >= 4)
+        {
+            // Mat[0] PlateDark / Mat[1] PlateMid : 重厚な黒（アンビエントを抑えて白飛び防止）
+            MV1SetMaterialDifColor(m_dumbbellModelHandle, 0, GetColorF(0.06f, 0.06f, 0.08f, 1.0f));
+            MV1SetMaterialAmbColor(m_dumbbellModelHandle, 0, GetColorF(0.04f, 0.04f, 0.05f, 1.0f));
+            MV1SetMaterialSpcColor(m_dumbbellModelHandle, 0, GetColorF(0.25f, 0.27f, 0.30f, 1.0f));
+            MV1SetMaterialSpcPower(m_dumbbellModelHandle, 0, 20.0f);
+
+            MV1SetMaterialDifColor(m_dumbbellModelHandle, 1, GetColorF(0.08f, 0.09f, 0.11f, 1.0f));
+            MV1SetMaterialAmbColor(m_dumbbellModelHandle, 1, GetColorF(0.05f, 0.05f, 0.06f, 1.0f));
+            MV1SetMaterialSpcColor(m_dumbbellModelHandle, 1, GetColorF(0.30f, 0.32f, 0.36f, 1.0f));
+            MV1SetMaterialSpcPower(m_dumbbellModelHandle, 1, 24.0f);
+
+            // Mat[2] ChromeShaft / Mat[3] GripRing : 落ち着いた灰色（グレー）
+            MV1SetMaterialDifColor(m_dumbbellModelHandle, 2, GetColorF(0.45f, 0.47f, 0.50f, 1.0f));
+            MV1SetMaterialAmbColor(m_dumbbellModelHandle, 2, GetColorF(0.24f, 0.25f, 0.27f, 1.0f));
+            MV1SetMaterialSpcColor(m_dumbbellModelHandle, 2, GetColorF(0.45f, 0.47f, 0.50f, 1.0f));
+            MV1SetMaterialSpcPower(m_dumbbellModelHandle, 2, 20.0f);
+
+            MV1SetMaterialDifColor(m_dumbbellModelHandle, 3, GetColorF(0.38f, 0.40f, 0.43f, 1.0f));
+            MV1SetMaterialAmbColor(m_dumbbellModelHandle, 3, GetColorF(0.20f, 0.21f, 0.23f, 1.0f));
+            MV1SetMaterialSpcColor(m_dumbbellModelHandle, 3, GetColorF(0.40f, 0.42f, 0.45f, 1.0f));
+            MV1SetMaterialSpcPower(m_dumbbellModelHandle, 3, 18.0f);
+        }
     }
 
     int flatBenchBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::FLAT_BENCH_MODEL_PATH);
@@ -956,7 +982,12 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
 
                     m_scZoneStart = bestStart;
                     m_scZoneEnd = m_scZoneStart + zoneWidth;
-                    m_prevScZoneCenter = (m_scZoneStart + m_scZoneEnd) * 0.5f;
+                    float zoneCenter = (m_scZoneStart + m_scZoneEnd) * 0.5f;
+                    float perfectHalfW = (std::max)(zoneWidth * 0.16f, 0.028f);
+                    m_scPerfectStart = zoneCenter - perfectHalfW;
+                    m_scPerfectEnd   = zoneCenter + perfectHalfW;
+                    m_prevScZoneCenter = zoneCenter;
+                    m_lastResultPerfect = false;
                 }
             }
             
@@ -982,15 +1013,15 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                 
                 else
                 {
-                    // 基本速度は押しやすい0.014f、レベル（Rep）が上がるごとに約1.2倍ずつ速くなる
-                    float speedMultiplier = std::pow(1.20f, static_cast<float>(m_repCount));
+                    // 基本速度は押しやすい0.013f、レベル（Rep）が上がるごとの加速を緩やか(約1.07倍ずつ)に調整
+                    float speedMultiplier = std::pow(1.07f, static_cast<float>(m_repCount));
 
-                    if (speedMultiplier > 2.8f)
+                    if (speedMultiplier > 1.85f)
                     {
-                        speedMultiplier = 2.8f; // 上限リミット
+                        speedMultiplier = 1.85f; // 上限リミット（高レベルでも早くなりすぎないよう抑制）
                     }
 
-                    float cursorSpeed = 0.014f * speedMultiplier;
+                    float cursorSpeed = 0.013f * speedMultiplier;
                     m_scCursor += cursorSpeed * m_scCursorDir;
                     m_scHoldingFrames++;
 
@@ -1010,6 +1041,7 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                     if (m_scHoldingFrames >= 900)
                     {
                         m_lastResultSuccess = false;
+                        m_lastResultPerfect = false;
                         SoundManager::GetInstance().PlaySE(SeType::SquatFail);
                         m_resultShowTimer = 90;
                         m_scStoppedTimer = 22;
@@ -1034,27 +1066,52 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
                         // タイミング判定
                         if (m_scCursor >= m_scZoneStart && m_scCursor <= m_scZoneEnd)
                         {
-                            // 【成功】Rep追加 & 15秒タイマーリセット
-                            m_repCount++;
-                            m_workoutSuccessCount++;
-                            if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
-                            WorkoutCollectionManager::GetInstance().OnWorkoutCompleted();
-                            SoundManager::GetInstance().PlaySE(SeType::SquatSuccess);
-                            m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒
-                            m_lastResultSuccess = true;
-                            m_resultShowTimer = 60;
-                            m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
+                            bool isPerfect = Config::ENABLE_QTE_PERFECT_ZONE &&
+                                             (m_scCursor >= m_scPerfectStart && m_scCursor <= m_scPerfectEnd);
+                            m_lastResultPerfect = isPerfect;
 
-                            // 筋トレ成功エフェクト再生
-                            // EffectManager::GetInstance().PlayPumpSuccessEffect(m_pos, m_repCount);
-                            CustomEffectManager::GetInstance().PlayWorkoutSuccessBurst(m_pos, m_repCount);
-                            camera.TriggerShake(4.0f, 4);
+                            if (isPerfect)
+                            {
+                                // ★【PERFECT（金ゾーン）成功】一気に +2 Lvアップ ＆ プロテインptボーナス(+200pt) ＆ 稲妻バースト！
+                                m_repCount += 2;
+                                m_workoutSuccessCount += 2;
+                                if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
+                                WorkoutCollectionManager::GetInstance().OnWorkoutCompleted(); // +100pt
+                                WorkoutCollectionManager::GetInstance().AddProteinPoints(WorkoutCollectionManager::POINTS_PER_WORKOUT); // ボーナス+100pt (計200pt)
+                                SoundManager::GetInstance().PlaySE(SeType::SquatSuccess);
+                                SoundManager::GetInstance().PlaySE(SeType::Stamp);
+                                m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒
+                                m_lastResultSuccess = true;
+                                m_resultShowTimer = 78;
+                                m_scStoppedTimer = 22; // ピタッと止めて快感演出
+
+                                CustomEffectManager::GetInstance().PlayPerfectWorkoutLightningBurst(m_pos, m_repCount);
+                                camera.TriggerShake(7.8f, 9);
+                            }
+                            else
+                            {
+                                // 【通常成功】Rep追加 & 15秒タイマーリセット
+                                m_repCount++;
+                                m_workoutSuccessCount++;
+                                if (m_repCount > m_maxRepCount) { m_maxRepCount = m_repCount; }
+                                WorkoutCollectionManager::GetInstance().OnWorkoutCompleted();
+                                SoundManager::GetInstance().PlaySE(SeType::SquatSuccess);
+                                m_pumpDecayTimer = PUMP_DECAY_FRAMES; // 15秒
+                                m_lastResultSuccess = true;
+                                m_resultShowTimer = 60;
+                                m_scStoppedTimer = 18; // 約0.3秒間針を止めて成功位置を表示
+
+                                // 筋トレ成功エフェクト再生
+                                CustomEffectManager::GetInstance().PlayWorkoutSuccessBurst(m_pos, m_repCount);
+                                camera.TriggerShake(4.0f, 4);
+                            }
                         }
                         
                         else
                         {
                             // 【失敗】即座に筋肉痛モーションへ切り替えつつ針を止めて失敗位置を表示
                             m_lastResultSuccess = false;
+                            m_lastResultPerfect = false;
                             SoundManager::GetInstance().PlaySE(SeType::SquatFail);
                             m_resultShowTimer = 90;
                             m_scStoppedTimer = 22; // 約0.36秒間針を止めて失敗位置を表示
@@ -1270,33 +1327,10 @@ void Player3D::Draw3D()
         DrawDumbbells(scale);
     }
 
-    // 3. バカゲー風コミカル・マッスル湯気＆マッチョオーラ（3D）
+    // 3. マッチョオーラ（3D）
     if (m_state == MuscleState::Muscular && m_repCount > 0)
     {
-        // コミカルな白い湯気（猫の表情や筋肉が見えるよう薄く控えめに立ち昇る）
-        float shoulderBaseY = (m_modelHandle != -1) ? (m_pos.y + 310.0f * scale) : (m_pos.y + 20.0f);
-        float puffRangeY = 24.0f * (scale / 0.12f);
-        float puffRadiusBase = 2.2f * (scale / 0.12f);
-
-        for (int i = 0; i < 3; ++i)
-        {
-            float phase = m_animTime * 5.0f + static_cast<float>(i) * 2.09f;
-            float puffY = shoulderBaseY + std::fmod(phase * 10.0f, puffRangeY);
-            float offsetX = std::sin(phase * 2.0f) * (9.0f * (scale / 0.12f));
-            float offsetZ = std::cos(phase * 2.0f) * (9.0f * (scale / 0.12f));
-            float puffRadius = puffRadiusBase + std::fmod(phase * 2.5f, 3.5f);
-            int puffAlpha = static_cast<int>(50.0f * (1.0f - (puffY - shoulderBaseY) / puffRangeY));
-
-            if (puffAlpha > 0)
-            {
-                SetDrawBlendMode(DX_BLENDMODE_ALPHA, puffAlpha);
-                DrawSphere3D(VGet(m_pos.x + offsetX, puffY, m_pos.z + offsetZ), puffRadius, 8,
-                             GetColor(255, 255, 255), GetColor(240, 240, 255), TRUE);
-                SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-            }
-        }
-
-        // Lv15以上：バカゲー神マッスル黄金オーラ（猫本体を遮らない足元リング＆上品なスパーク）
+        // Lv15以上：神マッスル黄金オーラ（猫本体を遮らない足元リングのみ）
         if (m_repCount >= MAX_EFFECTIVE_REP)
         {
             auto drawRingXZ = [](const VECTOR& center, float radius, unsigned int color, int segments = 16)
@@ -1316,16 +1350,6 @@ void Player3D::Draw3D()
             drawRingXZ(VGet(m_pos.x, m_pos.y + 1.0f, m_pos.z), auraR, GetColor(255, 215, 0));
             drawRingXZ(VGet(m_pos.x, m_pos.y + 1.0f, m_pos.z), auraR * 0.7f, GetColor(255, 235, 100));
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
-
-            // 四方に小さく煌めく黄金スパーク星
-            for (int k = 0; k < 4; ++k)
-            {
-                float aAngle = m_animTime * 6.0f + static_cast<float>(k) * (MathHelper::PI / 2.0f);
-                float spkX = m_pos.x + std::cos(aAngle) * (auraR * 0.9f);
-                float spkZ = m_pos.z + std::sin(aAngle) * (auraR * 0.9f);
-                float spkY = m_pos.y + 6.0f + std::sin(aAngle * 2.5f) * 5.0f;
-                DrawSphere3D(VGet(spkX, spkY, spkZ), 1.8f, 6, GetColor(255, 240, 50), GetColor(255, 255, 180), TRUE);
-            }
         }
     }
 
@@ -1358,6 +1382,7 @@ void Player3D::Draw3D()
 void Player3D::Draw2D()
 {
     const auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
     int font16 = fm.GetFont16();
     int font18 = fm.GetFont18();
     int font24 = fm.GetFont24();
@@ -1369,7 +1394,7 @@ void Player3D::Draw2D()
         int barW = 340;
         int barH = 32;
         int barX = (Config::SCREEN_WIDTH - barW) / 2;
-        int barY = Config::SCREEN_HEIGHT - 125 + static_cast<int>(qteFloat);
+        int barY = Config::SCREEN_HEIGHT - 138 + static_cast<int>(qteFloat);
 
         // 輪郭付きテキスト描画ラムダ（白いステージでもクッキリ目立つ黒縁取り）
         auto DrawOutlinedText = [](int x, int y, const char* str, unsigned int textColor, int fontHandle)
@@ -1424,6 +1449,27 @@ void Player3D::Draw2D()
             SetDrawBlendMode(DX_BLENDMODE_ALPHA, 180);
             DrawRoundRect(zoneX1, barY + 1, zoneX2, barY + barH - 1, 6, 6, GetColor(255, 255, 255), FALSE);
             SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+            // ★ 4.5. PERFECT（金ゾーン）：成功ゾーン中央に輝く黄金ゾーン
+            if (Config::ENABLE_QTE_PERFECT_ZONE)
+            {
+                int perfX1 = barX + static_cast<int>(m_scPerfectStart * barW);
+                int perfX2 = barX + static_cast<int>(m_scPerfectEnd * barW);
+                if (perfX2 > perfX1 + 2)
+                {
+                    float goldPulse = (std::sin(GetNowCount() * 0.015f) + 1.0f) * 0.5f;
+                    SetDrawBlendMode(DX_BLENDMODE_ADD, 110 + static_cast<int>(80 * goldPulse));
+                    DrawRoundRect(perfX1 - 3, barY - 3, perfX2 + 3, barY + barH + 3, 6, 6, GetColor(255, 215, 20), TRUE);
+                    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+                    // 黄金ゾーン本体＆白金コア
+                    DrawRoundRect(perfX1, barY + 1, perfX2, barY + barH - 1, 4, 4, GetColor(255, 205, 15), TRUE);
+                    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 140);
+                    DrawRoundRect(perfX1 + 2, barY + 3, perfX2 - 2, barY + barH / 2, 3, 3, GetColor(255, 250, 190), TRUE);
+                    SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+                    DrawRoundRect(perfX1, barY + 1, perfX2, barY + barH - 1, 4, 4, GetColor(255, 255, 220), FALSE);
+                }
+            }
         }
 
         // 5. 針（角丸ピル形状のソフトインジケーター）
@@ -1431,7 +1477,8 @@ void Player3D::Draw2D()
         unsigned int needleColor = GetColor(255, 55, 55);
         if (m_scStoppedTimer > 0)
         {
-            needleColor = m_lastResultSuccess ? GetColor(255, 140, 40) : GetColor(255, 40, 40);
+            needleColor = m_lastResultPerfect ? GetColor(255, 235, 40)
+                        : (m_lastResultSuccess ? GetColor(255, 140, 40) : GetColor(255, 40, 40));
         }
 
         // 針のソフトシャドウ
@@ -1444,23 +1491,29 @@ void Player3D::Draw2D()
         DrawRoundRect(cursorX - 2, barY - 7, cursorX + 2, barY + barH + 7, 3, 3, needleColor, TRUE);
         DrawRoundRect(cursorX - 1, barY - 5, cursorX + 1, barY + barH + 5, 1, 1, GetColor(255, 255, 255), TRUE);
 
-        // ガイドテキスト（バーと一緒にふわっと浮遊）
+        // ガイドテキスト（バーと一緒にふわっと浮遊：すべてバー上側に配置し右下HUDと一切重ならない）
         if (m_scStoppedTimer > 0)
         {
-            if (m_lastResultSuccess)
+            if (m_lastResultPerfect)
+            {
+                DrawOutlinedText(barX + 54, barY - 34, "★ PERFECT BULK!! ★", GetColor(255, 235, 40), font24);
+            }
+            else if (m_lastResultSuccess)
             {
                 DrawOutlinedText(barX + 85, barY - 34, "★ NICE PUMP!! ★", GetColor(255, 140, 40), font24);
             }
-            
             else
             {
                 DrawOutlinedText(barX + 115, barY - 34, "× MISS! ×", GetColor(255, 70, 70), font24);
             }
         }
-        
         else
         {
-            DrawOutlinedText(barX + 12, barY - 32, "長押し→緑のゾーンで [SPACE] を離せ！", GetColor(255, 160, 50), font18);
+            if (Config::ENABLE_QTE_PERFECT_ZONE)
+            {
+                DrawOutlinedText(barX + 32, barY - 50, "★ 中央の金ゾーンで PERFECT! (Lv+2 & +200pt) ★", GetColor(255, 235, 55), font13);
+            }
+            DrawOutlinedText(barX + 12, barY - 28, "長押し→緑のゾーンで [SPACE] を離せ！", GetColor(255, 160, 50), font18);
         }
     }
 
@@ -1511,13 +1564,24 @@ void Player3D::Draw2D()
         {
             char resultBuf[128];
 
-            if (m_repCount >= MAX_EFFECTIVE_REP)
+            if (m_lastResultPerfect)
+            {
+                snprintf(resultBuf, sizeof(resultBuf), "★ PERFECT BULK!! ★ +2 REP & +200pt! (Lv.%d)", m_repCount);
+                int tw = GetDrawStringWidthToHandle(resultBuf, static_cast<int>(strlen(resultBuf)), font24);
+                DrawOutlinedTextCenter((Config::SCREEN_WIDTH - tw) / 2, Config::SCREEN_HEIGHT / 2 - 155,
+                                       resultBuf, GetColor(255, 235, 35), font24);
+
+                const char* subPerf = "★ 超限界突破！筋肉＆プロテイン2倍ボーナス！！ ★";
+                int sw = GetDrawStringWidthToHandle(subPerf, static_cast<int>(strlen(subPerf)), font18);
+                DrawOutlinedTextCenter((Config::SCREEN_WIDTH - sw) / 2, Config::SCREEN_HEIGHT / 2 - 122,
+                                       subPerf, GetColor(90, 240, 255), font18);
+            }
+            else if (m_repCount >= MAX_EFFECTIVE_REP)
             {
                 snprintf(resultBuf, sizeof(resultBuf), "★ GOD MUSCLE MAX!! ★ +1 REP (Lv.%d)", m_repCount);
                 DrawOutlinedTextCenter(Config::SCREEN_WIDTH / 2 - 180, Config::SCREEN_HEIGHT / 2 - 45,
                                        resultBuf, GetColor(255, 60, 40), font24);
             }
-            
             else
             {
                 snprintf(resultBuf, sizeof(resultBuf), "PUMP UP!! +1 REP (Lv.%d)", m_repCount);
@@ -1852,9 +1916,9 @@ void Player3D::DrawInclineBench(float catScale)
         m_pos.z - cosR * (24.0f * ratio)
     );
     // インクラインベンチの背もたれはローカル+Zに向かって上がるため、
-    // 猫の進行方向 m_rotY と同じ回転に設定すると背もたれが猫の背中側に来る
+    // 猫モデルと同じく +CAT_MODEL_ROT_Y (180度反転) にすることで背もたれが猫の背中側(-Z方向)に来る
     MV1SetPosition(m_inclineBenchModelHandle, benchPos);
-    MV1SetRotationXYZ(m_inclineBenchModelHandle, VGet(0.0f, m_rotY, 0.0f));
+    MV1SetRotationXYZ(m_inclineBenchModelHandle, VGet(0.0f, m_rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
     MV1SetScale(m_inclineBenchModelHandle, VGet(catScale, catScale, catScale));
     MV1DrawModel(m_inclineBenchModelHandle);
 }
@@ -1883,19 +1947,22 @@ void Player3D::DrawSingleDumbbell(float catScale, bool isRight)
     VECTOR bY = VNorm(VGet(hMat.m[1][0], hMat.m[1][1], hMat.m[1][2]));
     VECTOR bZ = VNorm(VGet(hMat.m[2][0], hMat.m[2][1], hMat.m[2][2]));
 
-    // グリップ位置：手首から指先方向へ進んだ手のひら・拳の中心に配置（食い込み完全防止）
+    // グリップ位置：指付け根付近＆手のひら内側(-bZ)へオフセットして拳の握り穴の中心に配置（手首・手の甲への食い込み防止）
+    float ratio = catScale / ModelConfig::CAT_MODEL_SCALE;
     VECTOR posHand = VGet(hMat.m[3][0], hMat.m[3][1], hMat.m[3][2]);
     VECTOR gripPos = posHand;
 
     if (knuckleFrame != -1)
     {
         VECTOR posKnuckle = MV1GetFramePosition(m_modelHandle, knuckleFrame);
-        // 手首と中指付け根の間（約55%の位置が拳の内側の空洞・握り芯）
-        gripPos = VAdd(posHand, VScale(VSub(posKnuckle, posHand), 0.55f));
+        // 手首から中指付け根へ85%進んだ位置から、手のひら内側(-bZ)へシフトして握り芯に一致させる
+        gripPos = VAdd(posHand, VScale(VSub(posKnuckle, posHand), 0.85f));
+        gripPos = VAdd(gripPos, VScale(bZ, -3.2f * ratio));
     }
     else
     {
-        gripPos = VAdd(posHand, VScale(bY, 2.5f * (catScale / ModelConfig::CAT_MODEL_SCALE)));
+        gripPos = VAdd(posHand, VScale(bY, 8.5f * ratio));
+        gripPos = VAdd(gripPos, VScale(bZ, -3.2f * ratio));
     }
 
     // ダンベルのシャフト（モデルのローカルZ軸）を手首の握り穴軸（bX）に一致させる
@@ -1903,11 +1970,12 @@ void Player3D::DrawSingleDumbbell(float catScale, bool isRight)
     VECTOR dY = bZ;
     VECTOR dX = VCross(dY, dZ);
 
-    // ダンベルのスケール（手首や体・太ももに食い込まず、手のひらにジャストフィットするサイズ）
-    float s = 1.45f * (catScale / ModelConfig::CAT_MODEL_SCALE);
-    VECTOR sx = VScale(dX, s);
-    VECTOR sy = VScale(dY, s);
-    VECTOR sz = VScale(dZ, s);
+    // ダンベルのスケール（猫の拳サイズに合わせてプレート径・シャフト長を適正化し、全モーションで違和感なく保持）
+    float sXY = 3.55f * ratio;
+    float sZ  = 3.95f * ratio;
+    VECTOR sx = VScale(dX, sXY);
+    VECTOR sy = VScale(dY, sXY);
+    VECTOR sz = VScale(dZ, sZ);
 
     MATRIX mat = {};
     mat.m[0][0] = sx.x; mat.m[0][1] = sx.y; mat.m[0][2] = sx.z; mat.m[0][3] = 0.0f;

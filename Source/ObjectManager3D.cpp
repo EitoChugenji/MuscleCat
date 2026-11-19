@@ -485,6 +485,9 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     obj->SetAlive(false);
                     m_caughtCount++;
                     ApplyMouseSpeedBonus();
+                    int remainAfterCatch = GetRemainingMouseCount();
+                    bool isLastMouse = (remainAfterCatch == 0);
+
                     float catchVol = 1.0f + static_cast<float>((std::min)(m_comboCount, 5)) * 0.05f;
                     SoundManager::GetInstance().PlaySE(SeType::Catch, catchVol);
 
@@ -499,21 +502,32 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     }
                     if (m_comboCount > m_maxComboCount) { m_maxComboCount = m_comboCount; }
                     m_comboTimer = 210; // 約3.5秒のコンボ猶予
-                    m_catchFlashTimer = 16; // 画面端インパクトゴールドフラッシュ
+                    m_catchFlashTimer = Config::ENABLE_CATCH_FINISH_SLOWMO ? 20 : 16; // 画面端インパクトゴールドフラッシュ
 
                     // ネズミ捕獲3D祝祭エフェクト（星・ダイヤ噴水、ゴールド衝撃波、サンバースト光線、コミカル昇天ソウル）
-                    CustomEffectManager::GetInstance().SpawnMouseCatchCelebration(mPos, isFast, m_comboCount);
+                    CustomEffectManager::GetInstance().SpawnMouseCatchCelebration(mPos, isFast, isLastMouse ? 5 : m_comboCount);
 
                     // ネズミ捕獲Effekseerエフェクト再生
                     EffectManager::GetInstance().PlayCatchEffect(mPos, isFast);
 
-                    // カメラシェイク演出発動（コンボ数・高速ネズミに応じて手応え強化）
-                    float shakeAmp = 10.0f + static_cast<float>((std::min)(m_comboCount, 5)) * 2.2f + (isFast ? 3.5f : 0.0f);
-                    int shakeFrames = 10 + (std::min)(m_comboCount, 4) * 2;
+                    // カメラシェイク演出発動（コンボ数・高速ネズミ・飛びつきに応じて手応え強化）
+                    bool isPounceCatch = (m_player && m_player->IsPouncing());
+                    float baseShake = Config::ENABLE_CATCH_FINISH_SLOWMO ? 14.0f : 10.0f;
+                    float shakeAmp = baseShake
+                                   + static_cast<float>((std::min)(m_comboCount, 5)) * 2.5f
+                                   + (isFast ? 4.0f : 0.0f)
+                                   + (isPounceCatch ? 4.5f : 0.0f)
+                                   + (isLastMouse && Config::ENABLE_CATCH_FINISH_SLOWMO ? 8.0f : 0.0f);
+                    int shakeFrames = (Config::ENABLE_CATCH_FINISH_SLOWMO ? 12 : 10)
+                                    + (std::min)(m_comboCount, 4) * 2
+                                    + (isLastMouse && Config::ENABLE_CATCH_FINISH_SLOWMO ? 8 : 0);
                     camera.TriggerShake(shakeAmp, shakeFrames);
 
-                    // ヒットストップ発動（捕獲瞬間の手応え・重量感）
-                    int hitStop = 6 + (isFast ? 2 : 0) + (m_comboCount >= 3 ? 2 : 0);
+                    // ヒットストップ発動（捕獲瞬間の手応え・重量感：約0.08〜0.12秒ピタッと止める）
+                    int hitStop = (Config::ENABLE_CATCH_FINISH_SLOWMO ? 5 : 6)
+                                + (isFast ? 2 : 0)
+                                + (isPounceCatch ? 2 : 0)
+                                + (m_comboCount >= 3 ? 2 : 0);
                     TriggerHitStop(hitStop);
 
                     // プレイヤーの祝祭リアクション（オーラフレア＆パンプ時間全快リセット）
@@ -530,7 +544,14 @@ void ObjectManager3D::CheckCollisions(Camera3D& camera)
                     cp.combo = m_comboCount;
                     cp.isFast = isFast;
 
-                    if (m_comboCount >= 5)
+                    if (Config::ENABLE_CATCH_FINISH_SLOWMO && isLastMouse)
+                    {
+                        cp.titleText = "★ FINISH BULK!! ★";
+                        cp.subText = "FINAL TARGET CAUGHT!!";
+                        cp.titleColor = GetColor(255, 240, 50);
+                        cp.badgeColor = GetColor(255, 50, 50);
+                    }
+                    else if (m_comboCount >= 5)
                     {
                         cp.titleText = "★ " + std::to_string(m_comboCount) + " COMBO!! ★";
                         cp.subText = "GODLIKE CAT!! +1";

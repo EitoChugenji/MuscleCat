@@ -102,6 +102,8 @@ private:
     float m_scCursorDir        = 1.0f;  // 針の往復移動方向 (+1.0f: 右進, -1.0f: 左進)
     float m_scZoneStart        = 0.55f; // 成功ゾーンの開始位置 (0.0f 〜 1.0f)
     float m_scZoneEnd          = 0.85f; // 成功ゾーンの終了位置 (0.0f 〜 1.0f)
+    float m_scPerfectStart     = 0.65f; // ★ PERFECT（金ゾーン）の開始位置 (0.0f 〜 1.0f)
+    float m_scPerfectEnd       = 0.75f; // ★ PERFECT（金ゾーン）の終了位置 (0.0f 〜 1.0f)
     float m_prevScZoneCenter   = -1.0f; // 前回の成功ゾーン中心位置（連続で同じ場所にならないよう分散）
     int   m_scHoldingFrames    = 0;     // スペースキー長押し継続フレーム数（15秒超過で筋疲労失敗）
     int   m_repCount           = 0;     // 現在の筋トレレベル（Rep数）
@@ -110,6 +112,7 @@ private:
     bool  m_prevTriggerKey     = false; // 前フレームの筋トレキー押下状態（エッジ検出用）
     int   m_resultShowTimer    = 0;     // 成功/失敗/減衰テキストの表示残りフレーム
     bool  m_lastResultSuccess  = false; // 直前の筋トレQTEが成功したか
+    bool  m_lastResultPerfect  = false; // ★ 直前の筋トレQTEがPERFECT成功だったか
     bool  m_wasDecayed         = false; // 直前の通知が15秒放置減衰によるものか
     int   m_scStoppedTimer     = 0;     // キーを離した瞬間に針をピタッと止めて見せる演出タイマー
     int   m_needRepNoticeTimer = 0;     // Lv.4未満で攻撃ボタンを押した際のガイド表示タイマー

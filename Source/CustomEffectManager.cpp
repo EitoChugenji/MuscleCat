@@ -898,6 +898,120 @@ void CustomEffectManager::PlayWorkoutSuccessBurst(const VECTOR& playerPos, int r
 
 }
 
+void CustomEffectManager::PlayPerfectWorkoutLightningBurst(const VECTOR& playerPos, int repCount)
+{
+    if (!m_effectEnabled)
+    {
+        return;
+    }
+
+    // 1. 通常の筋トレ成功バーストをベースとして再生
+    PlayWorkoutSuccessBurst(playerPos, repCount);
+    m_burstTimer = 52; // さらに長い爆炎ブースト
+
+    int effRep = (std::min)(repCount, 15);
+    float scaleBoost = 1.15f + static_cast<float>(effRep) * 0.05f;
+    float catScale = ModelConfig::CAT_MODEL_SCALE + static_cast<float>(effRep) * 0.0025f;
+    float chestY = playerPos.y + 435.4f * catScale * 0.50f;
+    VECTOR centerPos = VGet(playerPos.x, chestY, playerPos.z);
+
+    // 2. 猫の周囲・背後に走るスタイリッシュな3D稲妻（猫の顔や肉体を隠さないよう外周リング状に配置）
+    const int boltCount = 10;
+    for (int b = 0; b < boltCount; ++b)
+    {
+        ThunderBoltArc bolt;
+        float angle = (MathHelper::PI * 2.0f * static_cast<float>(b)) / static_cast<float>(boltCount) + RandRange(-0.15f, 0.15f);
+        VECTOR right = VGet(std::cos(angle), 0.0f, std::sin(angle));
+        VECTOR up    = VGet(0.0f, 1.0f, 0.0f);
+
+        if (b < 4)
+        {
+            // 猫の周囲外周（半径48〜72）へ天から落ちるシャープな神雷（4本）
+            float rDist = RandRange(48.0f, 72.0f) * scaleBoost;
+            bolt.startPos = VGet(
+                playerPos.x + std::cos(angle) * rDist,
+                playerPos.y + RandRange(130.0f, 185.0f) * scaleBoost,
+                playerPos.z + std::sin(angle) * rDist
+            );
+            bolt.endPos = VGet(
+                playerPos.x + std::cos(angle) * (rDist * 0.90f),
+                playerPos.y + RandRange(4.0f, 22.0f),
+                playerPos.z + std::sin(angle) * (rDist * 0.90f)
+            );
+            bolt.thickness = RandRange(2.4f, 3.8f) * scaleBoost;
+            bolt.jaggedAmp = RandRange(8.0f, 14.0f) * scaleBoost;
+            bolt.maxLife   = RandRange(15.0f, 22.0f);
+        }
+        else
+        {
+            // 猫の周囲から外側へバチバチと放射状に弾ける電撃アーク（6本）
+            float inDist  = RandRange(42.0f, 54.0f) * scaleBoost;
+            float outDist = RandRange(82.0f, 130.0f) * scaleBoost;
+            bolt.startPos = VGet(
+                centerPos.x + std::cos(angle) * inDist,
+                centerPos.y + RandRange(-14.0f, 20.0f),
+                centerPos.z + std::sin(angle) * inDist
+            );
+            bolt.endPos = VGet(
+                centerPos.x + std::cos(angle) * outDist,
+                playerPos.y + RandRange(8.0f, 75.0f) * scaleBoost,
+                centerPos.z + std::sin(angle) * outDist
+            );
+            bolt.thickness = RandRange(2.0f, 3.4f) * scaleBoost;
+            bolt.jaggedAmp = RandRange(7.0f, 13.0f) * scaleBoost;
+            bolt.maxLife   = RandRange(12.0f, 18.0f);
+        }
+
+        VECTOR boltDir = VSub(bolt.endPos, bolt.startPos);
+        if (VSize(boltDir) < 0.01f) boltDir = up;
+        else boltDir = VNorm(boltDir);
+
+        VECTOR pA = VCross(boltDir, up);
+        if (VSize(pA) < 0.01f) pA = VCross(boltDir, right);
+        if (VSize(pA) < 0.01f) pA = VGet(1.0f, 0.0f, 0.0f);
+        bolt.perpA = VNorm(pA);
+        bolt.perpB = VNorm(VCross(boltDir, bolt.perpA));
+
+        bolt.age       = 0.0f;
+        bolt.seed      = RandRange(0.0f, 100.0f);
+        bolt.hasBranch = true;
+        m_thunderBolts.push_back(bolt);
+    }
+
+    // 3. 足元に広がる特大ゴールド電撃衝撃波リング（CatchShockwaveRing）
+    for (int r = 0; r < 2; ++r)
+    {
+        CatchShockwaveRing cRing;
+        cRing.center    = VGet(playerPos.x, playerPos.y + 3.0f + r * 8.0f, playerPos.z);
+        cRing.radius    = 18.0f + r * 12.0f;
+        cRing.maxRadius = (135.0f + r * 45.0f) * scaleBoost;
+        cRing.age       = 0.0f;
+        cRing.maxLife      = 24.0f + r * 4.0f;
+        cRing.isFast    = true;
+        cRing.combo     = 5;
+        m_catchRings.push_back(cRing);
+    }
+
+    // 4. 猫の周囲外周で煌めく黄金＆シアンの星（猫の顔や体に被らないよう外周リング状に配置）
+    for (int i = 0; i < 12; ++i)
+    {
+        CatchStarParticle star;
+        float a = (MathHelper::PI * 2.0f * static_cast<float>(i)) / 12.0f + RandRange(-0.15f, 0.15f);
+        float startR = RandRange(38.0f, 55.0f) * scaleBoost;
+        float spdXZ  = RandRange(2.5f, 5.2f) * scaleBoost;
+        star.pos          = VGet(centerPos.x + std::cos(a) * startR, playerPos.y + RandRange(12.0f, 45.0f), centerPos.z + std::sin(a) * startR);
+        star.vel          = VGet(std::cos(a) * spdXZ, RandRange(3.5f, 7.5f), std::sin(a) * spdXZ);
+        star.size         = RandRange(2.6f, 4.4f) * scaleBoost;
+        star.rot          = RandRange(0.0f, MathHelper::PI * 2.0f);
+        star.rotSpeed     = RandRange(-0.25f, 0.25f);
+        star.age          = 0.0f;
+        star.maxLife      = RandRange(28.0f, 40.0f);
+        star.colorVariant = (i % 3 == 0) ? 1 : 0; // Gold & Cyan
+        star.shapeType    = i % 2;
+        m_catchStars.push_back(star);
+    }
+}
+
 
 
 void CustomEffectManager::SpawnGougeDebrisAndDust(

@@ -56,4 +56,11 @@ namespace Config
     // ------------------------------------------------------------------------
     constexpr bool  USE_TIME_LIMIT_MODE = true;    // true: 制限時間制 / false: 従来の経過タイム制
     constexpr float TIME_LIMIT_SECONDS  = 120.0f;  // 制限時間（120秒 = 2分）
+
+    // ------------------------------------------------------------------------
+    // ★ コンテスト向け演出強化スイッチ（false にすると各演出を個別に無効化可能）
+    // ------------------------------------------------------------------------
+    constexpr bool ENABLE_QTE_PERFECT_ZONE    = true; // ① 筋トレQTEの「PERFECT（金ゾーン）」判定（+2Lv・稲妻・ptボーナス）
+    constexpr bool ENABLE_CATCH_FINISH_SLOWMO = true; // ② 捕獲時のヒットストップ強化 ＆ ラスト1匹のK.O.スロー＆カメラズーム演出
+    constexpr bool ENABLE_STAGE_START_INTRO   = true; // ③ ステージ開始時の「3・2・1・MUSCLE GO!!」開幕カメラ＆カウントダウン演出
 }
