@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+﻿<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -156,6 +156,7 @@
     <ClInclude Include="Source\EffectManager.h" />
     <ClInclude Include="Source\FontManager.h" />
     <ClInclude Include="Source\GameManager.h" />
+    <ClInclude Include="Source\UIManager.h" />
     <ClInclude Include="Source\GameObject3D.h" />
     <ClInclude Include="Source\ModelConfig.h" />
     <ClInclude Include="Source\ModelManager.h" />
@@ -175,6 +176,7 @@
     <ClCompile Include="Source\EffectManager.cpp" />
     <ClCompile Include="Source\FontManager.cpp" />
     <ClCompile Include="Source\GameManager.cpp" />
+    <ClCompile Include="Source\UIManager.cpp" />
     <ClCompile Include="Source\Main.cpp" />
     <ClCompile Include="Source\ModelManager.cpp" />
     <ClCompile Include="Source\Mouse3D.cpp" />

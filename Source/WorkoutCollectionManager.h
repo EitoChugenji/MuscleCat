@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include <string>
 #include <vector>
 #include <unordered_set>
@@ -15,6 +15,7 @@
 // 5. セーブコード生成・読み込み（クリップボード連携対応）
 // 6. デバッグ用全データ初期化（確認ダイアログ付き）
 // ============================================================================
+
 class WorkoutCollectionManager
 {
 public:

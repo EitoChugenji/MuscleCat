@@ -1,4 +1,4 @@
-#define NOMINMAX
+﻿#define NOMINMAX
 #include "WorkoutCollectionManager.h"
 #include "DxLib.h"
 #include "SoundManager.h"

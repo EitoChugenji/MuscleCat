@@ -30,14 +30,14 @@ namespace ModelConfig
     // ------------------------------------------------------------------------
     // 通常ネズミモデル設定
     // ------------------------------------------------------------------------
-    constexpr const char* MOUSE_NORMAL_MODEL_PATH  = "Resource/Models/MouseModel/ネズミ.mv1";
+    constexpr const char* MOUSE_NORMAL_MODEL_PATH  = "Resource/Models/MouseModel/mouse.mv1";
     constexpr float       MOUSE_NORMAL_MODEL_SCALE = 11.0f;       // 表示スケール
     constexpr float       MOUSE_NORMAL_MODEL_ROT_Y = 3.14159265f; // モデル正面方向の補正角（180度反転）
 
     // ------------------------------------------------------------------------
     // 高速逃走ネズミモデル設定
     // ------------------------------------------------------------------------
-    constexpr const char* MOUSE_FAST_MODEL_PATH  = "Resource/Models/MouseModel/ネズミ.mv1";
+    constexpr const char* MOUSE_FAST_MODEL_PATH  = "Resource/Models/MouseModel/mouse.mv1";
     constexpr float       MOUSE_FAST_MODEL_SCALE = 11.0f;         // 表示スケール
     constexpr float       MOUSE_FAST_MODEL_ROT_Y = 3.14159265f;   // モデル正面方向の補正角（180度反転）
 
