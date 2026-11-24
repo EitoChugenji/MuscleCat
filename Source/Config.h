@@ -63,4 +63,36 @@ namespace Config
     constexpr bool ENABLE_QTE_PERFECT_ZONE    = true; // ① 筋トレQTEの「PERFECT（金ゾーン）」判定（+2Lv・稲妻・ptボーナス）
     constexpr bool ENABLE_CATCH_FINISH_SLOWMO = true; // ② 捕獲時のヒットストップ強化 ＆ ラスト1匹のK.O.スロー＆カメラズーム演出
     constexpr bool ENABLE_STAGE_START_INTRO   = true; // ③ ステージ開始時の「3・2・1・MUSCLE GO!!」開幕カメラ＆カウントダウン演出
+
+    // ------------------------------------------------------------------------
+    // ゲームプレイ画面 HUD のカスタム PNG 画像・座標設定
+    // Resource/UI/ に同名PNGファイルを置くだけで自動的に差し替え描画される
+    // （W または H に 0 を指定すると、PNG画像の元サイズそのまま DrawGraph で描画）
+    // ------------------------------------------------------------------------
+    namespace HudUI
+    {
+        // 左上：ステータスHUD背景（レベル・残りネズミ・残り時間・速度）
+        constexpr const char* STATUS_PNG_PATH = "Resource/UI/hud_status.png";
+        constexpr int         STATUS_X        = 14;
+        constexpr int         STATUS_Y        = 14;
+        constexpr int         STATUS_W        = 380; // 0で画像元サイズ
+        constexpr int         STATUS_H        = 84;  // 0で画像元サイズ
+
+        // 右下：操作ガイド背景（攻撃スキル・筋トレ・移動操作）
+        constexpr const char* GUIDE_PNG_PATH  = "Resource/UI/hud_guide.png";
+        constexpr int         GUIDE_X         = 620; // SCREEN_WIDTH(1280) - 640 - 20
+        constexpr int         GUIDE_Y         = 628; // SCREEN_HEIGHT(720) - 72 - 20
+        constexpr int         GUIDE_W         = 640; // 0で画像元サイズ
+        constexpr int         GUIDE_H         = 72;  // 0で画像元サイズ
+
+        // 任意：画面追加オーバーレイ用PNG（キャラ立ち絵・枠装飾などを自由座標に配置可能）
+        constexpr const char* OVERLAY_PNG_PATH = "Resource/UI/hud_overlay.png";
+        constexpr int         OVERLAY_X        = 0;
+        constexpr int         OVERLAY_Y        = 0;
+        constexpr int         OVERLAY_W        = 0;  // 0で画像元サイズ
+        constexpr int         OVERLAY_H        = 0;  // 0で画像元サイズ
+
+        // HUDの上下浮遊アニメーション（イラスト固定表示にしたい場合は false）
+        constexpr bool        ENABLE_FLOAT_ANIM = true;
+    }
 }

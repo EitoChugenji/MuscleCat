@@ -13,9 +13,29 @@ class GameManager;
 /// </summary>
 class UIManager
 {
+private:
+    int m_hudStatusGraph  = -1; // Resource/UI/hud_status.png ハンドル
+    int m_hudGuideGraph   = -1; // Resource/UI/hud_guide.png ハンドル
+    int m_hudOverlayGraph = -1; // Resource/UI/hud_overlay.png ハンドル
+
 public:
     UIManager() = default;
-    ~UIManager() = default;
+    ~UIManager();
+
+    /// <summary>ゲームプレイHUD用のカスタムPNG画像を読み込む</summary>
+    void Init();
+
+    /// <summary>読み込んだUI用PNGグラフィックハンドルを解放する</summary>
+    void Release();
+
+    /// <summary>左上ステータスHUDのカスタムPNGを描画する（画像がある場合は true を返す）</summary>
+    bool DrawHudStatusBg(int x, int y, int w, int h) const;
+
+    /// <summary>右下操作ガイドHUDのカスタムPNGを描画する（画像がある場合は true を返す）</summary>
+    bool DrawHudGuideBg(int x, int y, int w, int h) const;
+
+    /// <summary>プレイ画面用の任意追加PNGオーバーレイを描画する（Config::HudUI::OVERLAY_* 準拠）</summary>
+    void DrawHudOverlay() const;
 
     /// <summary>タイトル画面の2D UI（ロゴ・吹き出し・メニューボタン・各種モーダル）を描画する</summary>
     void DrawTitleScreen(GameManager& gm);

@@ -483,6 +483,72 @@ void UIManager::GetWorkoutBtnRect(int cardX, int cardY, int cardW, int cardH, in
     ::GetWorkoutBtnRect(cardX, cardY, cardW, cardH, btnIdx, outX, outY, outW, outH);
 }
 
+UIManager::~UIManager()
+{
+    Release();
+}
+
+void UIManager::Init()
+{
+    Release();
+    // Resource/UI/ にカスタムPNGが置かれていれば自動ロード（存在しない場合は -1 のまま標準UIを描画）
+    m_hudStatusGraph  = LoadGraph(Config::HudUI::STATUS_PNG_PATH);
+    m_hudGuideGraph   = LoadGraph(Config::HudUI::GUIDE_PNG_PATH);
+    m_hudOverlayGraph = LoadGraph(Config::HudUI::OVERLAY_PNG_PATH);
+}
+
+void UIManager::Release()
+{
+    if (m_hudStatusGraph != -1)  { DeleteGraph(m_hudStatusGraph);  m_hudStatusGraph  = -1; }
+    if (m_hudGuideGraph != -1)   { DeleteGraph(m_hudGuideGraph);   m_hudGuideGraph   = -1; }
+    if (m_hudOverlayGraph != -1) { DeleteGraph(m_hudOverlayGraph); m_hudOverlayGraph = -1; }
+}
+
+bool UIManager::DrawHudStatusBg(int x, int y, int w, int h) const
+{
+    if (m_hudStatusGraph == -1) return false;
+    if (w > 0 && h > 0)
+    {
+        DrawExtendGraph(x, y, x + w, y + h, m_hudStatusGraph, TRUE);
+    }
+    else
+    {
+        DrawGraph(x, y, m_hudStatusGraph, TRUE);
+    }
+    return true;
+}
+
+bool UIManager::DrawHudGuideBg(int x, int y, int w, int h) const
+{
+    if (m_hudGuideGraph == -1) return false;
+    if (w > 0 && h > 0)
+    {
+        DrawExtendGraph(x, y, x + w, y + h, m_hudGuideGraph, TRUE);
+    }
+    else
+    {
+        DrawGraph(x, y, m_hudGuideGraph, TRUE);
+    }
+    return true;
+}
+
+void UIManager::DrawHudOverlay() const
+{
+    if (m_hudOverlayGraph == -1) return;
+    int x = Config::HudUI::OVERLAY_X;
+    int y = Config::HudUI::OVERLAY_Y;
+    int w = Config::HudUI::OVERLAY_W;
+    int h = Config::HudUI::OVERLAY_H;
+    if (w > 0 && h > 0)
+    {
+        DrawExtendGraph(x, y, x + w, y + h, m_hudOverlayGraph, TRUE);
+    }
+    else
+    {
+        DrawGraph(x, y, m_hudOverlayGraph, TRUE);
+    }
+}
+
 void UIManager::GetWorkoutActionBtnRect(int cardX, int cardY, int cardW, int cardH, int actionIdx,
                                         int& outX, int& outY, int& outW, int& outH)
 {

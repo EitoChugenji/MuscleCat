@@ -142,6 +142,7 @@ namespace
 void GameManager::Init()
 {
     WorkoutCollectionManager::GetInstance().Initialize();
+    m_uiManager.Init();
     m_state = GameState::Title;
     m_titleCameraAngle = 0.0f;
     m_frameCount = 0;
@@ -1694,14 +1695,17 @@ void GameManager::Draw()
         // =========================================================================
         if (m_finishSlowMoTimer == 0)
         {
-        float hudFloatY = std::sin(GetNowCount() * 0.0022f) * 3.0f;
-        int pX = 14;
-        int pY = 14 + static_cast<int>(hudFloatY);
-        int pW = 380;
-        int pH = 84;
+        float hudFloatY = Config::HudUI::ENABLE_FLOAT_ANIM ? (std::sin(GetNowCount() * 0.0022f) * 3.0f) : 0.0f;
+        int pX = Config::HudUI::STATUS_X;
+        int pY = Config::HudUI::STATUS_Y + static_cast<int>(hudFloatY);
+        int pW = (Config::HudUI::STATUS_W > 0) ? Config::HudUI::STATUS_W : 380;
+        int pH = (Config::HudUI::STATUS_H > 0) ? Config::HudUI::STATUS_H : 84;
 
-        // 白いステージ床でも優しく浮き立つふわっとした角丸プレート＆ソフトシャドウ
-        SoftUI::DrawSoftCard(pX, pY, pW, pH, 18, GetColor(20, 25, 40), 220, GetColor(255, 140, 50), 2);
+        // カスタムPNG (Resource/UI/hud_status.png) があればPNGを描画、なければ標準の角丸プレートを描画
+        if (!m_uiManager.DrawHudStatusBg(pX, pY, Config::HudUI::STATUS_W, Config::HudUI::STATUS_H))
+        {
+            SoftUI::DrawSoftCard(pX, pY, pW, pH, 18, GetColor(20, 25, 40), 220, GetColor(255, 140, 50), 2);
+        }
 
         auto player = m_objManager.GetPlayer();
         int reps = player ? player->GetRepCount() : 0;
@@ -1796,14 +1800,17 @@ void GameManager::Draw()
         // =========================================================================
         if (!m_isPaused)
         {
-            float guideFloatY = std::sin(GetNowCount() * 0.0020f + 1.2f) * 2.5f;
-            int gW = 640;
-            int gH = 72;
-            int gX = Config::SCREEN_WIDTH - gW - 20;
-            int gY = Config::SCREEN_HEIGHT - gH - 20 + static_cast<int>(guideFloatY);
+            float guideFloatY = Config::HudUI::ENABLE_FLOAT_ANIM ? (std::sin(GetNowCount() * 0.0020f + 1.2f) * 2.5f) : 0.0f;
+            int gW = (Config::HudUI::GUIDE_W > 0) ? Config::HudUI::GUIDE_W : 640;
+            int gH = (Config::HudUI::GUIDE_H > 0) ? Config::HudUI::GUIDE_H : 72;
+            int gX = Config::HudUI::GUIDE_X;
+            int gY = Config::HudUI::GUIDE_Y + static_cast<int>(guideFloatY);
 
-            // ふわっとした角丸プレート＆ソフトシャドウ
-            SoftUI::DrawSoftCard(gX, gY, gW, gH, 16, GetColor(18, 24, 38), 220, GetColor(100, 130, 180), 1);
+            // カスタムPNG (Resource/UI/hud_guide.png) があればPNGを描画、なければ標準の角丸プレートを描画
+            if (!m_uiManager.DrawHudGuideBg(gX, gY, Config::HudUI::GUIDE_W, Config::HudUI::GUIDE_H))
+            {
+                SoftUI::DrawSoftCard(gX, gY, gW, gH, 16, GetColor(18, 24, 38), 220, GetColor(100, 130, 180), 1);
+            }
 
             // 上段：アクションスキル（左クリック: 飛びつき、右クリック: スタン攻撃、SPACE: 筋トレ）
             if (reps >= 4)
@@ -1843,6 +1850,9 @@ void GameManager::Draw()
             char camInfo[128];
             snprintf(camInfo, sizeof(camInfo), "移動: WASD  |  視点: マウス(感度:%.1fx) / 矢印  |  感度変更: [- / +]  |  視点リセット: [F]", m_camera.GetMouseSensitivity());
             DrawStringToHandle(gX + 14, gY + 42, camInfo, GetColor(210, 225, 245), font13);
+
+            // 任意追加PNGオーバーレイ (Resource/UI/hud_overlay.png)
+            m_uiManager.DrawHudOverlay();
         }
 
 #ifdef _DEBUG
