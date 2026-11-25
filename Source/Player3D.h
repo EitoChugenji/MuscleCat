@@ -32,7 +32,10 @@ enum class WorkoutMotionType : int
     InclineBench    = 6, // インクラインベンチ (11_InClineBenti / InclineBench + ダンベル)
     BenchPress      = 7, // ベンチプレス (12_BenchPress / FlatBench + バーベル)
     InOverHeadPress = 8, // オーバーヘッドプレス (13_InOverHeadPress / InclineBench + ダンベル)
-    Count           = 9
+    ChestPress      = 9, // チェストプレス (14_ChestPress / FlatBench + ダンベル)
+    ProneTwistRow   = 10,// プローンツイスト (15_DB prone twist row / 逆向きInclineBench + ダンベル)
+    WBarbell        = 11,// Wバーベル (16_Wbarbell / FlatBench + WBarbell)
+    Count           = 12
 };
 
 // ============================================================================
@@ -97,6 +100,9 @@ private:
     bool  m_isTitleInclineBench    = false; // タイトル画面でのインクラインベンチ演出フラグ
     bool  m_isTitleBenchPress      = false; // タイトル画面でのベンチプレス演出フラグ
     bool  m_isTitleInOverHeadPress = false; // タイトル画面でのインクラインOHP演出フラグ
+    bool  m_isTitleChestPress      = false; // タイトル画面でのチェストプレス演出フラグ
+    bool  m_isTitleProneTwistRow   = false; // タイトル画面でのプローンツイスト演出フラグ
+    bool  m_isTitleWBarbell        = false; // タイトル画面でのWバーベル演出フラグ
     WorkoutMotionType m_activeWorkoutMotion = WorkoutMotionType::Squat; // 今回の筋トレで再生中のアニメーション種別
     float m_scCursor           = 0.0f;  // QTEゲージ内の針の現在位置 (0.0f 〜 1.0f)
     float m_scCursorDir        = 1.0f;  // 針の往復移動方向 (+1.0f: 右進, -1.0f: 左進)
@@ -169,6 +175,9 @@ private:
     int   m_animIndexInclineBench    = 9;     // 11_InClineBenti: インクラインベンチモーション
     int   m_animIndexBenchPress      = 10;    // 12_BenchPress: ベンチプレスモーション
     int   m_animIndexInOverHeadPress = 11;    // 13_InOverHeadPress: インクラインOHPモーション
+    int   m_animIndexChestPress      = 12;    // 14_ChestPress: チェストプレスモーション
+    int   m_animIndexProneTwistRow   = 13;    // 15_DB prone twist row: プローンツイストモーション
+    int   m_animIndexWBarbell        = 14;    // 16_Wbarbell: Wバーベルモーション
     int   m_animIndexSoreness        = 5;     // 06_MuscleSoreness: 筋肉痛モーション
     bool  m_pushFromSubModel         = false; // Pushアニメーションを補助モデルから参照するか
     bool  m_sorenessFromSubModel     = false; // 筋肉痛アニメーションを補助モデルから参照するか
@@ -187,17 +196,19 @@ private:
 
     // トレーニング器具3Dモデルハンドル
     int   m_barbellModelHandle      = -1;    // スクワット / ベンチプレス用バーベル
-    int   m_dumbbellModelHandle     = -1;    // サイドレイズ / カール / インクライン用ダンベル
-    int   m_flatBenchModelHandle    = -1;    // ベンチプレス用フラットベンチ
-    int   m_inclineBenchModelHandle = -1;    // インクラインベンチ / OHP用インクラインベンチ
+    int   m_wBarbellModelHandle     = -1;    // Wバーベル用EZバーベル
+    int   m_dumbbellModelHandle     = -1;    // サイドレイズ / カール / インクライン / チェストプレス / プローンツイスト用ダンベル
+    int   m_flatBenchModelHandle    = -1;    // ベンチプレス / チェストプレス / Wバーベル用フラットベンチ
+    int   m_inclineBenchModelHandle = -1;    // インクラインベンチ / OHP / プローンツイスト用インクラインベンチ
 
     // 内部ヘルパーメソッド
     void InitModel();                   // モデル・アニメーション・ボーンフレームの初期化
     void UpdateAnimation(bool isMoving);// 現在の行動状態に応じたアニメーション切り替え・再生進行
     void DrawBarbell(float catScale);   // 両手ボーン座標から変換行列を構築してバーベルを描画
+    void DrawWBarbell(float catScale);  // 両手ボーン座標から変換行列を構築してWバーベルを描画
     void DrawPullUpBar(float catScale); // 懸垂モーション時に両手位置に合わせた懸垂バー＆支柱ラックを描画
-    void DrawFlatBench(float catScale); // ベンチプレス時に猫の下に敷くフラットベンチを描画
-    void DrawInclineBench(float catScale); // インクラインベンチ＆OHP時に猫の後方に配置するインクラインベンチを描画
+    void DrawFlatBench(float catScale); // ベンチプレス・チェストプレス・Wバーベル時に猫の下に敷くフラットベンチを描画
+    void DrawInclineBench(float catScale, bool reversed = false); // インクラインベンチを描画（reversed=trueでさかさま配置）
     void DrawDumbbells(float catScale); // 両手にダンベルを描画
     void DrawSingleDumbbell(float catScale, bool isRight);
 
@@ -289,6 +300,9 @@ public:
         case WorkoutMotionType::InclineBench:    return "インクライン";
         case WorkoutMotionType::BenchPress:      return "ベンチプレス";
         case WorkoutMotionType::InOverHeadPress: return "インクラインOHP";
+        case WorkoutMotionType::ChestPress:      return "チェストプレス";
+        case WorkoutMotionType::ProneTwistRow:   return "プローンツイスト";
+        case WorkoutMotionType::WBarbell:        return "Wバーベル";
         default:                                 return "スクワット";
         }
     }
@@ -309,7 +323,10 @@ public:
         DumbbellCurl,    // ダンベルカール
         InclineBench,    // インクラインベンチ
         BenchPress,      // ベンチプレス
-        InOverHeadPress  // インクラインOHP
+        InOverHeadPress, // インクラインOHP
+        ChestPress,      // チェストプレス
+        ProneTwistRow,   // プローンツイスト
+        WBarbell         // Wバーベル
     };
 
     void UpdateTitleAnimation(TitleWorkoutType workoutType)
@@ -325,6 +342,9 @@ public:
         m_isTitleInclineBench    = (workoutType == TitleWorkoutType::InclineBench);
         m_isTitleBenchPress      = (workoutType == TitleWorkoutType::BenchPress);
         m_isTitleInOverHeadPress = (workoutType == TitleWorkoutType::InOverHeadPress);
+        m_isTitleChestPress      = (workoutType == TitleWorkoutType::ChestPress);
+        m_isTitleProneTwistRow   = (workoutType == TitleWorkoutType::ProneTwistRow);
+        m_isTitleWBarbell        = (workoutType == TitleWorkoutType::WBarbell);
         m_isSkillChecking = false;
         m_isPouncing      = false;
         m_isTackling      = false;
@@ -357,6 +377,9 @@ public:
         case WorkoutMotionType::InclineBench:    UpdateTitleAnimation(TitleWorkoutType::InclineBench); break;
         case WorkoutMotionType::BenchPress:      UpdateTitleAnimation(TitleWorkoutType::BenchPress); break;
         case WorkoutMotionType::InOverHeadPress: UpdateTitleAnimation(TitleWorkoutType::InOverHeadPress); break;
+        case WorkoutMotionType::ChestPress:      UpdateTitleAnimation(TitleWorkoutType::ChestPress); break;
+        case WorkoutMotionType::ProneTwistRow:   UpdateTitleAnimation(TitleWorkoutType::ProneTwistRow); break;
+        case WorkoutMotionType::WBarbell:        UpdateTitleAnimation(TitleWorkoutType::WBarbell); break;
         case WorkoutMotionType::Squat:
         default:                                 UpdateTitleAnimation(TitleWorkoutType::Squat); break;
         }
