@@ -169,7 +169,7 @@ private:
     int                     m_statusMessageTimer;
     std::string             m_lastGachaName;
     std::string             m_lastGachaCode;
-
+    
     // ガチャ演出用メンバ
     GachaAnimPhase          m_gachaAnimPhase       = GachaAnimPhase::None;
     int                     m_gachaAnimTimer       = 0;

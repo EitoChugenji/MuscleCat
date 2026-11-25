@@ -1423,41 +1423,20 @@ void GameManager::Update()
             VECTOR pPos = player->GetPos();
             float pRot = player->GetRotY();
 
-            bool isFloorWorkout  = (clearWorkout == Player3D::TitleWorkoutType::PushUp || clearWorkout == Player3D::TitleWorkoutType::SitUp || clearWorkout == Player3D::TitleWorkoutType::BenchPress);
-            bool isPullUpWorkout = (clearWorkout == Player3D::TitleWorkoutType::PullUp);
-
-            // 猫の斜め前方から撮影しつつ、画面左側（X ~ 280〜310）に猫の全身＆筋トレ器具が収まるようカメラと注視点を右へオフセット
-            int orbitFrames = (m_clearAnimTimer > CLEAR_ZOOM_DURATION) ? (m_clearAnimTimer - CLEAR_ZOOM_DURATION) : 0;
-            float frontAngle = pRot + MathHelper::PI * 0.80f + std::sin(orbitFrames * 0.012f) * 0.16f;
+            // モーション種別によって猫の位置がズレないよう、カメラ角度・距離・高さを常に一定に固定し左エリア中央に映す
+            float frontAngle = pRot + MathHelper::PI * 0.85f;
             float effRep = static_cast<float>(player->GetEffectiveRep());
 
-            float desiredDist    = (isPullUpWorkout ? 255.0f : (isFloorWorkout ? 215.0f : 230.0f)) + effRep * 2.8f;
-            float desiredHeight  = (isFloorWorkout ? 42.0f : (isPullUpWorkout ? 74.0f : 60.0f)) + effRep * 1.0f;
-            float desiredTargetY = pPos.y + (isFloorWorkout ? 26.0f : (isPullUpWorkout ? 62.0f : 50.0f)) + effRep * 0.9f;
-
-            // モーション切り替え時にカメラ高さ・距離がガクつかないよう滑らかに補間
-            static float s_smoothDist    = 230.0f;
-            static float s_smoothHeight  = 60.0f;
-            static float s_smoothTargetY = 50.0f;
-            if (m_clearAnimTimer <= 2)
-            {
-                s_smoothDist    = desiredDist;
-                s_smoothHeight  = desiredHeight;
-                s_smoothTargetY = desiredTargetY;
-            }
-            else
-            {
-                s_smoothDist    = MathHelper::Lerp(s_smoothDist,    desiredDist,    0.08f);
-                s_smoothHeight  = MathHelper::Lerp(s_smoothHeight,  desiredHeight,  0.08f);
-                s_smoothTargetY = MathHelper::Lerp(s_smoothTargetY, desiredTargetY, 0.08f);
-            }
+            float fixedDist    = 240.0f + effRep * 2.5f;
+            float fixedHeight  = 62.0f + effRep * 1.0f;
+            float fixedTargetY = pPos.y + 52.0f + effRep * 0.8f;
 
             VECTOR baseCamPos = VGet(
-                pPos.x - std::sin(frontAngle) * s_smoothDist,
-                pPos.y + s_smoothHeight,
-                pPos.z - std::cos(frontAngle) * s_smoothDist
+                pPos.x - std::sin(frontAngle) * fixedDist,
+                pPos.y + fixedHeight,
+                pPos.z - std::cos(frontAngle) * fixedDist
             );
-            VECTOR catCenter = VGet(pPos.x, s_smoothTargetY, pPos.z);
+            VECTOR catCenter = VGet(pPos.x, fixedTargetY, pPos.z);
 
             // カメラから猫へ向かう水平ベクトルと画面右方向ベクトル（camRight）を算出
             VECTOR viewDir = VSub(catCenter, baseCamPos);
@@ -1535,6 +1514,7 @@ void GameManager::Update()
         bool keyR     = (CheckHitKey(KEY_INPUT_R) != 0);
         bool keyT     = (CheckHitKey(KEY_INPUT_T) != 0);
         bool keyM     = (CheckHitKey(KEY_INPUT_M) != 0);
+        bool keyI     = (CheckHitKey(KEY_INPUT_I) != 0);
 
         bool triggerLeft  = keyLeft && !m_prevKeyLeft;
         bool triggerRight = keyRight && !m_prevKeyRight;
@@ -1543,6 +1523,7 @@ void GameManager::Update()
         bool triggerR     = keyR && !m_prevKeyR;
         bool triggerT     = keyT && !m_prevKeyT;
         bool triggerM     = keyM && !m_prevKeyM;
+        bool triggerI     = keyI && !m_prevKeyI;
 
         m_prevKeyLeft  = keyLeft;
         m_prevKeyRight = keyRight;
@@ -1551,6 +1532,12 @@ void GameManager::Update()
         m_prevKeyR     = keyR;
         m_prevKeyT     = keyT;
         m_prevKeyM     = keyM;
+        m_prevKeyI     = keyI;
+
+        if (m_clearAnimTimer == 1)
+        {
+            m_showClearDetails = false;
+        }
 
         // ズームイン演出完了の瞬間にスタンプ押印音を再生！
         if (m_clearAnimTimer == CLEAR_ZOOM_DURATION)
@@ -1563,6 +1550,20 @@ void GameManager::Update()
         {
             if (triggerLeft)  { m_clearSelectedBtn = 0; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
             if (triggerRight) { m_clearSelectedBtn = 1; SoundManager::GetInstance().PlaySE(SeType::Cursor); }
+
+            // 詳細表示トグルボタンの当たり判定座標（DrawGameClearScreenと完全一致）
+            int detBtnX = 568;
+            int detBtnY = 524;
+            int detBtnW = 672;
+            int detBtnH = 44;
+            bool hoverDetail = (mx >= detBtnX && mx <= detBtnX + detBtnW && my >= detBtnY && my <= detBtnY + detBtnH);
+
+            if (triggerI || (hoverDetail && isMouseTrigger))
+            {
+                m_showClearDetails = !m_showClearDetails;
+                SoundManager::GetInstance().PlaySE(SeType::Cursor);
+                return;
+            }
 
             // 右パネル下部のアクションボタン当たり判定座標（DrawGameClearScreenと完全一致）
             int btnW   = 322;
@@ -2886,39 +2887,39 @@ void GameManager::UpdatePause(bool triggerEsc)
         }
     }
 
-    // モーダルレイアウト寸法（文字やボタンの重なりを完全解消）
-    int modalW = 500;
-    int modalH = 556;
+    // モーダルレイアウト寸法（DrawPauseModalと完全一致）
+    int modalW = 640;
+    int modalH = 594;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
-    int btnW = 380;
+    int btnW = 460;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
 
-    int retryBtnY = modalY + 48;
+    int retryBtnY = modalY + 50;
     int retryBtnH = 34;
 
-    int titleBtnY = modalY + 86;
+    int titleBtnY = modalY + 90;
     int titleBtnH = 34;
 
-    int sensRowY  = modalY + 124;
+    int sensRowY  = modalY + 130;
     int sensRowH  = 52;
 
-    int bgmRowY   = modalY + 180;
+    int bgmRowY   = modalY + 188;
     int bgmRowH   = 52;
 
-    int seRowY    = modalY + 236;
+    int seRowY    = modalY + 246;
     int seRowH    = 52;
 
-    int workoutCardW = 468;
+    int workoutCardW = 604;
     int workoutCardX = (Config::SCREEN_WIDTH - workoutCardW) / 2;
-    int workoutCardY = modalY + 292;
-    int workoutCardH = 148;
+    int workoutCardY = modalY + 306;
+    int workoutCardH = 172;
 
     int resumeBtnW = 280;
     int resumeBtnH = 34;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 448;
+    int resumeBtnY = modalY + 488;
 
     int minusBtnX  = btnX + 10;
     int minusBtnW  = 46;
