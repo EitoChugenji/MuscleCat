@@ -23,6 +23,8 @@ namespace ModelConfig
     // ------------------------------------------------------------------------
     constexpr const char* BARBELL_MODEL_PATH       = "Resource/Models/AccessoryModels/Barbell.mv1";
     constexpr float       BARBELL_BASE_SCALE       = 18.0f;    // 基準スケール（猫の両手ボーン間隔に合わせて自動伸縮）
+    constexpr const char* WBARBELL_MODEL_PATH      = "Resource/Models/AccessoryModels/WBarbell.mv1";
+    constexpr float       WBARBELL_BASE_SCALE      = 24.0f;    // Wバーベル基準スケール（猫の両手ボーン間隔に合わせて自動伸縮）
     constexpr const char* DUMBBELL_MODEL_PATH      = "Resource/Models/AccessoryModels/Dumbbell.mv1";
     constexpr const char* FLAT_BENCH_MODEL_PATH    = "Resource/Models/AccessoryModels/FlatBench.mv1";
     constexpr const char* INCLINE_BENCH_MODEL_PATH = "Resource/Models/AccessoryModels/Inclinebench.mv1";

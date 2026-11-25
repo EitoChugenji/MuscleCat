@@ -21,6 +21,9 @@
 //  ID 6 (0110) -> EAAE (インクラインベンチ)
 //  ID 7 (0111) -> EAAA (ベンチプレス)
 //  ID 8 (1000) -> AEEE (インクラインOHP)
+//  ID 9 (1001) -> AEEA (チェストプレス)
+//  ID 10 (1010) -> AEAE (プローンツイスト)
+//  ID 11 (1011) -> AEAA (Wバーベル)
 // ============================================================================
 std::string WorkoutCollectionManager::IdToAeCode(int id)
 {
@@ -541,6 +544,18 @@ void WorkoutCollectionManager::StartGachaAnimation(int obtainedId, const std::st
     case 8: // インクラインOHP
         m_gachaTargetMuscle = "鍛えられる部位: 三角筋前部・僧帽筋 (天を突く筋肉の巨塔!)";
         m_gachaMuscleCall   = "「巨塔！スカイツリー！僧帽筋が富士山大噴火！！」";
+        break;
+    case 9: // チェストプレス
+        m_gachaTargetMuscle = "鍛えられる部位: 大胸筋・三角筋前部 (深い可動域で胸板パンプ!)";
+        m_gachaMuscleCall   = "「ダンベルで胸筋がはち切れる！極厚ステーキ胸板！！」";
+        break;
+    case 10: // プローンツイスト
+        m_gachaTargetMuscle = "鍛えられる部位: 広背筋・僧帽筋中部 (ベンチうつ伏せ極上ロウ!)";
+        m_gachaMuscleCall   = "「背中に立体彫刻！ひねり上げて広背筋が羽ばたく！！」";
+        break;
+    case 11: // Wバーベル
+        m_gachaTargetMuscle = "鍛えられる部位: 上腕三頭筋 (腕の太さを決める馬蹄の極み!)";
+        m_gachaMuscleCall   = "「Wバーベルがうなる！上腕三頭筋が鋼鉄のハンマー！！」";
         break;
     default:
         m_gachaTargetMuscle = "鍛えられる部位: 全身の筋肉 (超マッスルパンプアップ!)";

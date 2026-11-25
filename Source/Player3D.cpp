@@ -22,7 +22,7 @@
 #include <algorithm>
 
 // 筋トレアニメーション各モーションの初期設定（仕様: 腕立て伏せ [ID 1 / EEEA] のみ初期解放）
-bool Player3D::s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)] = { false, true, false, false, false, false, false, false, false };
+bool Player3D::s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)] = { false, true, false, false, false, false, false, false, false, false, false, false };
 int  Player3D::s_workoutSequenceIndex = 0;
 
 bool Player3D::IsWorkoutMotionEnabled(WorkoutMotionType type)
@@ -119,6 +119,12 @@ Player3D::~Player3D()
         m_barbellModelHandle = -1;
     }
 
+    if (m_wBarbellModelHandle != -1)
+    {
+        MV1DeleteModel(m_wBarbellModelHandle);
+        m_wBarbellModelHandle = -1;
+    }
+
     if (m_dumbbellModelHandle != -1)
     {
         MV1DeleteModel(m_dumbbellModelHandle);
@@ -211,6 +217,9 @@ void Player3D::InitModel()
             m_animIndexInclineBench    = findAnim({ "11_inclinebenti", "inclinebenti", "incline" }, 9);
             m_animIndexBenchPress      = findAnim({ "12_benchpress", "benchpress" }, 10);
             m_animIndexInOverHeadPress = findAnim({ "13_inoverheadpress", "inoverheadpress", "overhead" }, 11);
+            m_animIndexChestPress      = findAnim({ "14_chestpress", "chestpress" }, 12);
+            m_animIndexProneTwistRow   = findAnim({ "15_db prone twist row", "15_db", "prone twist", "pronetwist" }, 13);
+            m_animIndexWBarbell        = findAnim({ "16_wbarbell", "wbarbell" }, 14);
 
             // タックル（スタン攻撃）用：pushup以外の独立したパンチ/プッシュがあれば使用。無ければ補助モデルまたはAttackを使用
             m_pushFromSubModel  = false;
@@ -294,10 +303,18 @@ void Player3D::InitModel()
         m_barbellModelHandle = MV1DuplicateModel(barbellBase);
     }
 
+    int wBarbellBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::WBARBELL_MODEL_PATH);
+    if (wBarbellBase != -1)
+    {
+        m_wBarbellModelHandle = MV1DuplicateModel(wBarbellBase);
+    }
+
     int dumbbellBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::DUMBBELL_MODEL_PATH);
     if (dumbbellBase != -1)
     {
         m_dumbbellModelHandle = MV1DuplicateModel(dumbbellBase);
+        MV1SetDifColorScale(m_dumbbellModelHandle, GetColorF(2.2f, 2.2f, 2.4f, 1.0f));
+        MV1SetAmbColorScale(m_dumbbellModelHandle, GetColorF(1.8f, 1.8f, 2.0f, 1.0f));
     }
 
     int flatBenchBase = ModelManager::GetInstance().LoadModelHandle(ModelConfig::FLAT_BENCH_MODEL_PATH);
@@ -365,6 +382,9 @@ void Player3D::UpdateAnimation(bool isMoving)
         case WorkoutMotionType::InclineBench:    targetAnim = m_animIndexInclineBench; break;    // 11_InClineBenti (インクラインベンチ)
         case WorkoutMotionType::BenchPress:      targetAnim = m_animIndexBenchPress; break;      // 12_BenchPress (ベンチプレス)
         case WorkoutMotionType::InOverHeadPress: targetAnim = m_animIndexInOverHeadPress; break; // 13_InOverHeadPress (インクラインOHP)
+        case WorkoutMotionType::ChestPress:      targetAnim = m_animIndexChestPress; break;      // 14_ChestPress (チェストプレス)
+        case WorkoutMotionType::ProneTwistRow:   targetAnim = m_animIndexProneTwistRow; break;   // 15_DB prone twist row (プローンツイスト)
+        case WorkoutMotionType::WBarbell:        targetAnim = m_animIndexWBarbell; break;        // 16_Wbarbell (Wバーベル)
         case WorkoutMotionType::Squat:
         default:                                 targetAnim = m_animIndexSquat;  break;          // 03_squat (スクワット)
         }
@@ -413,6 +433,21 @@ void Player3D::UpdateAnimation(bool isMoving)
     else if (m_isTitleInOverHeadPress)
     {
         targetAnim = m_animIndexInOverHeadPress; // Armature|13_InOverHeadPress (インクラインOHP)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleChestPress)
+    {
+        targetAnim = m_animIndexChestPress; // Armature|14_ChestPress (チェストプレス)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleProneTwistRow)
+    {
+        targetAnim = m_animIndexProneTwistRow; // Armature|15_DB prone twist row (プローンツイスト)
+        playSpeed = 1.0f;
+    }
+    else if (m_isTitleWBarbell)
+    {
+        targetAnim = m_animIndexWBarbell; // Armature|16_Wbarbell (Wバーベル)
         playSpeed = 1.0f;
     }
     else if (isMoving)
@@ -471,6 +506,9 @@ void Player3D::UpdateWithCamera(Camera3D& camera, const std::vector<VECTOR>& tar
     m_isTitleInclineBench    = false;
     m_isTitleBenchPress      = false;
     m_isTitleInOverHeadPress = false;
+    m_isTitleChestPress      = false;
+    m_isTitleProneTwistRow   = false;
+    m_isTitleWBarbell        = false;
     m_prevPos = m_pos;
     m_animFrame++;
     m_animTime += 1.0f / 60.0f;
@@ -1138,7 +1176,7 @@ void Player3D::Draw3D()
     {
         float scaleRatio = scale / ModelConfig::CAT_MODEL_SCALE;
         float baseRadius = 24.0f * scaleRatio;
-        bool isPronePose = ((m_isSkillChecking && (m_activeWorkoutMotion == WorkoutMotionType::PushUp || m_activeWorkoutMotion == WorkoutMotionType::SitUp || m_activeWorkoutMotion == WorkoutMotionType::BenchPress)) || m_isTitlePushUp || m_isTitleSitUp || m_isTitleBenchPress);
+        bool isPronePose = ((m_isSkillChecking && (m_activeWorkoutMotion == WorkoutMotionType::PushUp || m_activeWorkoutMotion == WorkoutMotionType::SitUp || m_activeWorkoutMotion == WorkoutMotionType::BenchPress || m_activeWorkoutMotion == WorkoutMotionType::ChestPress || m_activeWorkoutMotion == WorkoutMotionType::WBarbell)) || m_isTitlePushUp || m_isTitleSitUp || m_isTitleBenchPress || m_isTitleChestPress || m_isTitleWBarbell);
         float shadowRx = isPronePose ? (baseRadius * 0.90f) : baseRadius;
         float shadowRz = isPronePose ? (baseRadius * 1.65f) : (baseRadius * 1.10f);
         float jumpH = (m_pos.y > m_groundY) ? (m_pos.y - m_groundY) : 0.0f;
@@ -1268,6 +1306,33 @@ void Player3D::Draw3D()
     {
         DrawInclineBench(scale);
         DrawDumbbells(scale);
+    }
+
+    // 8. チェストプレス (ChestPress): FlatBench + 両手ダンベル
+    bool isPlayingChestPress = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexChestPress) &&
+                               ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::ChestPress) || m_isTitleChestPress);
+    if (!isSoreness && isPlayingChestPress)
+    {
+        DrawFlatBench(scale);
+        DrawDumbbells(scale);
+    }
+
+    // 9. プローンツイスト (ProneTwistRow): さかさまInclineBench（胸に背もたれ） + 両手ダンベル
+    bool isPlayingProneTwistRow = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexProneTwistRow) &&
+                                  ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::ProneTwistRow) || m_isTitleProneTwistRow);
+    if (!isSoreness && isPlayingProneTwistRow)
+    {
+        DrawInclineBench(scale, true);
+        DrawDumbbells(scale);
+    }
+
+    // 10. Wバーベル (WBarbell): FlatBench + WBarbell
+    bool isPlayingWBarbell = (m_currentAnimSrcHandle == -1 && m_currentAnimIndex == m_animIndexWBarbell) &&
+                             ((m_isSkillChecking && m_activeWorkoutMotion == WorkoutMotionType::WBarbell) || m_isTitleWBarbell);
+    if (!isSoreness && isPlayingWBarbell)
+    {
+        DrawFlatBench(scale);
+        DrawWBarbell(scale);
     }
 
     // 3. バカゲー風コミカル・マッスル湯気＆マッチョオーラ（3D）
@@ -1683,6 +1748,75 @@ void Player3D::DrawBarbell(float catScale)
     }
 }
 
+void Player3D::DrawWBarbell(float catScale)
+{
+    // 3Dモデル版Wバーベル描画（WBarbell.mv1 のシャフト長軸はローカルX軸）
+    if (m_wBarbellModelHandle != -1 && m_modelHandle != -1 && m_lHandFrame != -1 && m_rHandFrame != -1)
+    {
+        VECTOR posL = MV1GetFramePosition(m_modelHandle, m_lHandFrame);
+        VECTOR posR = MV1GetFramePosition(m_modelHandle, m_rHandFrame);
+
+        VECTOR handCenterL = posL;
+        VECTOR handCenterR = posR;
+
+        if (m_lHandKnuckleFrame != -1 && m_rHandKnuckleFrame != -1)
+        {
+            VECTOR posLKnuckle = MV1GetFramePosition(m_modelHandle, m_lHandKnuckleFrame);
+            VECTOR posRKnuckle = MV1GetFramePosition(m_modelHandle, m_rHandKnuckleFrame);
+            handCenterL = VAdd(posL, VScale(VSub(posLKnuckle, posL), 0.5f));
+            handCenterR = VAdd(posR, VScale(VSub(posRKnuckle, posR), 0.5f));
+        }
+
+        VECTOR dir = VSub(handCenterR, handCenterL);
+        float dist = VSize(dir);
+
+        if (dist > 0.001f)
+        {
+            // WバーベルのX軸（長軸・シャフト方向）：左手から右手へ
+            VECTOR basisX = VNorm(dir);
+
+            // 上方向の基準ベクトル
+            VECTOR upRef = VGet(0.0f, 1.0f, 0.0f);
+
+            // Z軸（水平直交）：X × Up
+            VECTOR basisZ = VCross(basisX, upRef);
+            if (VSize(basisZ) < 0.001f)
+            {
+                basisZ = VGet(0.0f, 0.0f, 1.0f);
+            }
+            else
+            {
+                basisZ = VNorm(basisZ);
+            }
+
+            // Y軸（垂直直交）：Z × X
+            VECTOR basisY = VNorm(VCross(basisZ, basisX));
+
+            // 両手の中央位置（WBarbell.mv1 のY中心オフセット +0.21 を補正して握り芯を手のひら中央に合わせる）
+            VECTOR midPos = VScale(VAdd(handCenterL, handCenterR), 0.5f);
+            float wBarbellScale = (dist / 35.7f) * ModelConfig::WBARBELL_BASE_SCALE;
+            VECTOR drawPos = VSub(midPos, VScale(basisY, 0.21f * wBarbellScale));
+
+            VECTOR sx = VScale(basisX, wBarbellScale);
+            VECTOR sy = VScale(basisY, wBarbellScale);
+            VECTOR sz = VScale(basisZ, wBarbellScale);
+
+            MATRIX mat = {};
+            mat.m[0][0] = sx.x; mat.m[0][1] = sx.y; mat.m[0][2] = sx.z; mat.m[0][3] = 0.0f;
+            mat.m[1][0] = sy.x; mat.m[1][1] = sy.y; mat.m[1][2] = sy.z; mat.m[1][3] = 0.0f;
+            mat.m[2][0] = sz.x; mat.m[2][1] = sz.y; mat.m[2][2] = sz.z; mat.m[2][3] = 0.0f;
+            mat.m[3][0] = drawPos.x; mat.m[3][1] = drawPos.y; mat.m[3][2] = drawPos.z; mat.m[3][3] = 1.0f;
+
+            MV1SetMatrix(m_wBarbellModelHandle, mat);
+            MV1DrawModel(m_wBarbellModelHandle);
+        }
+    }
+    else
+    {
+        DrawBarbell(catScale);
+    }
+}
+
 void Player3D::DrawPullUpBar(float catScale)
 {
     float ratio = catScale / ModelConfig::CAT_MODEL_SCALE;
@@ -1839,22 +1973,32 @@ void Player3D::DrawFlatBench(float catScale)
     MV1DrawModel(m_flatBenchModelHandle);
 }
 
-void Player3D::DrawInclineBench(float catScale)
+void Player3D::DrawInclineBench(float catScale, bool reversed)
 {
     if (m_inclineBenchModelHandle == -1) return;
     float ratio = catScale / ModelConfig::CAT_MODEL_SCALE;
     float sinR = std::sin(m_rotY);
     float cosR = std::cos(m_rotY);
-    // 猫の後方へ 24.0f * ratio シフト
-    VECTOR benchPos = VGet(
-        m_pos.x - sinR * (24.0f * ratio),
-        m_pos.y,
-        m_pos.z - cosR * (24.0f * ratio)
-    );
-    // インクラインベンチの背もたれはローカル+Zに向かって上がるため、
-    // 猫の進行方向 m_rotY と同じ回転に設定すると背もたれが猫の背中側に来る
-    MV1SetPosition(m_inclineBenchModelHandle, benchPos);
-    MV1SetRotationXYZ(m_inclineBenchModelHandle, VGet(0.0f, m_rotY, 0.0f));
+
+    // Inclinebench.mv1 はローカル+Zに向かって背もたれが上がるため、
+    // m_rotY + CAT_MODEL_ROT_Y (180度反転) にすると背もたれが猫の後方(-Z)に向かって上がる
+    if (reversed)
+    {
+        // プローンツイスト用（うつ伏せで後ろ向きに胸を背もたれへ預ける）：原点位置に配置
+        MV1SetPosition(m_inclineBenchModelHandle, m_pos);
+        MV1SetRotationXYZ(m_inclineBenchModelHandle, VGet(0.0f, m_rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
+    }
+    else
+    {
+        // 通常（インクラインベンチ / OHP：仰向けで背中を背もたれへ預ける）：猫の後方へ 24.0f * ratio シフト
+        VECTOR benchPos = VGet(
+            m_pos.x - sinR * (24.0f * ratio),
+            m_pos.y,
+            m_pos.z - cosR * (24.0f * ratio)
+        );
+        MV1SetPosition(m_inclineBenchModelHandle, benchPos);
+        MV1SetRotationXYZ(m_inclineBenchModelHandle, VGet(0.0f, m_rotY + ModelConfig::CAT_MODEL_ROT_Y, 0.0f));
+    }
     MV1SetScale(m_inclineBenchModelHandle, VGet(catScale, catScale, catScale));
     MV1DrawModel(m_inclineBenchModelHandle);
 }
@@ -1898,22 +2042,25 @@ void Player3D::DrawSingleDumbbell(float catScale, bool isRight)
         gripPos = VAdd(posHand, VScale(bY, 2.5f * (catScale / ModelConfig::CAT_MODEL_SCALE)));
     }
 
-    // ダンベルのシャフト（モデルのローカルZ軸）を手首の握り穴軸（bX）に一致させる
-    VECTOR dZ = bX;
+    // 新 Dumbbell.mv1 のシャフト（モデルのローカルX軸、全長9.0・中心(+1.07, +0.12, -0.02)）を手首の握り穴軸（bX）に一致させる
+    VECTOR dX = bX;
     VECTOR dY = bZ;
-    VECTOR dX = VCross(dY, dZ);
+    VECTOR dZ = VCross(dX, dY);
 
-    // ダンベルのスケール（手首や体・太ももに食い込まず、手のひらにジャストフィットするサイズ）
-    float s = 1.45f * (catScale / ModelConfig::CAT_MODEL_SCALE);
+    // ダンベルのスケール（猫の拳の両側からウェイトプレートがしっかり見えるサイズ）
+    float s = 3.0f * (catScale / ModelConfig::CAT_MODEL_SCALE);
     VECTOR sx = VScale(dX, s);
     VECTOR sy = VScale(dY, s);
     VECTOR sz = VScale(dZ, s);
+
+    // モデル中心オフセット (+1.07, +0.12, -0.02) を補正してグリップ中央を手のひらに合わせる
+    VECTOR drawPos = VSub(gripPos, VAdd(VAdd(VScale(dX, 1.07f * s), VScale(dY, 0.12f * s)), VScale(dZ, -0.02f * s)));
 
     MATRIX mat = {};
     mat.m[0][0] = sx.x; mat.m[0][1] = sx.y; mat.m[0][2] = sx.z; mat.m[0][3] = 0.0f;
     mat.m[1][0] = sy.x; mat.m[1][1] = sy.y; mat.m[1][2] = sy.z; mat.m[1][3] = 0.0f;
     mat.m[2][0] = sz.x; mat.m[2][1] = sz.y; mat.m[2][2] = sz.z; mat.m[2][3] = 0.0f;
-    mat.m[3][0] = gripPos.x; mat.m[3][1] = gripPos.y; mat.m[3][2] = gripPos.z; mat.m[3][3] = 1.0f;
+    mat.m[3][0] = drawPos.x; mat.m[3][1] = drawPos.y; mat.m[3][2] = drawPos.z; mat.m[3][3] = 1.0f;
 
     MV1SetMatrix(m_dumbbellModelHandle, mat);
     MV1DrawModel(m_dumbbellModelHandle);
