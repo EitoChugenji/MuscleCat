@@ -242,6 +242,9 @@ namespace
         case WorkoutMotionType::InclineBench:    return Player3D::TitleWorkoutType::InclineBench;
         case WorkoutMotionType::BenchPress:      return Player3D::TitleWorkoutType::BenchPress;
         case WorkoutMotionType::InOverHeadPress: return Player3D::TitleWorkoutType::InOverHeadPress;
+        case WorkoutMotionType::ChestPress:      return Player3D::TitleWorkoutType::ChestPress;
+        case WorkoutMotionType::ProneTwistRow:   return Player3D::TitleWorkoutType::ProneTwistRow;
+        case WorkoutMotionType::WBarbell:        return Player3D::TitleWorkoutType::WBarbell;
         default:                                 return Player3D::TitleWorkoutType::Squat;
         }
     }
@@ -254,25 +257,15 @@ namespace
         const int gapY = 4;
         const int headerH = 22;
         const int btnH = 28;
+        const int cols = 6;
 
-        if (index < 5)
-        {
-            int col = index;
-            int btnW = (cardW - padX * 2 - gapX * 4) / 5;
-            outX = cardX + padX + col * (btnW + gapX);
-            outY = cardY + headerH;
-            outW = btnW;
-            outH = btnH;
-        }
-        else
-        {
-            int col = index - 5;
-            int btnW = (cardW - padX * 2 - gapX * 3) / 4;
-            outX = cardX + padX + col * (btnW + gapX);
-            outY = cardY + headerH + btnH + gapY;
-            outW = btnW;
-            outH = btnH;
-        }
+        int row  = index / cols;
+        int col  = index % cols;
+        int btnW = (cardW - padX * 2 - gapX * (cols - 1)) / cols;
+        outX = cardX + padX + col * (btnW + gapX);
+        outY = cardY + headerH + row * (btnH + gapY);
+        outW = btnW;
+        outH = btnH;
     }
 
     // 筋トレコレクションアクションボタン（ガチャ・セーブ・ロード・(Debug削除)）の座標算出ヘルパー
@@ -642,6 +635,9 @@ void UIManager::DrawGameClearScreen(GameManager& gm)
         else if (clearWorkout == Player3D::TitleWorkoutType::InclineBench) motionName = "インクラインベンチ";
         else if (clearWorkout == Player3D::TitleWorkoutType::BenchPress) motionName = "ベンチプレス";
         else if (clearWorkout == Player3D::TitleWorkoutType::InOverHeadPress) motionName = "インクラインOHP";
+        else if (clearWorkout == Player3D::TitleWorkoutType::ChestPress) motionName = "チェストプレス";
+        else if (clearWorkout == Player3D::TitleWorkoutType::ProneTwistRow) motionName = "プローンツイスト";
+        else if (clearWorkout == Player3D::TitleWorkoutType::WBarbell) motionName = "Wバーベル";
 
         char showcaseBuf[96];
         snprintf(showcaseBuf, sizeof(showcaseBuf), "WORKOUT SHOWCASE : %s", motionName);
@@ -1466,6 +1462,39 @@ void UIManager::DrawTitleScreen(GameManager& gm)
             };
             activePool = ohpShouts;
             activeCount = sizeof(ohpShouts) / sizeof(ohpShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::ChestPress)
+        {
+            static const char* cpShouts[] = {
+                "ダンベルで胸筋爆発！",
+                "深い可動域が効くぜ！",
+                "大胸筋がステーキ状態！",
+                "胸の厚みが規格外！"
+            };
+            activePool = cpShouts;
+            activeCount = sizeof(cpShouts) / sizeof(cpShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::ProneTwistRow)
+        {
+            static const char* ptShouts[] = {
+                "背中に羽が生えるぜ！",
+                "ひねり上げて広背筋MAX！",
+                "ベンチに胸を預けて引け！",
+                "鬼の背中が仕上がり中！"
+            };
+            activePool = ptShouts;
+            activeCount = sizeof(ptShouts) / sizeof(ptShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::WBarbell)
+        {
+            static const char* wbShouts[] = {
+                "Wバーベルがうなるぜ！",
+                "上腕三頭筋が鋼鉄！",
+                "馬蹄の輝きがまぶしい！",
+                "腕の太さが丸太超え！"
+            };
+            activePool = wbShouts;
+            activeCount = sizeof(wbShouts) / sizeof(wbShouts[0]);
         }
 
         // --- 掛け声吹き出し（左右各1箇所に厳選し、画面のごちゃつきを解消してテンポよく入れ替え） ---
@@ -3184,7 +3213,7 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
 
     // 2. モーダル本体外枠
     int modalW = 760;
-    int modalH = 376;
+    int modalH = 424;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
@@ -3200,9 +3229,9 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     // ヘッダー左側: ★ 筋トレコレクション
     DrawStringToHandle(modalX + 20, modalY + 14, "★ 筋トレコレクション", GetColor(255, 220, 90), font18);
 
-    // ヘッダー: (所持: X / 9)
+    // ヘッダー: (所持: X / 12)
     char countBuf[32];
-    snprintf(countBuf, sizeof(countBuf), "(所持: %d / 9)", collMgr.GetUnlockedCount());
+    snprintf(countBuf, sizeof(countBuf), "(所持: %d / %d)", collMgr.GetUnlockedCount(), collMgr.GetTotalMotionCount());
     DrawStringToHandle(modalX + 245, modalY + 16, countBuf, GetColor(200, 220, 255), font16);
 
     // ヘッダー中央右: プロテイン: X pt
@@ -3239,11 +3268,13 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     DrawRoundRect(xBtnX, xBtnY, xBtnX + xBtnSize, xBtnY + xBtnSize, 6, 6, hoverX ? GetColor(190, 40, 60) : GetColor(50, 40, 65), TRUE);
     DrawStringToHandle(xBtnX + 7, xBtnY + 5, "×", hoverX ? GetColor(255, 255, 255) : GetColor(200, 180, 220), font16);
 
-    // 3. 9つの筋トレモーションボタン（上段5個 / 下段4個）
-    int topRowY = modalY + 56;
-    int botRowY = modalY + 110;
-    int btnW    = 124;
-    int btnH    = 46;
+    // 3. 12個の筋トレモーションボタン（4列 × 3行）
+    const int cols = 4;
+    int startY  = modalY + 56;
+    int btnW    = 166;
+    int btnH    = 42;
+    int gapX    = 12;
+    int gapY    = 8;
 
     for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
     {
@@ -3252,8 +3283,8 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
         bool isOn       = Player3D::IsWorkoutMotionEnabled(mType);
         std::string aeCode = WorkoutCollectionManager::IdToAeCode(i);
 
-        int bx = (i < 5) ? (modalX + 30 + i * 140) : (modalX + 100 + (i - 5) * 140);
-        int by = (i < 5) ? topRowY : botRowY;
+        int bx = modalX + 30 + (i % cols) * (btnW + gapX);
+        int by = startY + (i / cols) * (btnH + gapY);
 
         bool isHover = (mx >= bx && mx <= bx + btnW && my >= by && my <= by + btnH);
         bool isFocus = (gm.m_selectedWorkoutBtn == i) || isHover;
@@ -3300,7 +3331,7 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     }
 
     // 4. アクションボタン（ガチャ・セーブ・ロード・(Debug削除)）
-    int actBtnY = modalY + 168;
+    int actBtnY = modalY + 212;
     int actBtnH = 36;
 #ifdef _DEBUG
     const int numTitleActs = 4;
@@ -3377,7 +3408,7 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     // 5. ★ デバッグツールバー（Debugビルド時のみ）
     if (collMgr.IsDebugMode())
     {
-        int dbgRowY = modalY + 214;
+        int dbgRowY = modalY + 258;
         int dbgRowH = 32;
 
         int dBtnX[5] = { modalX + 30, modalX + 176, modalX + 322, modalX + 448, modalX + 574 };
@@ -3408,14 +3439,14 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     else
     {
         // デバッグOFF時のショートカット案内ヒント
-        int hintY = modalY + 222;
+        int hintY = modalY + 266;
         const char* dHint = "※ [D] または [F1] キーで【筋トレデバッグモード】を切り替え可能";
         DrawStringToHandle(modalX + 30, hintY, dHint, GetColor(130, 150, 180), font13);
     }
 #endif
 
     // 6. ステータスメッセージ / セーブコード（行1）
-    int statusY = modalY + 258;
+    int statusY = modalY + 302;
     if (collMgr.GetStatusMessageTimer() > 0)
     {
         const auto& msg = collMgr.GetStatusMessage();
@@ -3428,7 +3459,7 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     }
 
     // 操作案内（行2：ステータスと重複しない独立行）
-    int guideY = modalY + 282;
+    int guideY = modalY + 326;
     const char* hintTxt = "※クリックまたは[ENTER / SPACE]でON/OFF切替";
     DrawStringToHandle(modalX + 30, guideY, hintTxt, GetColor(140, 160, 185), font13);
 

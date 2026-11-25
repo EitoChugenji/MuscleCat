@@ -659,7 +659,7 @@ void GameManager::Update()
             auto player = m_objManager.GetPlayer();
             float catY = (player) ? player->GetPos().y : 0.0f;
             Player3D::TitleWorkoutType workout = CalcActiveTitleWorkout(m_titleAnimTimer);
-            bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
+            bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress || workout == Player3D::TitleWorkoutType::ChestPress || workout == Player3D::TitleWorkoutType::WBarbell);
             bool isPullUpWorkout = (workout == Player3D::TitleWorkoutType::PullUp);
             float camDist = isPullUpWorkout ? 260.0f : 240.0f;
             float targetY = isFloorWorkout ? (catY + 14.0f) : (isPullUpWorkout ? (catY + 42.0f) : (catY + 20.0f));
@@ -727,6 +727,9 @@ void GameManager::Update()
             case 6: workout = Player3D::TitleWorkoutType::InclineBench; break;
             case 7: workout = Player3D::TitleWorkoutType::BenchPress; break;
             case 8: workout = Player3D::TitleWorkoutType::InOverHeadPress; break;
+            case 9: workout = Player3D::TitleWorkoutType::ChestPress; break;
+            case 10: workout = Player3D::TitleWorkoutType::ProneTwistRow; break;
+            case 11: workout = Player3D::TitleWorkoutType::WBarbell; break;
             default: workout = Player3D::TitleWorkoutType::PushUp; break;
             }
 
@@ -740,7 +743,7 @@ void GameManager::Update()
             workout = CalcActiveTitleWorkout(m_titleAnimTimer);
         }
 
-        bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
+        bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress || workout == Player3D::TitleWorkoutType::ChestPress || workout == Player3D::TitleWorkoutType::WBarbell);
         bool isPullUpWorkout = (workout == Player3D::TitleWorkoutType::PullUp);
 
         // ガチャ結果時は猫の全身（耳から足先まで）が完璧に収まるベストディスタンスに調整！
@@ -1423,7 +1426,7 @@ void GameManager::Update()
             VECTOR pPos = player->GetPos();
             float pRot = player->GetRotY();
 
-            bool isFloorWorkout  = (clearWorkout == Player3D::TitleWorkoutType::PushUp || clearWorkout == Player3D::TitleWorkoutType::SitUp || clearWorkout == Player3D::TitleWorkoutType::BenchPress);
+            bool isFloorWorkout  = (clearWorkout == Player3D::TitleWorkoutType::PushUp || clearWorkout == Player3D::TitleWorkoutType::SitUp || clearWorkout == Player3D::TitleWorkoutType::BenchPress || clearWorkout == Player3D::TitleWorkoutType::ChestPress || clearWorkout == Player3D::TitleWorkoutType::WBarbell);
             bool isPullUpWorkout = (clearWorkout == Player3D::TitleWorkoutType::PullUp);
 
             // 猫の斜め前方から撮影しつつ、画面左側（X ~ 280〜310）に猫の全身＆筋トレ器具が収まるようカメラと注視点を右へオフセット
@@ -2483,7 +2486,7 @@ void GameManager::DrawTitle3DScene()
     float catY = catPos.y;
 
     Player3D::TitleWorkoutType workout = CalcActiveTitleWorkout(m_titleAnimTimer);
-    bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
+    bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress || workout == Player3D::TitleWorkoutType::ChestPress || workout == Player3D::TitleWorkoutType::WBarbell);
     bool isPushUp   = isFloorWorkout;
     bool isTraining = (workout != Player3D::TitleWorkoutType::Idle);
 
@@ -3000,21 +3003,23 @@ void GameManager::UpdatePause(bool triggerEsc)
 
     if (m_pauseMenuItem == 5)
     {
+        const int totalWorkouts = static_cast<int>(WorkoutMotionType::Count);
+        const int cols = 6;
         if (triggerLeft)
         {
-            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 8) % 9;
+            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + totalWorkouts - 1) % totalWorkouts;
             SoundManager::GetInstance().PlaySE(SeType::Cursor);
         }
         if (triggerRight)
         {
-            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 1) % 9;
+            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 1) % totalWorkouts;
             SoundManager::GetInstance().PlaySE(SeType::Cursor);
         }
         if (triggerUp)
         {
-            if (m_pauseSelectedWorkoutBtn >= 5)
+            if (m_pauseSelectedWorkoutBtn >= cols)
             {
-                m_pauseSelectedWorkoutBtn -= 5;
+                m_pauseSelectedWorkoutBtn -= cols;
                 SoundManager::GetInstance().PlaySE(SeType::Cursor);
             }
             else
@@ -3025,9 +3030,9 @@ void GameManager::UpdatePause(bool triggerEsc)
         }
         if (triggerDown)
         {
-            if (m_pauseSelectedWorkoutBtn < 5)
+            if (m_pauseSelectedWorkoutBtn + cols < totalWorkouts)
             {
-                m_pauseSelectedWorkoutBtn = (std::min)(8, m_pauseSelectedWorkoutBtn + 5);
+                m_pauseSelectedWorkoutBtn += cols;
                 SoundManager::GetInstance().PlaySE(SeType::Cursor);
             }
             else
@@ -3722,7 +3727,7 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
 #endif
 
     int modalW = 760;
-    int modalH = 376;
+    int modalH = 424;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
@@ -3764,7 +3769,7 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
     }
 
     // アクションボタン（ガチャ・セーブ・ロード・(Debug削除)）のクリック
-    int actBtnY = modalY + 168;
+    int actBtnY = modalY + 212;
     int actBtnH = 36;
 #ifdef _DEBUG
     const int numTitleActs = 4;
@@ -3796,7 +3801,7 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
     // デバッグモードON時の5つのチートボタンクリック
     if (collMgr.IsDebugMode())
     {
-        int dbgRowY = modalY + 214;
+        int dbgRowY = modalY + 258;
         int dbgRowH = 32;
         int dBtnX[5] = { modalX + 30, modalX + 176, modalX + 322, modalX + 448, modalX + 574 };
         int dBtnW[5] = { 136, 136, 116, 116, 156 };
@@ -3818,16 +3823,19 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
         }
     }
 
-    // 9つの筋トレモーションボタンのホバー＆クリック
-    int topRowY = modalY + 56;
-    int botRowY = modalY + 110;
-    int btnW    = 124;
-    int btnH    = 46;
+    // 12個の筋トレモーションボタンのホバー＆クリック（4列 × 3行）
+    const int totalWorkouts = static_cast<int>(WorkoutMotionType::Count);
+    const int cols = 4;
+    int startY  = modalY + 56;
+    int btnW    = 166;
+    int btnH    = 42;
+    int gapX    = 12;
+    int gapY    = 8;
 
-    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    for (int i = 0; i < totalWorkouts; ++i)
     {
-        int bx = (i < 5) ? (modalX + 30 + i * 140) : (modalX + 100 + (i - 5) * 140);
-        int by = (i < 5) ? topRowY : botRowY;
+        int bx = modalX + 30 + (i % cols) * (btnW + gapX);
+        int by = startY + (i / cols) * (btnH + gapY);
 
         if (mx >= bx && mx <= bx + btnW && my >= by && my <= by + btnH)
         {
@@ -3849,30 +3857,30 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
         }
     }
 
-    // キーボードによる9つのボタン間移動
+    // キーボードによる12個のボタン間移動（4列 × 3行）
     if (triggerLeft)
     {
-        m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 8) % 9;
+        m_selectedWorkoutBtn = (m_selectedWorkoutBtn + totalWorkouts - 1) % totalWorkouts;
         SoundManager::GetInstance().PlaySE(SeType::Cursor);
     }
     if (triggerRight)
     {
-        m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 1) % 9;
+        m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 1) % totalWorkouts;
         SoundManager::GetInstance().PlaySE(SeType::Cursor);
     }
     if (triggerUp)
     {
-        if (m_selectedWorkoutBtn >= 5)
+        if (m_selectedWorkoutBtn >= cols)
         {
-            m_selectedWorkoutBtn -= 5;
+            m_selectedWorkoutBtn -= cols;
             SoundManager::GetInstance().PlaySE(SeType::Cursor);
         }
     }
     if (triggerDown)
     {
-        if (m_selectedWorkoutBtn < 5)
+        if (m_selectedWorkoutBtn + cols < totalWorkouts)
         {
-            m_selectedWorkoutBtn = (std::min)(8, m_selectedWorkoutBtn + 5);
+            m_selectedWorkoutBtn += cols;
             SoundManager::GetInstance().PlaySE(SeType::Cursor);
         }
     }

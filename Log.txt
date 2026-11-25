@@ -1,0 +1,188 @@
+﻿0:ChangeWindowMode実行 
+2:ウインドウモードフラグが立てられました
+8:ＤＸライブラリの初期化処理開始
+12:	システムの情報を出力します
+12:		ＤＸライブラリ Ver3.24f
+12:		論理プロセッサの数 : 8
+12:		ＯＳ  Windows11 ( Build 26300  )
+114:		現時点のＣＰＵ動作速度：大体4.01GHz
+114:		ＭＭＸ命令を使用します
+116:		ＳＳＥ命令が使用可能です
+121:		ＳＳＥ２命令が使用可能です
+123:		ＣＰＵベンダ：GenuineIntel
+134:		ＣＰＵ名：Intel(R) Xeon(R) W-2125 CPU @ 4.00GHz
+134:	ＣＯＭの初期化... 成功
+340:	非同期読み込み処理の初期化...成功
+341:	ファイルアクセス処理の初期化...成功
+342:	メモリ総量:32440.41MB  空きメモリ領域:19421.47MB 
+342:	タイマーの精度を検査します
+343:	精度結果 更新回数 マルチメディアタイマー：0  パフォーマンスカウンター：60
+343:	 パフォーマンスカウンターを使用します タイマー精度 : 10000.000000 KHz 
+343:	 
+344:	ソフトの二重起動検査... 二重起動はされていませんでした
+344:	ウインドウクラスを登録します... 登録に成功しました
+344:	ウインドウモード起動用のウインドウを作成します
+345:	ディスプレイ情報のセットアップ開始
+346:		モニターの数：1  ディスプレイデバイスの数：4
+346:		No.0  モニター名：\\.\DISPLAY1　1920x1080　32bit　59Hz  96x96dpi
+368:	ディスプレイ情報のセットアップ完了
+368:	ウインドウ矩形 ( 304, 129 )-( 1600, 888 )
+400:	ウインドウの作成に成功しました
+400:	ウインドウを表示します
+430:	ＩＭＥを無効にしました
+432:	ウインドウスタイルをウインドウモード用に変更します... 完了
+471:	XInput DLL の読み込み中... 成功
+483:	DirectInput関係初期化処理
+484:		DirectInput8 の取得を試みます...成功
+509:			引き続き初期化処理... 初期化成功
+511:		ジョイパッドの初期化... 
+515:			XInput 対応コントローラーのチェックを開始します
+516:				XInput 対応コントローラー No.0 をチェック
+516:				XInput 対応コントローラー No.0 の接続は確認できませんでした
+516:				XInput 対応コントローラー No.1 をチェック
+516:				XInput 対応コントローラー No.1 の接続は確認できませんでした
+518:				XInput 対応コントローラー No.2 をチェック
+518:				XInput 対応コントローラー No.2 の接続は確認できませんでした
+518:				XInput 対応コントローラー No.3 をチェック
+519:				XInput 対応コントローラー No.3 の接続は確認できませんでした
+519:			XInput 対応コントローラーのチェック完了
+519:			DirectInput 対応ジョイパッドの列挙を開始します
+536:			DirectInput 対応ジョイパッドの列挙終了
+536:		ジョイパッドの初期化は正常に終了しました
+536:		マウスデバイスの初期化... 初期化成功
+537:		キーボードデバイスの初期化... 初期化成功
+541:	DirectInput 関連の初期化は正常に終了しました
+546:	WASAPI の初期化を行います
+554:		デバイス名 : スピーカー / ヘッドホン (Realtek Audio)
+582:	d3d11.dll の読み込み.... 成功
+587:	dxgi.dll の読み込み.... 成功
+587:	API CreateDXGIFactory2 のアドレスを取得します.... 成功
+588:	IDXGIFactory2 を作成します.... 成功
+604:	API CreateDXGIFactory6 のアドレスを取得します.... 成功
+605:	IDXGIAdapter を列挙
+605:		Adapter No.0 Desc:NVIDIA Quadro P2200  VRAM:5008MB
+605:			Output Device No.0 Name:\\.\DISPLAY1 ( 0, 0 )-( 1920, 1080 )
+606:		Adapter No.1 Desc:Microsoft Basic Render Driver  VRAM:0MB
+607:	API D3D11CreateDevice のアドレスを取得します.... 成功
+607:	IDXGIAdapter を取得します.... 成功
+608:	IDXGIAdapter1 を取得します.... 成功
+608:	IDXGIAdapter2 を取得します.... 成功
+611:	IDXGIAdapter3 を取得します.... 成功
+612:	IDXGIAdapter4 を取得します.... 成功
+612:	Direct3D 11 FeatureLevel 11_0 以上を対象とします
+612:	ID3D11Device オブジェクトを取得します.... 成功
+890:	IDXGIDevice1 を取得します.... 成功
+891:	IDXGIDevice1->SetMaximunFrameLatency( 1 ); を実行しました
+891:	[ウインドウモード 1280x720 ( 320, 167 )-( 1600, 887 )]
+891:	IDXGISwapChain2 を作成します.... 成功
+893:	IDXGIFactory2->CreateSwapChainForHwnd の戻り値：0x00000000
+893:	IDXGIOutput を取得します.... 成功
+894:	Graphics Device:NVIDIA Quadro P2200
+894:	画面のフォーマットは DXGI_FORMAT_R8G8B8A8_UNORM です
+894:	16bit Zバッファフォーマットは DXGI_FORMAT_D16_UNORM です
+896:	24bit Zバッファフォーマットは DXGI_FORMAT_D24_UNORM_S8_UINT です
+896:	32bit Zバッファフォーマットは DXGI_FORMAT_D32_FLOAT です
+896:	16bit カラーフォーマットは DXGI_FORMAT_B5G6R5_UNORM です
+896:	32bit カラーフォーマットは DXGI_FORMAT_B8G8R8X8_UNORM です
+896:	アルファ付き 16bit カラーフォーマットは DXGI_FORMAT_B4G4R4A4_UNORM です
+897:	アルファ付き 32bit カラーフォーマットは DXGI_FORMAT_R8G8B8A8_UNORM です
+897:	アルファテスト用 16bit カラーフォーマットは DXGI_FORMAT_B5G5R5A1_UNORM です
+897:	アルファテスト用 32bit カラーフォーマットは DXGI_FORMAT_R8G8B8A8_UNORM です
+897:	ＤＸＴ１テクスチャフォーマットは DXGI_FORMAT_BC1_UNORM です
+897:	ＤＸＴ２テクスチャフォーマットは使えません
+898:	ＤＸＴ３テクスチャフォーマットは DXGI_FORMAT_BC2_UNORM です
+898:	ＤＸＴ４テクスチャフォーマットは使えません
+898:	ＤＸＴ５テクスチャフォーマットは DXGI_FORMAT_BC3_UNORM です
+898:	BC7_UNORM テクスチャフォーマットは DXGI_FORMAT_BC7_UNORM です
+899:	BC7_UNORM_SRGB テクスチャフォーマットは DXGI_FORMAT_BC7_UNORM_SRGB です
+899:	ABGR 整数 16 ビット型カラーフォーマットは DXGI_FORMAT_R16G16B16A16_UNORM です
+900:	ABGR 浮動小数点 16 ビット型カラーフォーマットは DXGI_FORMAT_R16G16B16A16_FLOAT です
+900:	ABGR 浮動小数点 32 ビット型カラーフォーマットは DXGI_FORMAT_R32G32B32A32_FLOAT です
+900:	１チャンネル整数 8 ビット型カラーフォーマットは DXGI_FORMAT_R8_UNORM です
+900:	１チャンネル整数 16 ビット型カラーフォーマットは DXGI_FORMAT_R16_UNORM です
+900:	１チャンネル浮動小数点 16 ビット型カラーフォーマットは DXGI_FORMAT_R16_FLOAT です
+900:	１チャンネル浮動小数点 32 ビット型カラーフォーマットは DXGI_FORMAT_R32_FLOAT です
+901:	２チャンネル整数 8 ビット型カラーフォーマットは DXGI_FORMAT_R8G8_UNORM です
+901:	２チャンネル整数 16 ビット型カラーフォーマットは DXGI_FORMAT_R16G16_UNORM です
+901:	２チャンネル浮動小数点 16 ビット型カラーフォーマットは DXGI_FORMAT_R16G16_FLOAT です
+901:	２チャンネル浮動小数点 32 ビット型カラーフォーマットは DXGI_FORMAT_R32G32_FLOAT です
+901:	描画用 16bit カラーフォーマットは DXGI_FORMAT_B5G6R5_UNORM です
+902:	描画用 32bit カラーフォーマットは DXGI_FORMAT_B8G8R8X8_UNORM です
+902:	描画用アルファ付き 32bit カラーフォーマットは DXGI_FORMAT_R8G8B8A8_UNORM です
+902:	描画用 ABGR 整数 16 ビット型カラーフォーマットは DXGI_FORMAT_R16G16B16A16_UNORM です
+902:	描画用 ABGR 浮動小数点 16 ビット型カラーフォーマットは DXGI_FORMAT_R16G16B16A16_FLOAT です
+902:	描画用 ABGR 浮動小数点 32 ビット型カラーフォーマットは DXGI_FORMAT_R32G32B32A32_FLOAT です
+902:	描画用１チャンネル整数 8 ビット型カラーフォーマットは DXGI_FORMAT_R8_UNORM です
+903:	描画用１チャンネル整数 16 ビット型カラーフォーマットは DXGI_FORMAT_R16_UNORM です
+903:	描画用１チャンネル浮動小数点 16 ビット型カラーフォーマットは DXGI_FORMAT_R16_FLOAT です
+903:	描画用１チャンネル浮動小数点 32 ビット型カラーフォーマットは DXGI_FORMAT_R32_FLOAT です
+903:	描画用２チャンネル整数 8 ビット型カラーフォーマットは DXGI_FORMAT_R8G8_UNORM です
+903:	描画用２チャンネル整数 16 ビット型カラーフォーマットは DXGI_FORMAT_R16G16_UNORM です
+903:	描画用２チャンネル浮動小数点 16 ビット型カラーフォーマットは DXGI_FORMAT_R16G16_FLOAT です
+904:	描画用２チャンネル浮動小数点 32 ビット型カラーフォーマットは DXGI_FORMAT_R32G32_FLOAT です
+904:	使用する機能レベル:D3D_FEATURE_LEVEL_11_1
+904:	同時にレンダリングできるバッファの数:8
+904:	最大テクスチャサイズ　幅:16384 高さ:16384
+904:	標準描画用の頂点バッファの作成.... 成功
+905:	シェーダーコード関係の初期化.... 成功
+946:	各種シェーダー用定数バッファの作成.... 成功
+947:	各種 ID3D11InputLayout の作成.... 成功
+1022:	画像の単純転送処理の初期化... 成功
+1030:	深度バッファを作成します.... 成功
+1034:	フォントの初期化を行います
+1046:	フォントの初期化は正常に終了しました
+2194:	文字コードバッファの初期化を行います... 完了しました
+2209:ＤＸライブラリの初期化処理終了
+2215:[CsvManager] Loaded Status CSV 'Resource/CSV/Statu.csv' (rows=2): Cat(base=4.00, growth=0.10, max=5.50), Mouse(base=4.20, growth=0.05, max=4.70)
+2216:[CsvManager] Loaded Position CSV 'Resource/CSV/Position.csv': Cat positions=1, Mouse positions=8
+2976:SoundManager: Initializing sounds...
+2977:SoundManager: Found TitleBGM at 'Resource/Sounds/TitleBGM.mp3'
+2977:SoundManager: Found mainBGM at 'Resource/Sounds/mainBGM.mp3'
+3671:SoundManager: Loaded BGM [Title] from 'Resource/Sounds/TitleBGM.mp3' (handle=201588736)
+4438:SoundManager: Loaded BGM [Stage/Main] from 'Resource/Sounds/mainBGM.mp3' (handle=201850881)
+4440:SoundManager: Loaded BGM [Clear] from 'Resource/Sounds/bgm_clear.wav' (handle=202113026)
+4441:SoundManager: Loaded BGM [TimeUp] from 'Resource/Sounds/bgm_timeup.wav' (handle=202375171)
+4447:SoundManager: Initialization complete.
+4450:画像ファイル D:\MuscleCat\Resource\UI\hud_status.png がありません
+4451:画像ファイル D:\MuscleCat\Resource\UI\hud_guide.png がありません
+4451:画像ファイル D:\MuscleCat\Resource\UI\hud_overlay.png がありません
+4491:=== MAP 2 (NewMap) COLLISION BUILT ===
+4492:NewMap Bounds: Min=(-2310.0, -5.0, -1837.5), Max=(2610.0, 200.0, 1460.0), WallPolygons=1798
+4498:=== MAP 2 (NewMap) COLLISION BUILT ===
+4498:NewMap Bounds: Min=(-2310.0, -5.0, -1837.5), Max=(2610.0, 200.0, 1460.0), WallPolygons=1798
+7342:SoundManager: PlayBGM(type=0, handle=201588736, loop=1)
+17131:[CsvManager] Loaded Status CSV 'Resource/CSV/Statu.csv' (rows=2): Cat(base=4.00, growth=0.10, max=5.50), Mouse(base=4.20, growth=0.05, max=4.70)
+17135:[CsvManager] Loaded Position CSV 'Resource/CSV/Position.csv': Cat positions=1, Mouse positions=8
+17140:=== MAP 2 (NewMap) COLLISION BUILT ===
+17141:NewMap Bounds: Min=(-2310.0, -5.0, -1837.5), Max=(2610.0, 200.0, 1460.0), WallPolygons=1798
+17155:SoundManager: PlayBGM(type=1, handle=201850881, loop=1)
+120044:SoundManager: PlayBGM(type=2, handle=202113026, loop=0)
+134479:=== MAP 2 (NewMap) COLLISION BUILT ===
+134480:NewMap Bounds: Min=(-2310.0, -5.0, -1837.5), Max=(2610.0, 200.0, 1460.0), WallPolygons=1798
+134491:SoundManager: PlayBGM(type=0, handle=201588736, loop=1)
+147674:[CsvManager] Loaded Status CSV 'Resource/CSV/Statu.csv' (rows=2): Cat(base=4.00, growth=0.10, max=5.50), Mouse(base=4.20, growth=0.05, max=4.70)
+147677:[CsvManager] Loaded Position CSV 'Resource/CSV/Position.csv': Cat positions=1, Mouse positions=8
+147682:=== MAP 2 (NewMap) COLLISION BUILT ===
+147682:NewMap Bounds: Min=(-2310.0, -5.0, -1837.5), Max=(2610.0, 200.0, 1460.0), WallPolygons=1798
+147701:SoundManager: PlayBGM(type=1, handle=201850881, loop=1)
+179510:SoundManager: PlayBGM(type=2, handle=202113026, loop=0)
+187835:=== MAP 2 (NewMap) COLLISION BUILT ===
+187836:NewMap Bounds: Min=(-2310.0, -5.0, -1837.5), Max=(2610.0, 200.0, 1460.0), WallPolygons=1798
+187842:SoundManager: PlayBGM(type=0, handle=201588736, loop=1)
+297132:ウインドウを閉じようとしています
+297141:ウインドウが破棄されようとしています
+297142:ソフトを終了する準備が整いました
+297202:フォントの初期化を行います
+297202:フォントの初期化は正常に終了しました
+297298:d3d11.dll の解放 1
+297299:dxgi.dll の解放 1
+297300:Direct3D11 のオブジェクト数を出力
+297300:Direct3D11 のオブジェクト合計数 : 0
+297307:DirectInput 関連の終了処理... 完了
+297311:サウンド関連の終了処理... 完了
+297318:ウィンドウ関連の終了処理... 完了
+297383:ＣＯＭを終了... 完了
+297384:
+297384:Alloc memory dump
+297386:	Total size:0(0.000kb)  Alloc num:0
+297386:
