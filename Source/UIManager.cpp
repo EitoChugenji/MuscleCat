@@ -249,11 +249,11 @@ namespace
     // 筋トレアニメーション選択ボタン（9種・2段グリッド）の座標算出ヘルパー
     void GetWorkoutBtnRect(int cardX, int cardY, int cardW, int cardH, int index, int& outX, int& outY, int& outW, int& outH)
     {
-        const int padX = 8;
-        const int gapX = 4;
-        const int gapY = 4;
-        const int headerH = 22;
-        const int btnH = 28;
+        const int padX = 12;
+        const int gapX = 8;
+        const int gapY = 6;
+        const int headerH = 26;
+        const int btnH = 34;
 
         if (index < 5)
         {
@@ -278,10 +278,10 @@ namespace
     // 筋トレコレクションアクションボタン（ガチャ・セーブ・ロード・(Debug削除)）の座標算出ヘルパー
     void GetWorkoutActionBtnRect(int cardX, int cardY, int cardW, int cardH, int actionIdx, int& outX, int& outY, int& outW, int& outH)
     {
-        const int padX = 8;
-        const int gapX = 6;
-        const int actY = cardY + 22 + 28 * 2 + 4 + 7; // cardY + 89
-        const int actH = 26;
+        const int padX = 12;
+        const int gapX = 8;
+        const int actY = cardY + 26 + 34 * 2 + 6 + 10; // cardY + 110
+        const int actH = 28;
         outY = actY;
         outH = actH;
 
@@ -460,7 +460,7 @@ namespace
         }
 
         // 5. フッターステータス ＆ セーブコード表示
-        int footerY = y + 122;
+        int footerY = y + 148;
         if (collMgr.GetStatusMessageTimer() > 0)
         {
             const auto& msg = collMgr.GetStatusMessage();
@@ -760,92 +760,11 @@ void UIManager::DrawGameClearScreen(GameManager& gm)
     DrawStringToHandle(chX, panelY + 13, caughtHeaderBuf, colYellow, font16);
 
     // =========================================================================
-    // 4. ヒーローセクション（上段 Y = 58〜232：左にランクスタンプ、右に総合スコア＆ゲージ）
+    // 4. メイン表示（通常: ランク＋特大TOTAL SCOREのみスッキリ表示 / 詳細ON時: 内訳4項目表示）
     // =========================================================================
-    int heroY = panelY + 58;
-    int heroH = 166;
+    int earnedPoints = workoutSuccess * WorkoutCollectionManager::POINTS_PER_WORKOUT;
+    int totalPoints  = WorkoutCollectionManager::GetInstance().GetProteinPoints();
 
-    // --- 4A. 左ボックス：S / A / B / C ランクスタンプ ---
-    int stampBoxX = panelX + 18;
-    int stampBoxW = 232;
-    SoftUI::DrawSoftCard(stampBoxX, heroY, stampBoxW, heroH, 16, GetColor(12, 15, 26), 240, rankMainCol, 2, true, rankMainCol);
-
-    int rankCX = stampBoxX + stampBoxW / 2;
-    int rankCY = heroY + 68;
-
-    float stampProgress = MathHelper::Clamp(uiTimer / 14.0f, 0.0f, 1.0f);
-    float stampBounce = (uiTimer >= 14 && uiTimer < 26)
-        ? std::sin((uiTimer - 14) * 0.5f) * 0.08f
-        : 0.0f;
-    float burstScale = stampProgress + stampBounce;
-
-    // アメコミ風ギザギザ爆発フラッシュ（スタンプ背面）
-    constexpr int NUM_VERTICES = 24;
-    for (int layer = 0; layer < 3; ++layer)
-    {
-        float rOuterBase = (layer == 0 ? 64.0f : (layer == 1 ? 58.0f : 46.0f)) * burstScale;
-        float rInnerBase = (layer == 0 ? 44.0f : (layer == 1 ? 38.0f : 30.0f)) * burstScale;
-        unsigned int layerCol = (layer == 0) ? colBlack : (layer == 1 ? ((rankLetter[0] == 'S') ? colNeonRed : colOrange) : colYellow);
-        float angleOffset = (layer == 2) ? (-animSec * 0.30f + 0.2f) : (animSec * 0.22f);
-
-        int vx[NUM_VERTICES];
-        int vy[NUM_VERTICES];
-        int ox = (layer == 0) ? 4 : 0;
-        int oy = (layer == 0) ? 4 : 0;
-
-        for (int i = 0; i < NUM_VERTICES; ++i)
-        {
-            float angle = angleOffset + (MathHelper::PI * 2.0f * i) / NUM_VERTICES;
-            float r = (i % 2 == 0) ? rOuterBase : rInnerBase;
-            vx[i] = rankCX + ox + static_cast<int>(std::cos(angle) * r);
-            vy[i] = rankCY + oy + static_cast<int>(std::sin(angle) * r);
-        }
-        for (int i = 0; i < NUM_VERTICES; ++i)
-        {
-            int next = (i + 1) % NUM_VERTICES;
-            DrawTriangle(rankCX + ox, rankCY + oy, vx[i], vy[i], vx[next], vy[next], layerCol, TRUE);
-        }
-    }
-
-    // 特大ランク文字（S / A / B / C）の3D立体描画
-    int rLetterW = GetDrawStringWidthToHandle(rankLetter, static_cast<int>(strlen(rankLetter)), font96);
-    int rLetterX = rankCX - rLetterW / 2;
-    int rLetterY = rankCY - 48;
-
-    for (int d = 3; d <= 6; ++d)
-    {
-        DrawStringToHandle(rLetterX + d, rLetterY + d, rankLetter, colBlack, font96);
-    }
-    for (int dy = -3; dy <= 3; ++dy)
-    {
-        for (int dx = -3; dx <= 3; ++dx)
-        {
-            if (dx != 0 || dy != 0)
-            {
-                DrawStringToHandle(rLetterX + dx, rLetterY + dy, rankLetter, colBlack, font96);
-            }
-        }
-    }
-    DrawStringToHandle(rLetterX, rLetterY + 2, rankLetter, rankSubCol, font96);
-    DrawStringToHandle(rLetterX, rLetterY,     rankLetter, rankMainCol, font96);
-    DrawStringToHandle(rLetterX, rLetterY - 2, rankLetter, colWhite, font96);
-
-    // ランク称号リボン（スタンプ下部）
-    int ribbonW = stampBoxW - 20;
-    int ribbonH = 28;
-    int ribbonX = stampBoxX + 10;
-    int ribbonY = heroY + heroH - 36;
-    DrawRoundRect(ribbonX, ribbonY, ribbonX + ribbonW, ribbonY + ribbonH, 8, 8, rankMainCol, TRUE);
-    DrawRoundRect(ribbonX, ribbonY, ribbonX + ribbonW, ribbonY + ribbonH, 8, 8, colBlack, FALSE);
-    int rTitleW = GetDrawStringWidthToHandle(rankTitle, static_cast<int>(strlen(rankTitle)), font16);
-    DrawStringToHandle(rankCX - rTitleW / 2, ribbonY + 5, rankTitle, colBlack, font16);
-
-    // --- 4B. 右ボックス：TOTAL SCORE ＆ S/A/B/C ランク到達ゲージ ---
-    int scoreBoxX = stampBoxX + stampBoxW + 14;
-    int scoreBoxW = panelW - (scoreBoxX - panelX) - 18;
-    SoftUI::DrawSoftCard(scoreBoxX, heroY, scoreBoxW, heroH, 16, GetColor(12, 15, 26), 240, colGold, 1);
-
-    DrawStringToHandle(scoreBoxX + 18, heroY + 12, "TOTAL SCORE", colGold, font18);
     char scoreSubLabel[96];
     if (caughtMice >= totalMice)
     {
@@ -857,146 +776,249 @@ void UIManager::DrawGameClearScreen(GameManager& gm)
         int penaltyPct = 100 - caughtPct;
         snprintf(scoreSubLabel, sizeof(scoreSubLabel), "捕獲率 %d%% (%d/%d匹 : %d匹未捕獲で-%d%%)", caughtPct, caughtMice, totalMice, missed, penaltyPct);
     }
-    DrawStringToHandle(scoreBoxX + 148, heroY + 15, scoreSubLabel, (caughtMice >= totalMice) ? GetColor(100, 245, 140) : GetColor(255, 130, 120), font13);
 
     char totalScoreStr[48];
     snprintf(totalScoreStr, sizeof(totalScoreStr), "%d PTS", dispTotalScore);
-    int tsW = GetDrawStringWidthToHandle(totalScoreStr, static_cast<int>(strlen(totalScoreStr)), font48);
-    int tsX = scoreBoxX + scoreBoxW - tsW - 20;
-    int tsY = heroY + 38;
-    DrawStringToHandle(tsX + 3, tsY + 3, totalScoreStr, colBlack, font48);
-    DrawStringToHandle(tsX,     tsY,     totalScoreStr, colYellow, font48);
 
-    // ランク到達プログレスバー（0 〜 17500 PTS）
-    int barX = scoreBoxX + 18;
-    int barY = heroY + 104;
-    int barW = scoreBoxW - 36;
-    int barH = 16;
-    float maxBarScore = 17500.0f;
-    float barRatio = MathHelper::Clamp(static_cast<float>(dispTotalScore) / maxBarScore, 0.0f, 1.0f);
+    float stampProgress = MathHelper::Clamp(uiTimer / 14.0f, 0.0f, 1.0f);
+    float stampBounce = (uiTimer >= 14 && uiTimer < 26)
+        ? std::sin((uiTimer - 14) * 0.5f) * 0.08f
+        : 0.0f;
+    float burstScale = stampProgress + stampBounce;
 
-    DrawRoundRect(barX, barY, barX + barW, barY + barH, 6, 6, GetColor(24, 30, 46), TRUE);
-    int fillW = static_cast<int>(barW * barRatio);
-    if (fillW > 4)
+    if (!gm.m_showClearDetails)
     {
-        DrawRoundRect(barX + 1, barY + 1, barX + fillW, barY + barH - 1, 5, 5, rankMainCol, TRUE);
+        // =====================================================================
+        // 【シンプル表示モード】特大ランクスタンプ ＆ 超特大 TOTAL SCORE を中央に堂々配置
+        // =====================================================================
+        int heroY = panelY + 62;
+        int heroH = 368;
+        int boxX  = panelX + 20;
+        int boxW  = panelW - 40;
+
+        SoftUI::DrawSoftCard(boxX, heroY, boxW, heroH, 20, GetColor(12, 15, 26), 242, rankMainCol, 2, true, rankMainCol);
+
+        // 上段：左にランクスタンプ、右に「TOTAL SCORE」＋超特大スコア数字
+        int rankCX = boxX + 128;
+        int rankCY = heroY + 118;
+
+        constexpr int NUM_VERTICES = 24;
+        for (int layer = 0; layer < 3; ++layer)
+        {
+            float rOuterBase = (layer == 0 ? 78.0f : (layer == 1 ? 70.0f : 56.0f)) * burstScale;
+            float rInnerBase = (layer == 0 ? 54.0f : (layer == 1 ? 46.0f : 36.0f)) * burstScale;
+            unsigned int layerCol = (layer == 0) ? colBlack : (layer == 1 ? ((rankLetter[0] == 'S') ? colNeonRed : colOrange) : colYellow);
+            float angleOffset = (layer == 2) ? (-animSec * 0.30f + 0.2f) : (animSec * 0.22f);
+
+            int vx[NUM_VERTICES];
+            int vy[NUM_VERTICES];
+            int ox = (layer == 0) ? 4 : 0;
+            int oy = (layer == 0) ? 4 : 0;
+            for (int i = 0; i < NUM_VERTICES; ++i)
+            {
+                float angle = angleOffset + (MathHelper::PI * 2.0f * i) / NUM_VERTICES;
+                float r = (i % 2 == 0) ? rOuterBase : rInnerBase;
+                vx[i] = rankCX + ox + static_cast<int>(std::cos(angle) * r);
+                vy[i] = rankCY + oy + static_cast<int>(std::sin(angle) * r);
+            }
+            for (int i = 0; i < NUM_VERTICES; ++i)
+            {
+                int next = (i + 1) % NUM_VERTICES;
+                DrawTriangle(rankCX + ox, rankCY + oy, vx[i], vy[i], vx[next], vy[next], layerCol, TRUE);
+            }
+        }
+
+        int rLetterW = GetDrawStringWidthToHandle(rankLetter, static_cast<int>(strlen(rankLetter)), font96);
+        int rLetterX = rankCX - rLetterW / 2;
+        int rLetterY = rankCY - 48;
+        for (int d = 3; d <= 6; ++d) DrawStringToHandle(rLetterX + d, rLetterY + d, rankLetter, colBlack, font96);
+        for (int dy = -3; dy <= 3; ++dy)
+            for (int dx = -3; dx <= 3; ++dx)
+                if (dx != 0 || dy != 0) DrawStringToHandle(rLetterX + dx, rLetterY + dy, rankLetter, colBlack, font96);
+        DrawStringToHandle(rLetterX, rLetterY + 2, rankLetter, rankSubCol, font96);
+        DrawStringToHandle(rLetterX, rLetterY,     rankLetter, rankMainCol, font96);
+        DrawStringToHandle(rLetterX, rLetterY - 2, rankLetter, colWhite, font96);
+
+        // ランク称号リボン
+        int ribbonW = 216;
+        int ribbonH = 30;
+        int ribbonX = rankCX - ribbonW / 2;
+        int ribbonY = heroY + 206;
+        DrawRoundRect(ribbonX, ribbonY, ribbonX + ribbonW, ribbonY + ribbonH, 8, 8, rankMainCol, TRUE);
+        DrawRoundRect(ribbonX, ribbonY, ribbonX + ribbonW, ribbonY + ribbonH, 8, 8, colBlack, FALSE);
+        int rTitleW = GetDrawStringWidthToHandle(rankTitle, static_cast<int>(strlen(rankTitle)), font16);
+        DrawStringToHandle(rankCX - rTitleW / 2, ribbonY + 6, rankTitle, colBlack, font16);
+
+        // 右側：超特大 TOTAL SCORE（font60 で大きく強調表示）
+        int rightAreaX = boxX + 252;
+        int rightAreaW = boxW - 270;
+
+        DrawStringToHandle(rightAreaX, heroY + 34, "TOTAL SCORE", colGold, font24);
+        DrawStringToHandle(rightAreaX, heroY + 66, scoreSubLabel, (caughtMice >= totalMice) ? GetColor(100, 245, 140) : GetColor(255, 130, 120), font16);
+
+        int tsW = GetDrawStringWidthToHandle(totalScoreStr, static_cast<int>(strlen(totalScoreStr)), font60);
+        int tsX = rightAreaX + (rightAreaW - tsW) / 2;
+        int tsY = heroY + 104;
+        DrawStringToHandle(tsX + 4, tsY + 4, totalScoreStr, colBlack, font60);
+        DrawStringToHandle(tsX,     tsY,     totalScoreStr, colYellow, font60);
+
+        // ランク到達プログレスバー（0 〜 17500 PTS）
+        int barX = boxX + 28;
+        int barY = heroY + 266;
+        int barW = boxW - 56;
+        int barH = 20;
+        float maxBarScore = 17500.0f;
+        float barRatio = MathHelper::Clamp(static_cast<float>(dispTotalScore) / maxBarScore, 0.0f, 1.0f);
+
+        DrawRoundRect(barX, barY, barX + barW, barY + barH, 8, 8, GetColor(24, 30, 46), TRUE);
+        int fillW = static_cast<int>(barW * barRatio);
+        if (fillW > 4) DrawRoundRect(barX + 1, barY + 1, barX + fillW, barY + barH - 1, 7, 7, rankMainCol, TRUE);
+        DrawRoundRect(barX, barY, barX + barW, barY + barH, 8, 8, GetColor(90, 110, 145), FALSE);
+
+        int tickB = barX + static_cast<int>(barW * (SCORE_RANK_B / maxBarScore));
+        int tickA = barX + static_cast<int>(barW * (SCORE_RANK_A / maxBarScore));
+        int tickS = barX + static_cast<int>(barW * (SCORE_RANK_S / maxBarScore));
+        DrawLine(tickB, barY - 4, tickB, barY + barH + 4, colYellow);
+        DrawLine(tickA, barY - 4, tickA, barY + barH + 4, colOrange);
+        DrawLine(tickS, barY - 4, tickS, barY + barH + 4, colGold);
+
+        char critBuf[96];
+        snprintf(critBuf, sizeof(critBuf), "S >= %d   |   A >= %d   |   B >= %d   |   C < %d",
+                 SCORE_RANK_S, SCORE_RANK_A, SCORE_RANK_B, SCORE_RANK_B);
+        int cW = GetDrawStringWidthToHandle(critBuf, static_cast<int>(strlen(critBuf)), font16);
+        DrawStringToHandle(boxX + (boxW - cW) / 2, barY + 30, critBuf, GetColor(220, 230, 245), font16);
+
+        // プロテインポイント獲得バナー（シンプル表示下部にコンパクト配置）
+        int ptCardY = heroY + heroH + 14;
+        int ptCardH = 52;
+        SoftUI::DrawSoftCard(boxX, ptCardY, boxW, ptCardH, 12, GetColor(16, 22, 38), 245, colGold, 1);
+
+        int pBadgeW = 96;
+        int pBadgeH = 30;
+        int pBadgeX = boxX + 14;
+        int pBadgeY = ptCardY + (ptCardH - pBadgeH) / 2;
+        SoftUI::DrawSoftCard(pBadgeX, pBadgeY, pBadgeW, pBadgeH, 8, colOrange, 255, colGold, 1);
+        const char* pBadgeText = "PROTEIN";
+        int pbW = GetDrawStringWidthToHandle(pBadgeText, static_cast<int>(strlen(pBadgeText)), font16);
+        DrawStringToHandle(pBadgeX + (pBadgeW - pbW) / 2, pBadgeY + 7, pBadgeText, colBlack, font16);
+
+        char earnedText[64];
+        snprintf(earnedText, sizeof(earnedText), "獲得: +%d pt", earnedPoints);
+        DrawStringToHandle(pBadgeX + pBadgeW + 18, ptCardY + 17, earnedText, colYellow, font18);
+
+        char totalText[64];
+        snprintf(totalText, sizeof(totalText), "総所持: %d pt", totalPoints);
+        int ttW = GetDrawStringWidthToHandle(totalText, static_cast<int>(strlen(totalText)), font18);
+        DrawStringToHandle(boxX + boxW - ttW - 18, ptCardY + 17, totalText, colGold, font18);
     }
-    DrawRoundRect(barX, barY, barX + barW, barY + barH, 6, 6, GetColor(90, 110, 145), FALSE);
-
-    // B (4500), A (6500), S (8500) の境界目盛り線
-    int tickB = barX + static_cast<int>(barW * (SCORE_RANK_B / maxBarScore));
-    int tickA = barX + static_cast<int>(barW * (SCORE_RANK_A / maxBarScore));
-    int tickS = barX + static_cast<int>(barW * (SCORE_RANK_S / maxBarScore));
-    DrawLine(tickB, barY - 3, tickB, barY + barH + 3, colYellow);
-    DrawLine(tickA, barY - 3, tickA, barY + barH + 3, colOrange);
-    DrawLine(tickS, barY - 3, tickS, barY + barH + 3, colGold);
-
-    // ランク基準ガイド
-    char critBuf[96];
-    snprintf(critBuf, sizeof(critBuf), "S >= %d   |   A >= %d   |   B >= %d   |   C < %d",
-             SCORE_RANK_S, SCORE_RANK_A, SCORE_RANK_B, SCORE_RANK_B);
-    DrawStringToHandle(barX, heroY + 130, critBuf, GetColor(220, 230, 245), font13);
-
-    // =========================================================================
-    // 5. スコア内訳4項目カード（残り時間・最大コンボ数・筋トレ成功回数・最大レベル）
-    // =========================================================================
-    int rowX   = panelX + 18;
-    int rowW   = panelW - 36;
-    int rowH   = 60;
-    int rowGap = 6;
-    int startRowY = heroY + heroH + 10;
-
-    auto DrawScoreBreakdownRow = [&](int rowIndex, const char* title, const char* subFormula,
-                                     const char* valueStr, int scorePts, unsigned int accentCol)
+    else
     {
-        int ry = startRowY + rowIndex * (rowH + rowGap);
+        // =====================================================================
+        // 【詳細表示モード】上段コンパクト要約 ＋ スコア内訳4項目 ＋ プロテイン情報
+        // =====================================================================
+        int rowX = panelX + 18;
+        int rowW = panelW - 36;
 
-        SoftUI::DrawSoftCard(rowX, ry, rowW, rowH, 12, GetColor(12, 15, 26), 238, accentCol, 1);
-        DrawRoundRect(rowX + 3, ry + 4, rowX + 9, ry + rowH - 4, 3, 3, accentCol, TRUE);
+        // 上段：コンパクトな総合スコアサマリーバー
+        int sumY = panelY + 56;
+        int sumH = 74;
+        SoftUI::DrawSoftCard(rowX, sumY, rowW, sumH, 14, GetColor(12, 15, 26), 242, colGold, 1);
+        DrawFormatStringToHandle(rowX + 18, sumY + 14, rankMainCol, font48, "%s", rankLetter);
+        DrawStringToHandle(rowX + 76, sumY + 12, "TOTAL SCORE", colGold, font16);
+        DrawStringToHandle(rowX + 76, sumY + 38, scoreSubLabel, (caughtMice >= totalMice) ? GetColor(100, 245, 140) : GetColor(255, 130, 120), font13);
 
-        // 項目タイトル（左上）＆ 計算式サブテキスト（左下）
-        DrawStringToHandle(rowX + 18, ry + 9,  title, accentCol, font16);
-        DrawStringToHandle(rowX + 18, ry + 34, subFormula, GetColor(170, 190, 215), font13);
+        int tsW = GetDrawStringWidthToHandle(totalScoreStr, static_cast<int>(strlen(totalScoreStr)), font36);
+        DrawStringToHandle(rowX + rowW - tsW - 18, sumY + 18, totalScoreStr, colYellow, font36);
 
-        // 加算スコアピルバッジ（右端）
-        int pillW = 160;
-        int pillH = 40;
-        int pillX = rowX + rowW - pillW - 12;
-        int pillY = ry + (rowH - pillH) / 2;
-        SoftUI::DrawSoftCard(pillX, pillY, pillW, pillH, 10, GetColor(24, 30, 48), 245, accentCol, 1);
+        // スコア内訳4項目カード
+        int rowH      = 64;
+        int rowGap    = 8;
+        int startRowY = sumY + sumH + 12;
 
-        int dispPts = static_cast<int>(scorePts * countUpRatio + 0.5f);
-        char ptsBuf[32];
-        snprintf(ptsBuf, sizeof(ptsBuf), "+%d PTS", dispPts);
-        int pW = GetDrawStringWidthToHandle(ptsBuf, static_cast<int>(strlen(ptsBuf)), font24);
-        int pX = pillX + (pillW - pW) / 2;
-        int pY = pillY + (pillH - 24) / 2;
-        DrawStringToHandle(pX + 2, pY + 2, ptsBuf, colBlack, font24);
-        DrawStringToHandle(pX,     pY,     ptsBuf, colYellow, font24);
+        auto DrawScoreBreakdownRow = [&](int rowIndex, const char* title, const char* subFormula,
+                                         const char* valueStr, int scorePts, unsigned int accentCol)
+        {
+            int ry = startRowY + rowIndex * (rowH + rowGap);
 
-        // 記録値（ピル左側の空きスペースにゆったり配置、文字衝突を防止）
-        int valW = GetDrawStringWidthToHandle(valueStr, static_cast<int>(strlen(valueStr)), font24);
-        int valX = pillX - 16 - valW;
-        int valY = ry + (rowH - 24) / 2;
-        DrawStringToHandle(valX + 2, valY + 2, valueStr, colBlack, font24);
-        DrawStringToHandle(valX,     valY,     valueStr, colWhite, font24);
-    };
+            SoftUI::DrawSoftCard(rowX, ry, rowW, rowH, 12, GetColor(12, 15, 26), 238, accentCol, 1);
+            DrawRoundRect(rowX + 3, ry + 4, rowX + 9, ry + rowH - 4, 3, 3, accentCol, TRUE);
 
-    // 項目1: 残り時間 (TIME LEFT)
-    int totalCentisec = static_cast<int>(remainSec * 100.0f + 0.5f);
-    int minutes  = totalCentisec / 6000;
-    int seconds  = (totalCentisec / 100) % 60;
-    int centisec = totalCentisec % 100;
-    char timeValStr[32];
-    snprintf(timeValStr, sizeof(timeValStr), "%02d:%02d.%02d", minutes, seconds, centisec);
-    char timeSubStr[96];
-    snprintf(timeSubStr, sizeof(timeSubStr), "クリアタイム: %.2f秒 (残り1秒 × 50 PTS)", gm.m_clearTimeSeconds);
-    DrawScoreBreakdownRow(0, "【TIME】 残り時間 (TIME LEFT)", timeSubStr, timeValStr, timeScore, colYellow);
+            DrawStringToHandle(rowX + 18, ry + 10, title, accentCol, font16);
+            DrawStringToHandle(rowX + 18, ry + 36, subFormula, GetColor(170, 190, 215), font13);
 
-    // 項目2: 最大コンボ数 (MAX COMBO)
-    char comboValStr[32];
-    snprintf(comboValStr, sizeof(comboValStr), "%d COMBO", maxCombo);
-    DrawScoreBreakdownRow(1, "【COMBO】 最大コンボ数 (MAX COMBO)", "ネズミ連続捕獲数 (1コンボ × 500 PTS)", comboValStr, comboScore, colCyan);
+            int pillW = 160;
+            int pillH = 40;
+            int pillX = rowX + rowW - pillW - 12;
+            int pillY = ry + (rowH - pillH) / 2;
+            SoftUI::DrawSoftCard(pillX, pillY, pillW, pillH, 10, GetColor(24, 30, 48), 245, accentCol, 1);
 
-    // 項目3: 筋トレ成功回数 (WORKOUT SUCCESS)
-    char workoutValStr[32];
-    snprintf(workoutValStr, sizeof(workoutValStr), "%d 回", workoutSuccess);
-    DrawScoreBreakdownRow(2, "【PUMP】 筋トレ成功回数 (WORKOUT SUCCESS)", "筋トレQTE成功 (1回 × 100 PTS)", workoutValStr, workoutScore, colGreen);
+            int dispPts = static_cast<int>(scorePts * countUpRatio + 0.5f);
+            char ptsBuf[32];
+            snprintf(ptsBuf, sizeof(ptsBuf), "+%d PTS", dispPts);
+            int pW = GetDrawStringWidthToHandle(ptsBuf, static_cast<int>(strlen(ptsBuf)), font24);
+            int pX = pillX + (pillW - pW) / 2;
+            int pY = pillY + (pillH - 24) / 2;
+            DrawStringToHandle(pX + 2, pY + 2, ptsBuf, colBlack, font24);
+            DrawStringToHandle(pX,     pY,     ptsBuf, colYellow, font24);
 
-    // 項目4: 最大レベル (MAX LEVEL)
-    char lvValStr[32];
-    snprintf(lvValStr, sizeof(lvValStr), "Lv. %d", maxLevel);
-    DrawScoreBreakdownRow(3, "【LEVEL】 最大レベル (MAX LEVEL)", "最高到達マッスルレベル (1Lv × 400 PTS)", lvValStr, levelScore, colOrange);
+            int valW = GetDrawStringWidthToHandle(valueStr, static_cast<int>(strlen(valueStr)), font24);
+            int valX = pillX - 16 - valW;
+            int valY = ry + (rowH - 24) / 2;
+            DrawStringToHandle(valX + 2, valY + 2, valueStr, colBlack, font24);
+            DrawStringToHandle(valX,     valY,     valueStr, colWhite, font24);
+        };
+
+        int totalCentisec = static_cast<int>(remainSec * 100.0f + 0.5f);
+        int minutes  = totalCentisec / 6000;
+        int seconds  = (totalCentisec / 100) % 60;
+        int centisec = totalCentisec % 100;
+        char timeValStr[32];
+        snprintf(timeValStr, sizeof(timeValStr), "%02d:%02d.%02d", minutes, seconds, centisec);
+        char timeSubStr[96];
+        snprintf(timeSubStr, sizeof(timeSubStr), "クリアタイム: %.2f秒 (残り1秒 × 50 PTS)", gm.m_clearTimeSeconds);
+        DrawScoreBreakdownRow(0, "【TIME】 残り時間 (TIME LEFT)", timeSubStr, timeValStr, timeScore, colYellow);
+
+        char comboValStr[32];
+        snprintf(comboValStr, sizeof(comboValStr), "%d COMBO", maxCombo);
+        DrawScoreBreakdownRow(1, "【COMBO】 最大コンボ数 (MAX COMBO)", "ネズミ連続捕獲数 (1コンボ × 500 PTS)", comboValStr, comboScore, colCyan);
+
+        char workoutValStr[32];
+        snprintf(workoutValStr, sizeof(workoutValStr), "%d 回", workoutSuccess);
+        DrawScoreBreakdownRow(2, "【PUMP】 筋トレ成功回数 (WORKOUT SUCCESS)", "筋トレQTE成功 (1回 × 100 PTS)", workoutValStr, workoutScore, colGreen);
+
+        char lvValStr[32];
+        snprintf(lvValStr, sizeof(lvValStr), "Lv. %d", maxLevel);
+        DrawScoreBreakdownRow(3, "【LEVEL】 最大レベル (MAX LEVEL)", "最高到達マッスルレベル (1Lv × 400 PTS)", lvValStr, levelScore, colOrange);
+
+        // プロテイン獲得サマリー
+        int ptY = startRowY + 4 * (rowH + rowGap) + 6;
+        char ptSummary[96];
+        snprintf(ptSummary, sizeof(ptSummary), "★ 獲得プロテイン: +%d pt  /  総所持: %d pt", earnedPoints, totalPoints);
+        int ptsW = GetDrawStringWidthToHandle(ptSummary, static_cast<int>(strlen(ptSummary)), font16);
+        DrawStringToHandle(rowX + (rowW - ptsW) / 2, ptY + 4, ptSummary, colGold, font16);
+    }
 
     // =========================================================================
-    // 5B. プロテインポイント獲得バナー（独立した専用カードとして配置し重なりを解消）
+    // 5. 詳細表示トグルボタン（RETRY / MAIN MENU の直上に配置）
     // =========================================================================
-    int earnedPoints = workoutSuccess * WorkoutCollectionManager::POINTS_PER_WORKOUT;
-    int totalPoints  = WorkoutCollectionManager::GetInstance().GetProteinPoints();
-    int ptCardY      = startRowY + 4 * (rowH + rowGap) + 6;
-    int ptCardH      = 44;
+    int mx = 0, my = 0;
+    GetMousePoint(&mx, &my);
+    int detBtnX = 568;
+    int detBtnY = 524;
+    int detBtnW = 672;
+    int detBtnH = 44;
+    bool hoverDetail = (mx >= detBtnX && mx <= detBtnX + detBtnW && my >= detBtnY && my <= detBtnY + detBtnH);
 
-    SoftUI::DrawSoftCard(rowX, ptCardY, rowW, ptCardH, 12, GetColor(16, 22, 38), 245, colGold, 1);
+    SoftUI::DrawSoftCard(detBtnX, detBtnY, detBtnW, detBtnH, 14,
+                         hoverDetail ? GetColor(48, 68, 108) : GetColor(26, 36, 58), 245,
+                         hoverDetail ? colYellow : colCyan, hoverDetail ? 2 : 1,
+                         hoverDetail, colCyan);
 
-    // 左側：アイコンバッジ [ PROTEIN ]
-    int pBadgeW = 96;
-    int pBadgeH = 28;
-    int pBadgeX = rowX + 12;
-    int pBadgeY = ptCardY + (ptCardH - pBadgeH) / 2;
-    SoftUI::DrawSoftCard(pBadgeX, pBadgeY, pBadgeW, pBadgeH, 8, colOrange, 255, colGold, 1);
-    const char* pBadgeText = "PROTEIN";
-    int pbW = GetDrawStringWidthToHandle(pBadgeText, static_cast<int>(strlen(pBadgeText)), font16);
-    DrawStringToHandle(pBadgeX + (pBadgeW - pbW) / 2, pBadgeY + 6, pBadgeText, colBlack, font16);
-
-    // 獲得プロテイン ＆ 総所持プロテイン
-    char earnedText[64];
-    snprintf(earnedText, sizeof(earnedText), "獲得: +%d pt (1回につき+%d pt)", earnedPoints, WorkoutCollectionManager::POINTS_PER_WORKOUT);
-    DrawStringToHandle(pBadgeX + pBadgeW + 16, ptCardY + 13, earnedText, colYellow, font16);
-
-    char totalText[64];
-    snprintf(totalText, sizeof(totalText), "総所持: %d pt", totalPoints);
-    int ttW = GetDrawStringWidthToHandle(totalText, static_cast<int>(strlen(totalText)), font16);
-    DrawStringToHandle(rowX + rowW - ttW - 18, ptCardY + 13, totalText, colGold, font16);
+    const char* detLabel = gm.m_showClearDetails
+        ? "▲ スコア詳細を閉じる  (クリック / [I] キー)"
+        : "▼ スコア詳細を表示  (クリック / [I] キー)";
+    int dW = GetDrawStringWidthToHandle(detLabel, static_cast<int>(strlen(detLabel)), font18);
+    DrawStringToHandle(detBtnX + (detBtnW - dW) / 2, detBtnY + 13, detLabel, hoverDetail ? colYellow : colWhite, font18);
 
     // =========================================================================
     // 6. アクションボタン（右パネル最下部：RETRY / MAIN MENU）
@@ -2378,9 +2400,9 @@ void UIManager::DrawPauseModal(GameManager& gm)
     DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 18), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // 2. モーダル本体（文字やボタンの重なりを完全解消した新寸法）
-    int modalW = 500;
-    int modalH = 556;
+    // 2. モーダル本体（文字はみ出し・ボタン密集を完全解消したゆったり寸法）
+    int modalW = 640;
+    int modalH = 594;
     int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
@@ -2396,23 +2418,23 @@ void UIManager::DrawPauseModal(GameManager& gm)
     int hW = GetDrawStringWidthToHandle(pauseHeader, static_cast<int>(strlen(pauseHeader)), font24);
     DrawStringToHandle((Config::SCREEN_WIDTH - hW) / 2, modalY + 10, pauseHeader, GetColor(255, 220, 60), font24);
 
-    int btnW = 380;
+    int btnW = 460;
     int btnX = (Config::SCREEN_WIDTH - btnW) / 2;
 
-    int retryBtnY    = modalY + 48;
+    int retryBtnY    = modalY + 50;
     int retryBtnH    = 34;
-    int titleBtnY    = modalY + 86;
+    int titleBtnY    = modalY + 90;
     int titleBtnH    = 34;
-    int sensRowY     = modalY + 124;
+    int sensRowY     = modalY + 130;
     int sensRowH     = 52;
-    int bgmRowY      = modalY + 180;
+    int bgmRowY      = modalY + 188;
     int bgmRowH      = 52;
-    int seRowY       = modalY + 236;
+    int seRowY       = modalY + 246;
     int seRowH       = 52;
-    int workoutCardW = 468;
+    int workoutCardW = 604;
     int workoutCardX = (Config::SCREEN_WIDTH - workoutCardW) / 2;
-    int workoutCardY = modalY + 292;
-    int workoutCardH = 148;
+    int workoutCardY = modalY + 306;
+    int workoutCardH = 172;
 
     float btnPulse = (std::sin(GetNowCount() * 0.01f) + 1.0f) * 0.5f;
 
@@ -2528,7 +2550,7 @@ void UIManager::DrawPauseModal(GameManager& gm)
     int resumeBtnW = 280;
     int resumeBtnH = 34;
     int resumeBtnX = (Config::SCREEN_WIDTH - resumeBtnW) / 2;
-    int resumeBtnY = modalY + 448;
+    int resumeBtnY = modalY + 488;
     bool hoverResume = (mx >= resumeBtnX && mx <= resumeBtnX + resumeBtnW && my >= resumeBtnY && my <= resumeBtnY + resumeBtnH);
 
     SoftUI::DrawSoftCard(resumeBtnX, resumeBtnY, resumeBtnW, resumeBtnH, 18,
@@ -2543,11 +2565,11 @@ void UIManager::DrawPauseModal(GameManager& gm)
     // 操作説明ガイド（モーダル枠内下部に綺麗に配置）
     const char* guideTxt1 = "選択: [↑/↓]  感度・音量・モーション選択: [←/→] または クリック";
     int gW1 = GetDrawStringWidthToHandle(guideTxt1, static_cast<int>(strlen(guideTxt1)), font13);
-    DrawStringToHandle((Config::SCREEN_WIDTH - gW1) / 2, modalY + 492, guideTxt1, GetColor(160, 185, 220), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW1) / 2, modalY + 534, guideTxt1, GetColor(160, 185, 220), font13);
 
     const char* guideTxt2 = "決定/ON・OFF切替: [ENTER] / [SPACE]  |  ゲーム説明: [H / TAB]  |  閉じる: [ESC]";
     int gW2 = GetDrawStringWidthToHandle(guideTxt2, static_cast<int>(strlen(guideTxt2)), font13);
-    DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 512, guideTxt2, GetColor(130, 150, 180), font13);
+    DrawStringToHandle((Config::SCREEN_WIDTH - gW2) / 2, modalY + 556, guideTxt2, GetColor(130, 150, 180), font13);
 
     // 筋トレコレクション確認ダイアログ（最前面描画）
     WorkoutCollectionManager::GetInstance().DrawConfirmDialogModal(font24, font16);

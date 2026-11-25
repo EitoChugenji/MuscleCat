@@ -53,7 +53,9 @@ private:
     bool   m_isTimeUp             = false;                   // 時間切れ（TIME UP）で終了したかどうか
     int    m_clearAnimTimer       = 0;                       // リザルト開始からの経過フレーム数
     int    m_clearSelectedBtn     = 0;                       // リザルト画面の選択ボタン (0: RETRY, 1: MAIN MENU)
+    bool   m_showClearDetails     = false;                   // リザルト画面のスコア詳細内訳表示フラグ
     bool   m_prevKeyM             = false;                   // [M]キーの前フレーム押下状態
+    bool   m_prevKeyI             = false;                   // [I]キーの前フレーム押下状態（詳細表示トグル）
     VECTOR m_clearCamStartPos     = VGet(0.0f, 0.0f, 0.0f);  // クリア瞬間のカメラ座標（ズーム補間開始点）
     VECTOR m_clearCamStartTarget  = VGet(0.0f, 0.0f, 0.0f);  // クリア瞬間のカメラ注視点（ズーム補間開始点）
     static constexpr int CLEAR_ZOOM_DURATION = 75;           // クリア時に筋トレする猫へズームインする演出フレーム数（約1.25秒）
