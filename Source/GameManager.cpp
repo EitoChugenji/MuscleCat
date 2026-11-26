@@ -659,7 +659,7 @@ void GameManager::Update()
             auto player = m_objManager.GetPlayer();
             float catY = (player) ? player->GetPos().y : 0.0f;
             Player3D::TitleWorkoutType workout = CalcActiveTitleWorkout(m_titleAnimTimer);
-            bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
+            bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress || workout == Player3D::TitleWorkoutType::ChestPress || workout == Player3D::TitleWorkoutType::WBarbell);
             bool isPullUpWorkout = (workout == Player3D::TitleWorkoutType::PullUp);
             float camDist = isPullUpWorkout ? 260.0f : 240.0f;
             float targetY = isFloorWorkout ? (catY + 14.0f) : (isPullUpWorkout ? (catY + 42.0f) : (catY + 20.0f));
@@ -707,31 +707,49 @@ void GameManager::Update()
         auto player = m_objManager.GetPlayer();
         float catY = (player) ? player->GetPos().y : 0.0f;
 
-        // ★ ガチャ演出時（特に当たった筋トレ大発表時）：当たったモーションを猫が実演！
+        // ★ ガチャ演出時（特に当たった筋トレ大発表時）または筋トレコレクション画面プレビュー時：該当モーションを猫が実演！
         auto& collMgr = WorkoutCollectionManager::GetInstance();
         bool isGachaResult = (collMgr.IsGachaAnimationActive() &&
                               collMgr.GetGachaAnimPhase() == WorkoutCollectionManager::GachaAnimPhase::ResultCard);
+        bool isCollectionPreview = (m_showWorkoutCollection && !collMgr.IsGachaAnimationActive());
+
+        auto motionIdToTitleWorkout = [](int id, Player3D::TitleWorkoutType fallback) -> Player3D::TitleWorkoutType
+        {
+            switch (id)
+            {
+            case 0: return Player3D::TitleWorkoutType::Squat;
+            case 1: return Player3D::TitleWorkoutType::PushUp;
+            case 2: return Player3D::TitleWorkoutType::SitUp;
+            case 3: return Player3D::TitleWorkoutType::PullUp;
+            case 4: return Player3D::TitleWorkoutType::SideRaise;
+            case 5: return Player3D::TitleWorkoutType::DumbbellCurl;
+            case 6: return Player3D::TitleWorkoutType::InclineBench;
+            case 7: return Player3D::TitleWorkoutType::BenchPress;
+            case 8: return Player3D::TitleWorkoutType::InOverHeadPress;
+            case 9: return Player3D::TitleWorkoutType::ChestPress;
+            case 10: return Player3D::TitleWorkoutType::ProneTwistRow;
+            case 11: return Player3D::TitleWorkoutType::WBarbell;
+            default: return fallback;
+            }
+        };
 
         Player3D::TitleWorkoutType workout = Player3D::TitleWorkoutType::PushUp;
         if (isGachaResult)
         {
-            int gachaId = collMgr.GetGachaObtainedId();
-            switch (gachaId)
-            {
-            case 0: workout = Player3D::TitleWorkoutType::Squat; break;
-            case 1: workout = Player3D::TitleWorkoutType::PushUp; break;
-            case 2: workout = Player3D::TitleWorkoutType::SitUp; break;
-            case 3: workout = Player3D::TitleWorkoutType::PullUp; break;
-            case 4: workout = Player3D::TitleWorkoutType::SideRaise; break;
-            case 5: workout = Player3D::TitleWorkoutType::DumbbellCurl; break;
-            case 6: workout = Player3D::TitleWorkoutType::InclineBench; break;
-            case 7: workout = Player3D::TitleWorkoutType::BenchPress; break;
-            case 8: workout = Player3D::TitleWorkoutType::InOverHeadPress; break;
-            default: workout = Player3D::TitleWorkoutType::PushUp; break;
-            }
+            workout = motionIdToTitleWorkout(collMgr.GetGachaObtainedId(), Player3D::TitleWorkoutType::PushUp);
 
             // カメラ画面中心を画面左側（X=330）にシフトし、画面右側の獲得カードと美しく並立！
             SetCameraScreenCenter(330.0f, 360.0f);
+        }
+        else if (isCollectionPreview)
+        {
+            int slotIdx = m_selectedWorkoutBtn;
+            if (slotIdx < 0 || slotIdx >= Player3D::GetMaxEquippedWorkouts()) slotIdx = 0;
+            int previewId = Player3D::GetEquippedWorkoutSlot(slotIdx);
+            workout = motionIdToTitleWorkout(previewId, Player3D::TitleWorkoutType::Idle);
+
+            // 画面左側のプレビューエリア中央（X=248）に3D猫を映し、右側の筋トレコレクションパネルと並立！
+            SetCameraScreenCenter(248.0f, 360.0f);
         }
         else
         {
@@ -740,18 +758,21 @@ void GameManager::Update()
             workout = CalcActiveTitleWorkout(m_titleAnimTimer);
         }
 
-        bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
+        bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress || workout == Player3D::TitleWorkoutType::ChestPress || workout == Player3D::TitleWorkoutType::WBarbell);
         bool isPullUpWorkout = (workout == Player3D::TitleWorkoutType::PullUp);
 
-        // ガチャ結果時は猫の全身（耳から足先まで）が完璧に収まるベストディスタンスに調整！
+        // ガチャ結果・コレクションプレビュー時は猫の全身＆器具が綺麗に収まるベストディスタンスに調整！
         float camDist = isGachaResult ? (isPullUpWorkout ? 210.0f : (isFloorWorkout ? 165.0f : 185.0f))
-                                      : (isPullUpWorkout ? 260.0f : 240.0f);
-        float targetY = isGachaResult ? (isFloorWorkout ? (catY + 12.0f) : (isPullUpWorkout ? (catY + 40.0f) : (catY + 24.0f)))
-                                      : (isFloorWorkout ? (catY + 14.0f) : (isPullUpWorkout ? (catY + 42.0f) : (catY + 20.0f)));
-        float camHeight = isGachaResult ? (isFloorWorkout ? (catY + 26.0f) : (isPullUpWorkout ? (catY + 48.0f) : (catY + 32.0f)))
-                                        : ((isFloorWorkout ? (catY + 34.0f) : (isPullUpWorkout ? (catY + 56.0f) : (catY + 38.0f))) + std::sin(m_titleAnimTimer * 0.02f) * 5.0f);
+                      : (isCollectionPreview ? (isPullUpWorkout ? 225.0f : (isFloorWorkout ? 185.0f : 205.0f))
+                                             : (isPullUpWorkout ? 260.0f : 240.0f));
+        float targetY = (isGachaResult || isCollectionPreview)
+                      ? (isFloorWorkout ? (catY + 12.0f) : (isPullUpWorkout ? (catY + 40.0f) : (catY + 24.0f)))
+                      : (isFloorWorkout ? (catY + 14.0f) : (isPullUpWorkout ? (catY + 42.0f) : (catY + 20.0f)));
+        float camHeight = (isGachaResult || isCollectionPreview)
+                        ? (isFloorWorkout ? (catY + 28.0f) : (isPullUpWorkout ? (catY + 48.0f) : (catY + 34.0f)))
+                        : ((isFloorWorkout ? (catY + 34.0f) : (isPullUpWorkout ? (catY + 56.0f) : (catY + 38.0f))) + std::sin(m_titleAnimTimer * 0.02f) * 5.0f);
 
-        // ガチャ結果時は筋トレの筋肉の動きが最も美しく見えるアングルに固定
+        // ガチャ結果時はベストアングル固定、コレクションプレビュー時はゆっくり回転して全方向から確認可能
         float camAngle = isGachaResult ? (isFloorWorkout ? -0.75f : -0.32f) : m_titleCameraAngle;
 
         VECTOR catPos = (player) ? player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
@@ -2484,7 +2505,7 @@ void GameManager::DrawTitle3DScene()
     float catY = catPos.y;
 
     Player3D::TitleWorkoutType workout = CalcActiveTitleWorkout(m_titleAnimTimer);
-    bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress);
+    bool isFloorWorkout = (workout == Player3D::TitleWorkoutType::PushUp || workout == Player3D::TitleWorkoutType::SitUp || workout == Player3D::TitleWorkoutType::BenchPress || workout == Player3D::TitleWorkoutType::ChestPress || workout == Player3D::TitleWorkoutType::WBarbell);
     bool isPushUp   = isFloorWorkout;
     bool isTraining = (workout != Player3D::TitleWorkoutType::Idle);
 
@@ -2973,26 +2994,48 @@ void GameManager::UpdatePause(bool triggerEsc)
         }
     }
 
-    // 筋トレモーション選択ボタン（9種・2段）の個別ホバー＆クリック・キー操作
-    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    // 筋トレ持ち運び3スロット（縦1〜3個目）のスライド操作（ホバー＆クリック・左右キー）
+    const int maxSlots = Player3D::GetMaxEquippedWorkouts();
+    if (m_pauseSelectedWorkoutBtn < 0 || m_pauseSelectedWorkoutBtn >= maxSlots)
     {
-        int bx = 0, by = 0, bw = 0, bh = 0;
-        GetWorkoutBtnRect(workoutCardX, workoutCardY, workoutCardW, workoutCardH, i, bx, by, bw, bh);
-        if (mx >= bx && mx <= bx + bw && my >= by && my <= by + bh)
+        m_pauseSelectedWorkoutBtn = 0;
+    }
+
+    for (int s = 0; s < maxSlots; ++s)
+    {
+        int rowX = 0, rowY = 0, rowW = 0, rowH = 0;
+        int leftX = 0, leftY = 0, leftW = 0, leftH = 0;
+        int rightX = 0, rightY = 0, rightW = 0, rightH = 0;
+        UIManager::GetWorkoutSlotRects(workoutCardX, workoutCardY, workoutCardW, workoutCardH, s,
+                                       rowX, rowY, rowW, rowH,
+                                       leftX, leftY, leftW, leftH,
+                                       rightX, rightY, rightW, rightH);
+
+        bool hoverRow   = (mx >= rowX && mx <= rowX + rowW && my >= rowY && my <= rowY + rowH);
+        bool hoverLeft  = (mx >= leftX && mx <= leftX + leftW && my >= leftY && my <= leftY + leftH);
+        bool hoverRight = (mx >= rightX && mx <= rightX + rightW && my >= rightY && my <= rightY + rightH);
+
+        if (hoverRow)
         {
             m_pauseMenuItem           = 5;
-            m_pauseSelectedWorkoutBtn = i;
+            m_pauseSelectedWorkoutBtn = s;
             if (isMouseTrigger)
             {
-                if (collMgr.IsMotionUnlocked(i))
+                if (hoverLeft)
                 {
-                    Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(i));
+                    Player3D::CycleEquippedWorkoutSlot(s, -1);
+                    SoundManager::GetInstance().PlaySE(SeType::Decide);
+                }
+                else if (hoverRight)
+                {
+                    Player3D::CycleEquippedWorkoutSlot(s, +1);
                     SoundManager::GetInstance().PlaySE(SeType::Decide);
                 }
                 else
                 {
-                    collMgr.SetStatusMessage("この筋トレは未所持です。ガチャを引いて解放してください！", 180);
-                    SoundManager::GetInstance().PlaySE(SeType::Cancel);
+                    // 行の中央クリックでも次へスライド切替
+                    Player3D::CycleEquippedWorkoutSlot(s, +1);
+                    SoundManager::GetInstance().PlaySE(SeType::Decide);
                 }
                 return;
             }
@@ -3003,19 +3046,19 @@ void GameManager::UpdatePause(bool triggerEsc)
     {
         if (triggerLeft)
         {
-            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 8) % 9;
-            SoundManager::GetInstance().PlaySE(SeType::Cursor);
+            Player3D::CycleEquippedWorkoutSlot(m_pauseSelectedWorkoutBtn, -1);
+            SoundManager::GetInstance().PlaySE(SeType::Decide);
         }
         if (triggerRight)
         {
-            m_pauseSelectedWorkoutBtn = (m_pauseSelectedWorkoutBtn + 1) % 9;
-            SoundManager::GetInstance().PlaySE(SeType::Cursor);
+            Player3D::CycleEquippedWorkoutSlot(m_pauseSelectedWorkoutBtn, +1);
+            SoundManager::GetInstance().PlaySE(SeType::Decide);
         }
         if (triggerUp)
         {
-            if (m_pauseSelectedWorkoutBtn >= 5)
+            if (m_pauseSelectedWorkoutBtn > 0)
             {
-                m_pauseSelectedWorkoutBtn -= 5;
+                m_pauseSelectedWorkoutBtn--;
                 SoundManager::GetInstance().PlaySE(SeType::Cursor);
             }
             else
@@ -3026,9 +3069,9 @@ void GameManager::UpdatePause(bool triggerEsc)
         }
         if (triggerDown)
         {
-            if (m_pauseSelectedWorkoutBtn < 5)
+            if (m_pauseSelectedWorkoutBtn + 1 < maxSlots)
             {
-                m_pauseSelectedWorkoutBtn = (std::min)(8, m_pauseSelectedWorkoutBtn + 5);
+                m_pauseSelectedWorkoutBtn++;
                 SoundManager::GetInstance().PlaySE(SeType::Cursor);
             }
             else
@@ -3039,16 +3082,8 @@ void GameManager::UpdatePause(bool triggerEsc)
         }
         if (triggerEnter || triggerSpace)
         {
-            if (collMgr.IsMotionUnlocked(m_pauseSelectedWorkoutBtn))
-            {
-                Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(m_pauseSelectedWorkoutBtn));
-                SoundManager::GetInstance().PlaySE(SeType::Decide);
-            }
-            else
-            {
-                collMgr.SetStatusMessage("この筋トレは未所持です。ガチャを引いて解放してください！", 180);
-                SoundManager::GetInstance().PlaySE(SeType::Cancel);
-            }
+            Player3D::CycleEquippedWorkoutSlot(m_pauseSelectedWorkoutBtn, +1);
+            SoundManager::GetInstance().PlaySE(SeType::Decide);
             return;
         }
     }
@@ -3723,13 +3758,13 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
 #endif
 
     int modalW = 760;
-    int modalH = 376;
-    int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
+    int modalH = 424;
+    int modalX = Config::SCREEN_WIDTH - modalW - 24; // 右側配置（左側に3Dライブプレビュー領域を確保）
     int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
 
     int closeBtnW = 220;
     int closeBtnH = 36;
-    int closeBtnX = (Config::SCREEN_WIDTH - closeBtnW) / 2;
+    int closeBtnX = modalX + (modalW - closeBtnW) / 2;
     int closeBtnY = modalY + modalH - 46;
 
     // 右上の [×] ボタン
@@ -3754,7 +3789,8 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
 
     bool hoverClose = (mx >= closeBtnX && mx <= closeBtnX + closeBtnW && my >= closeBtnY && my <= closeBtnY + closeBtnH);
     bool hoverXBtn  = (mx >= xBtnX && mx <= xBtnX + xBtnSize && my >= xBtnY && my <= xBtnY + xBtnSize);
-    bool clickOutside = (isMouseTrigger && (mx < modalX || mx > modalX + modalW || my < modalY || my > modalY + modalH));
+    bool inPreviewArea = (mx >= 20 && mx <= modalX - 16 && my >= 110 && my <= Config::SCREEN_HEIGHT - 110);
+    bool clickOutside = (isMouseTrigger && !inPreviewArea && (mx < modalX || mx > modalX + modalW || my < modalY || my > modalY + modalH));
 
     // ESCキー, Cキー, 閉じるボタン, またはモーダル外クリックで閉じる
     if (triggerEsc || triggerC || (hoverClose && isMouseTrigger) || (hoverXBtn && isMouseTrigger) || clickOutside)
@@ -3765,7 +3801,7 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
     }
 
     // アクションボタン（ガチャ・セーブ・ロード・(Debug削除)）のクリック
-    int actBtnY = modalY + 168;
+    int actBtnY = modalY + 212;
     int actBtnH = 36;
 #ifdef _DEBUG
     const int numTitleActs = 4;
@@ -3797,7 +3833,7 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
     // デバッグモードON時の5つのチートボタンクリック
     if (collMgr.IsDebugMode())
     {
-        int dbgRowY = modalY + 214;
+        int dbgRowY = modalY + 258;
         int dbgRowH = 32;
         int dBtnX[5] = { modalX + 30, modalX + 176, modalX + 322, modalX + 448, modalX + 574 };
         int dBtnW[5] = { 136, 136, 116, 116, 156 };
@@ -3819,76 +3855,87 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
         }
     }
 
-    // 9つの筋トレモーションボタンのホバー＆クリック
-    int topRowY = modalY + 56;
-    int botRowY = modalY + 110;
-    int btnW    = 124;
-    int btnH    = 46;
-
-    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    // 縦に3つのスライド式筋トレ選択スロット（1個目・2個目・3個目）のホバー＆クリック・キーボード操作
+    const int maxSlots = Player3D::GetMaxEquippedWorkouts();
+    if (m_selectedWorkoutBtn < 0 || m_selectedWorkoutBtn >= maxSlots)
     {
-        int bx = (i < 5) ? (modalX + 30 + i * 140) : (modalX + 100 + (i - 5) * 140);
-        int by = (i < 5) ? topRowY : botRowY;
+        m_selectedWorkoutBtn = 0;
+    }
 
-        if (mx >= bx && mx <= bx + btnW && my >= by && my <= by + btnH)
+    int slotRowX   = modalX + 30;
+    int slotRowW   = modalW - 60;
+    int slotRowH   = 44;
+    int slotGapY   = 8;
+    int slotStartY = modalY + 58;
+
+    for (int s = 0; s < maxSlots; ++s)
+    {
+        int ry = slotStartY + s * (slotRowH + slotGapY);
+        int leftW  = 54;
+        int leftH  = 38;
+        int leftX  = slotRowX + 102;
+        int leftY  = ry + 3;
+
+        int rightW = 54;
+        int rightH = 38;
+        int rightX = slotRowX + slotRowW - rightW;
+        int rightY = ry + 3;
+
+        bool hoverRow   = (mx >= slotRowX && mx <= slotRowX + slotRowW && my >= ry && my <= ry + slotRowH);
+        bool hoverLeft  = (mx >= leftX && mx <= leftX + leftW && my >= leftY && my <= leftY + leftH);
+        bool hoverRight = (mx >= rightX && mx <= rightX + rightW && my >= rightY && my <= rightY + rightH);
+
+        if (hoverRow)
         {
-            m_selectedWorkoutBtn = i;
+            m_selectedWorkoutBtn = s;
             if (isMouseTrigger)
             {
-                if (collMgr.IsMotionUnlocked(i))
+                if (hoverLeft)
                 {
-                    Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(i));
+                    Player3D::CycleEquippedWorkoutSlot(s, -1);
+                    SoundManager::GetInstance().PlaySE(SeType::Decide);
+                }
+                else if (hoverRight)
+                {
+                    Player3D::CycleEquippedWorkoutSlot(s, +1);
                     SoundManager::GetInstance().PlaySE(SeType::Decide);
                 }
                 else
                 {
-                    collMgr.SetStatusMessage("この筋トレは未所持です。ガチャを引いて解放してください！", 180);
-                    SoundManager::GetInstance().PlaySE(SeType::Cancel);
+                    // 中央エリアクリックでも次へスライド切替
+                    Player3D::CycleEquippedWorkoutSlot(s, +1);
+                    SoundManager::GetInstance().PlaySE(SeType::Decide);
                 }
                 return;
             }
         }
     }
 
-    // キーボードによる9つのボタン間移動
-    if (triggerLeft)
-    {
-        m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 8) % 9;
-        SoundManager::GetInstance().PlaySE(SeType::Cursor);
-    }
-    if (triggerRight)
-    {
-        m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 1) % 9;
-        SoundManager::GetInstance().PlaySE(SeType::Cursor);
-    }
+    // キーボード操作（↑/↓ で1〜3個目の枠選択、←/→ または Enter/Space でスライド切替）
     if (triggerUp)
     {
-        if (m_selectedWorkoutBtn >= 5)
-        {
-            m_selectedWorkoutBtn -= 5;
-            SoundManager::GetInstance().PlaySE(SeType::Cursor);
-        }
+        m_selectedWorkoutBtn = (m_selectedWorkoutBtn + maxSlots - 1) % maxSlots;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
     }
     if (triggerDown)
     {
-        if (m_selectedWorkoutBtn < 5)
-        {
-            m_selectedWorkoutBtn = (std::min)(8, m_selectedWorkoutBtn + 5);
-            SoundManager::GetInstance().PlaySE(SeType::Cursor);
-        }
+        m_selectedWorkoutBtn = (m_selectedWorkoutBtn + 1) % maxSlots;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+    if (triggerLeft)
+    {
+        Player3D::CycleEquippedWorkoutSlot(m_selectedWorkoutBtn, -1);
+        SoundManager::GetInstance().PlaySE(SeType::Decide);
+    }
+    if (triggerRight)
+    {
+        Player3D::CycleEquippedWorkoutSlot(m_selectedWorkoutBtn, +1);
+        SoundManager::GetInstance().PlaySE(SeType::Decide);
     }
     if (triggerEnter || triggerSpace)
     {
-        if (collMgr.IsMotionUnlocked(m_selectedWorkoutBtn))
-        {
-            Player3D::ToggleWorkoutMotionEnabled(static_cast<WorkoutMotionType>(m_selectedWorkoutBtn));
-            SoundManager::GetInstance().PlaySE(SeType::Decide);
-        }
-        else
-        {
-            collMgr.SetStatusMessage("この筋トレは未所持です。ガチャを引いて解放してください！", 180);
-            SoundManager::GetInstance().PlaySE(SeType::Cancel);
-        }
+        Player3D::CycleEquippedWorkoutSlot(m_selectedWorkoutBtn, +1);
+        SoundManager::GetInstance().PlaySE(SeType::Decide);
         return;
     }
 }

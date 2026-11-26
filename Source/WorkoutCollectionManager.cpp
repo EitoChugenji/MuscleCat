@@ -129,6 +129,7 @@ void WorkoutCollectionManager::UnlockMotion(int id)
     if (id >= 0 && id < static_cast<int>(WorkoutMotionType::Count))
     {
         m_unlockedIds.insert(id);
+        Player3D::AutoFillEmptySlot(id);
         SyncToPlayer3D();
     }
 }
@@ -403,24 +404,31 @@ void WorkoutCollectionManager::Update()
     }
 }
 
-// Player3Dのランダム筋トレ選択対象フラグと同期
+// Player3Dの持ち運び3スロットと同期
 void WorkoutCollectionManager::SyncToPlayer3D()
 {
-    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    // 未解放のモーションがスロットに入っていればクリア
+    for (int s = 0; s < Player3D::GetMaxEquippedWorkouts(); ++s)
     {
-        auto type = static_cast<WorkoutMotionType>(i);
-        bool isUnlocked = IsMotionUnlocked(i);
-        // 未解放のものは強制OFF、解放済みのものは現在状態を維持
-        if (!isUnlocked)
+        int id = Player3D::GetEquippedWorkoutSlot(s);
+        if (id != -1 && !IsMotionUnlocked(id))
         {
-            Player3D::SetWorkoutMotionEnabled(type, false);
+            if (s == 0)
+            {
+                Player3D::SetEquippedWorkoutSlot(0, INITIAL_MOTION_ID);
+            }
+            else
+            {
+                Player3D::SetEquippedWorkoutSlot(s, -1);
+            }
         }
     }
-    // 解放済みが1つ以上ONになっていることを保証
-    if (Player3D::GetEnabledWorkoutMotionCount() == 0)
+    // 1個目スロットが空または未解放なら初期モーション（腕立て伏せ）を保証
+    if (Player3D::GetEquippedWorkoutSlot(0) == -1 || !IsMotionUnlocked(Player3D::GetEquippedWorkoutSlot(0)))
     {
-        Player3D::SetWorkoutMotionEnabled(WorkoutMotionType::PushUp, true);
+        Player3D::SetEquippedWorkoutSlot(0, INITIAL_MOTION_ID);
     }
+    Player3D::SyncEnabledFlagsFromSlots();
 }
 
 // ============================================================================
@@ -981,7 +989,7 @@ void WorkoutCollectionManager::DebugUnlockAll()
     }
     SyncToPlayer3D();
     SaveToFile();
-    SetStatusMessage("【Debug】全9種の筋トレモーションを全解放しました！", 240);
+    SetStatusMessage("【Debug】全12種の筋トレモーションを全解放しました！", 240);
     SoundManager::GetInstance().PlaySE(SeType::SquatSuccess);
 }
 
@@ -995,24 +1003,26 @@ void WorkoutCollectionManager::DebugAddProtein(int amount)
 
 void WorkoutCollectionManager::DebugEnableAllMotions()
 {
-    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    int slot = 0;
+    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count) && slot < Player3D::GetMaxEquippedWorkouts(); ++i)
     {
         if (IsMotionUnlocked(i))
         {
-            Player3D::SetWorkoutMotionEnabled(static_cast<WorkoutMotionType>(i), true);
+            Player3D::SetEquippedWorkoutSlot(slot++, i);
         }
     }
-    SetStatusMessage("【Debug】所持している全筋トレモーションをONに設定しました！", 200);
+    SetStatusMessage("【Debug】1〜3個目の枠に筋トレを自動セットしました！", 200);
     SoundManager::GetInstance().PlaySE(SeType::Decide);
 }
 
 void WorkoutCollectionManager::DebugDisableAllMotions()
 {
-    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    Player3D::SetEquippedWorkoutSlot(0, INITIAL_MOTION_ID);
+    for (int s = 1; s < Player3D::GetMaxEquippedWorkouts(); ++s)
     {
-        Player3D::SetWorkoutMotionEnabled(static_cast<WorkoutMotionType>(i), (i == INITIAL_MOTION_ID));
+        Player3D::SetEquippedWorkoutSlot(s, -1);
     }
-    SetStatusMessage("【Debug】腕立て伏せ以外をすべてOFFに設定しました！", 200);
+    SetStatusMessage("【Debug】1個目（腕立て伏せ）のみにリセットしました！", 200);
     SoundManager::GetInstance().PlaySE(SeType::Cursor);
 }
 #endif

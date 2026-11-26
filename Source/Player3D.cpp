@@ -21,9 +21,144 @@
 #include <cctype>
 #include <algorithm>
 
-// 筋トレアニメーション各モーションの初期設定（仕様: 腕立て伏せ [ID 1 / EEEA] のみ初期解放）
+// 筋トレアニメーション各モーションの初期設定（仕様: 腕立て伏せ [ID 1 / EEEA] のみ初期解放、持ち運び最大3スロット）
 bool Player3D::s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)] = { false, true, false, false, false, false, false, false, false, false, false, false };
+int  Player3D::s_equippedWorkouts[Player3D::MAX_EQUIPPED_WORKOUTS] = { static_cast<int>(WorkoutMotionType::PushUp), -1, -1 };
 int  Player3D::s_workoutSequenceIndex = 0;
+
+void Player3D::SyncEnabledFlagsFromSlots()
+{
+    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    {
+        s_workoutMotionEnabled[i] = false;
+    }
+    bool anyEnabled = false;
+    for (int s = 0; s < MAX_EQUIPPED_WORKOUTS; ++s)
+    {
+        int id = s_equippedWorkouts[s];
+        if (id >= 0 && id < static_cast<int>(WorkoutMotionType::Count))
+        {
+            s_workoutMotionEnabled[id] = true;
+            anyEnabled = true;
+        }
+    }
+    if (!anyEnabled)
+    {
+        s_equippedWorkouts[0] = static_cast<int>(WorkoutMotionType::PushUp);
+        s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::PushUp)] = true;
+    }
+}
+
+int Player3D::GetEquippedWorkoutSlot(int slotIndex)
+{
+    if (slotIndex < 0 || slotIndex >= MAX_EQUIPPED_WORKOUTS) return -1;
+    return s_equippedWorkouts[slotIndex];
+}
+
+void Player3D::SetEquippedWorkoutSlot(int slotIndex, int motionId)
+{
+    if (slotIndex < 0 || slotIndex >= MAX_EQUIPPED_WORKOUTS) return;
+    if (motionId < -1 || motionId >= static_cast<int>(WorkoutMotionType::Count)) return;
+    // 1個目スロットは最低1種目を保証するため未設定(-1)を禁止
+    if (slotIndex == 0 && motionId == -1) return;
+
+    // すでに別スロットに同じ種目が設定されている場合は、その別スロットと入れ替え（重複防止）
+    if (motionId != -1)
+    {
+        for (int s = 0; s < MAX_EQUIPPED_WORKOUTS; ++s)
+        {
+            if (s != slotIndex && s_equippedWorkouts[s] == motionId)
+            {
+                s_equippedWorkouts[s] = s_equippedWorkouts[slotIndex];
+                break;
+            }
+        }
+    }
+    s_equippedWorkouts[slotIndex] = motionId;
+    SyncEnabledFlagsFromSlots();
+}
+
+void Player3D::CycleEquippedWorkoutSlot(int slotIndex, int delta)
+{
+    if (slotIndex < 0 || slotIndex >= MAX_EQUIPPED_WORKOUTS) return;
+    if (delta == 0) return;
+
+    auto& collMgr = WorkoutCollectionManager::GetInstance();
+    int currentId = s_equippedWorkouts[slotIndex];
+
+    // このスロットで選択可能な候補リストを構築（他のスロットで使用中の種目は除外）
+    std::vector<int> candidates;
+    if (slotIndex > 0)
+    {
+        candidates.push_back(-1); // 2個目・3個目は「未設定(---)」を選択可能
+    }
+
+    for (int id = 0; id < static_cast<int>(WorkoutMotionType::Count); ++id)
+    {
+        if (!collMgr.IsMotionUnlocked(id)) continue;
+
+        bool usedByOther = false;
+        for (int s = 0; s < MAX_EQUIPPED_WORKOUTS; ++s)
+        {
+            if (s != slotIndex && s_equippedWorkouts[s] == id)
+            {
+                usedByOther = true;
+                break;
+            }
+        }
+        if (!usedByOther)
+        {
+            candidates.push_back(id);
+        }
+    }
+
+    if (candidates.empty()) return;
+
+    int curIdx = -1;
+    for (int i = 0; i < static_cast<int>(candidates.size()); ++i)
+    {
+        if (candidates[i] == currentId)
+        {
+            curIdx = i;
+            break;
+        }
+    }
+
+    int count = static_cast<int>(candidates.size());
+    int nextIdx = 0;
+    if (curIdx == -1)
+    {
+        nextIdx = (delta > 0) ? 0 : (count - 1);
+    }
+    else
+    {
+        int step = (delta > 0) ? 1 : -1;
+        nextIdx = (curIdx + step + count) % count;
+    }
+
+    s_equippedWorkouts[slotIndex] = candidates[nextIdx];
+    SyncEnabledFlagsFromSlots();
+}
+
+void Player3D::AutoFillEmptySlot(int motionId)
+{
+    if (motionId < 0 || motionId >= static_cast<int>(WorkoutMotionType::Count)) return;
+    // すでに装備済みなら何もしない
+    for (int s = 0; s < MAX_EQUIPPED_WORKOUTS; ++s)
+    {
+        if (s_equippedWorkouts[s] == motionId) return;
+    }
+    // 空きスロットがあれば自動セット
+    for (int s = 0; s < MAX_EQUIPPED_WORKOUTS; ++s)
+    {
+        if (s_equippedWorkouts[s] == -1)
+        {
+            s_equippedWorkouts[s] = motionId;
+            SyncEnabledFlagsFromSlots();
+            return;
+        }
+    }
+}
 
 bool Player3D::IsWorkoutMotionEnabled(WorkoutMotionType type)
 {
@@ -61,11 +196,12 @@ int Player3D::GetEnabledWorkoutMotionCount()
 WorkoutMotionType Player3D::PickNextEnabledWorkoutMotion()
 {
     std::vector<WorkoutMotionType> enabledList;
-    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    for (int s = 0; s < MAX_EQUIPPED_WORKOUTS; ++s)
     {
-        if (s_workoutMotionEnabled[i])
+        int id = s_equippedWorkouts[s];
+        if (id >= 0 && id < static_cast<int>(WorkoutMotionType::Count))
         {
-            enabledList.push_back(static_cast<WorkoutMotionType>(i));
+            enabledList.push_back(static_cast<WorkoutMotionType>(id));
         }
     }
     if (enabledList.empty())

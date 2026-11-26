@@ -62,6 +62,12 @@ public:
     static void GetWorkoutBtnRect(int cardX, int cardY, int cardW, int cardH, int btnIdx,
                                   int& outX, int& outY, int& outW, int& outH);
 
+    /// <summary>筋トレ持ち運び3スロット（縦1〜3個目）のスライド行・左右矢印ボタン矩形を算出する</summary>
+    static void GetWorkoutSlotRects(int cardX, int cardY, int cardW, int cardH, int slotIdx,
+                                    int& rowX, int& rowY, int& rowW, int& rowH,
+                                    int& leftX, int& leftY, int& leftW, int& leftH,
+                                    int& rightX, int& rightY, int& rightW, int& rightH);
+
     /// <summary>筋トレコレクションカード下部のアクションボタン矩形を算出する（描画・当たり判定共通）</summary>
     static void GetWorkoutActionBtnRect(int cardX, int cardY, int cardW, int cardH, int actionIdx,
                                         int& outX, int& outY, int& outW, int& outH);

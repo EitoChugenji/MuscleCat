@@ -182,8 +182,10 @@ private:
     bool  m_pushFromSubModel         = false; // Pushアニメーションを補助モデルから参照するか
     bool  m_sorenessFromSubModel     = false; // 筋肉痛アニメーションを補助モデルから参照するか
 
-    // 筋トレアニメーション各モーションのON/OFF設定（メニュー画面のトグルボタンと連動）
+    // 筋トレアニメーション各モーションのON/OFF設定および持ち運び3スロット（1個目〜3個目）
+    static constexpr int MAX_EQUIPPED_WORKOUTS = 3;
     static bool s_workoutMotionEnabled[static_cast<int>(WorkoutMotionType::Count)];
+    static int  s_equippedWorkouts[MAX_EQUIPPED_WORKOUTS]; // -1: 未設定, 0〜Count-1: 装備中のWorkoutMotionType
     static int  s_workoutSequenceIndex;
 
     // トレーニング器具配置用のMixamoボーンフレーム番号キャッシュ
@@ -279,8 +281,15 @@ public:
     bool IsSkillChecking() const { return m_isSkillChecking; }
 
     // ------------------------------------------------------------------------
-    // 筋トレ時アニメーションのON/OFF選択設定（メニュー画面＆コレクション連動）
+    // 筋トレ時アニメーションの持ち運び3スロット＆選択設定（メニュー画面＆コレクション連動）
     // ------------------------------------------------------------------------
+    static constexpr int     GetMaxEquippedWorkouts() { return MAX_EQUIPPED_WORKOUTS; }
+    static int               GetEquippedWorkoutSlot(int slotIndex);
+    static void              SetEquippedWorkoutSlot(int slotIndex, int motionId);
+    static void              CycleEquippedWorkoutSlot(int slotIndex, int delta);
+    static void              AutoFillEmptySlot(int motionId);
+    static void              SyncEnabledFlagsFromSlots();
+
     static bool              IsWorkoutMotionEnabled(WorkoutMotionType type);
     static void              SetWorkoutMotionEnabled(WorkoutMotionType type, bool enabled);
     static void              ToggleWorkoutMotionEnabled(WorkoutMotionType type);

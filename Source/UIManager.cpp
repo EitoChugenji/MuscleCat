@@ -242,6 +242,9 @@ namespace
         case WorkoutMotionType::InclineBench:    return Player3D::TitleWorkoutType::InclineBench;
         case WorkoutMotionType::BenchPress:      return Player3D::TitleWorkoutType::BenchPress;
         case WorkoutMotionType::InOverHeadPress: return Player3D::TitleWorkoutType::InOverHeadPress;
+        case WorkoutMotionType::ChestPress:      return Player3D::TitleWorkoutType::ChestPress;
+        case WorkoutMotionType::ProneTwistRow:   return Player3D::TitleWorkoutType::ProneTwistRow;
+        case WorkoutMotionType::WBarbell:        return Player3D::TitleWorkoutType::WBarbell;
         default:                                 return Player3D::TitleWorkoutType::Squat;
         }
     }
@@ -250,29 +253,44 @@ namespace
     void GetWorkoutBtnRect(int cardX, int cardY, int cardW, int cardH, int index, int& outX, int& outY, int& outW, int& outH)
     {
         const int padX = 12;
-        const int gapX = 8;
+        const int gapX = 6;
         const int gapY = 6;
         const int headerH = 26;
         const int btnH = 34;
+        const int cols = 6;
 
-        if (index < 5)
-        {
-            int col = index;
-            int btnW = (cardW - padX * 2 - gapX * 4) / 5;
-            outX = cardX + padX + col * (btnW + gapX);
-            outY = cardY + headerH;
-            outW = btnW;
-            outH = btnH;
-        }
-        else
-        {
-            int col = index - 5;
-            int btnW = (cardW - padX * 2 - gapX * 3) / 4;
-            outX = cardX + padX + col * (btnW + gapX);
-            outY = cardY + headerH + btnH + gapY;
-            outW = btnW;
-            outH = btnH;
-        }
+        int row  = index / cols;
+        int col  = index % cols;
+        int btnW = (cardW - padX * 2 - gapX * (cols - 1)) / cols;
+        outX = cardX + padX + col * (btnW + gapX);
+        outY = cardY + headerH + row * (btnH + gapY);
+        outW = btnW;
+        outH = btnH;
+    }
+
+    // 筋トレ持ち運び3スロット（縦に1個目・2個目・3個目）の座標算出ヘルパー
+    void GetWorkoutSlotRectsImpl(int cardX, int cardY, int cardW, int cardH, int slotIdx,
+                                 int& rowX, int& rowY, int& rowW, int& rowH,
+                                 int& leftX, int& leftY, int& leftW, int& leftH,
+                                 int& rightX, int& rightY, int& rightW, int& rightH)
+    {
+        const int padX    = 12;
+        const int headerH = 25;
+        const int gapY    = 3;
+        rowX = cardX + padX;
+        rowW = cardW - padX * 2;
+        rowH = 26;
+        rowY = cardY + headerH + slotIdx * (rowH + gapY);
+
+        leftW  = 44;
+        leftH  = 24;
+        leftX  = rowX + 82;
+        leftY  = rowY + 1;
+
+        rightW = 44;
+        rightH = 24;
+        rightX = rowX + rowW - rightW;
+        rightY = rowY + 1;
     }
 
     // 筋トレコレクションアクションボタン（ガチャ・セーブ・ロード・(Debug削除)）の座標算出ヘルパー
@@ -280,8 +298,8 @@ namespace
     {
         const int padX = 12;
         const int gapX = 8;
-        const int actY = cardY + 26 + 34 * 2 + 6 + 10; // cardY + 110
-        const int actH = 28;
+        const int actY = cardY + 114;
+        const int actH = 26;
         outY = actY;
         outH = actH;
 
@@ -328,9 +346,9 @@ namespace
                              isRowSelected ? GetColor(255, 195, 50) : GetColor(55, 75, 110),
                              isRowSelected ? 2 : 1, isRowSelected, GetColor(255, 185, 45));
 
-        // 2. ヘッダー表示（コレクション所持数 ＆ プロテインポイント）
-        char colTitleBuf[64];
-        snprintf(colTitleBuf, sizeof(colTitleBuf), "★ 筋トレコレクション (%d / %d 所持)",
+        // 2. ヘッダー表示（持ち運び最大3種・所持数 ＆ プロテインポイント）
+        char colTitleBuf[96];
+        snprintf(colTitleBuf, sizeof(colTitleBuf), "★ 持ち運び筋トレ (最大3種・ランダム / %d/%d所持)",
                  collMgr.GetUnlockedCount(), collMgr.GetTotalMotionCount());
         DrawStringToHandle(x + 12, y + 5, colTitleBuf, isRowSelected ? GetColor(255, 235, 90) : GetColor(220, 240, 255), font13);
 
@@ -339,59 +357,62 @@ namespace
         int ptW = GetDrawStringWidthToHandle(ptBuf, static_cast<int>(strlen(ptBuf)), font13);
         DrawStringToHandle(x + w - ptW - 12, y + 5, ptBuf, GetColor(255, 215, 60), font13);
 
-        // 3. 9つのモーションボタン（上段5個 / 下段4個）
-        for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+        // 3. 縦に3つのスライド式筋トレ選択スロット（1個目・2個目・3個目）
+        static const char* kSlotLabels[3] = { "1個目", "2個目", "3個目" };
+        for (int s = 0; s < Player3D::GetMaxEquippedWorkouts(); ++s)
         {
-            auto mType      = static_cast<WorkoutMotionType>(i);
-            bool isUnlocked = collMgr.IsMotionUnlocked(i);
-            bool isOn       = Player3D::IsWorkoutMotionEnabled(mType);
-            std::string aeCode = WorkoutCollectionManager::IdToAeCode(i);
+            int rowX = 0, rowY = 0, rowW = 0, rowH = 0;
+            int leftX = 0, leftY = 0, leftW = 0, leftH = 0;
+            int rightX = 0, rightY = 0, rightW = 0, rightH = 0;
+            GetWorkoutSlotRectsImpl(x, y, w, h, s, rowX, rowY, rowW, rowH, leftX, leftY, leftW, leftH, rightX, rightY, rightW, rightH);
 
-            int bx = 0, by = 0, bw = 0, bh = 0;
-            GetWorkoutBtnRect(x, y, w, h, i, bx, by, bw, bh);
+            bool hoverRow   = (mx >= rowX && mx <= rowX + rowW && my >= rowY && my <= rowY + rowH);
+            bool hoverLeft  = (mx >= leftX && mx <= leftX + leftW && my >= leftY && my <= leftY + leftH);
+            bool hoverRight = (mx >= rightX && mx <= rightX + rightW && my >= rightY && my <= rightY + rightH);
+            bool isFocus    = (isRowSelected && focusedBtnIdx == s) || hoverRow;
 
-            bool isHover = (mx >= bx && mx <= bx + bw && my >= by && my <= by + bh);
-            bool isFocus = (isRowSelected && focusedBtnIdx == i) || isHover;
+            int equippedId = Player3D::GetEquippedWorkoutSlot(s);
+            bool hasMotion = (equippedId >= 0 && equippedId < static_cast<int>(WorkoutMotionType::Count));
 
-            if (isUnlocked)
-            {
-                unsigned int bgCol     = isOn ? (isFocus ? GetColor(38, 110, 68) : GetColor(24, 82, 50))
-                                              : (isFocus ? GetColor(50, 60, 80)  : GetColor(30, 36, 50));
-                unsigned int borderCol = isFocus ? GetColor(255, 230, 80)
-                                                 : (isOn ? GetColor(85, 230, 130) : GetColor(70, 85, 110));
+            // 左ラベルバッジ（1個目 / 2個目 / 3個目）
+            unsigned int badgeBg     = isFocus ? GetColor(60, 85, 130) : GetColor(30, 40, 62);
+            unsigned int badgeBorder = isFocus ? GetColor(255, 225, 80) : GetColor(75, 95, 130);
+            SoftUI::DrawSoftCard(rowX, rowY + 1, 76, rowH - 2, 6, badgeBg, 245, badgeBorder, isFocus ? 2 : 1);
+            int lblW = GetDrawStringWidthToHandle(kSlotLabels[s], static_cast<int>(strlen(kSlotLabels[s])), font13);
+            DrawStringToHandle(rowX + (76 - lblW) / 2, rowY + 5, kSlotLabels[s],
+                               isFocus ? GetColor(255, 240, 120) : GetColor(200, 220, 245), font13);
 
-                SoftUI::DrawSoftCard(bx, by, bw, bh, 8,
-                                     bgCol, 245, borderCol, isFocus ? 2 : 1,
-                                     isFocus || isOn, isFocus ? GetColor(255, 220, 70) : GetColor(70, 210, 115));
+            // 左矢印 [◀] ボタン
+            SoftUI::DrawSoftCard(leftX, leftY, leftW, leftH, 6,
+                                 hoverLeft ? GetColor(70, 125, 195) : GetColor(34, 52, 82), 250,
+                                 hoverLeft ? GetColor(255, 235, 100) : GetColor(90, 135, 190), hoverLeft ? 2 : 1);
+            int lArrW = GetDrawStringWidthToHandle("◀", static_cast<int>(strlen("◀")), font13);
+            DrawStringToHandle(leftX + (leftW - lArrW) / 2, leftY + 4, "◀",
+                               hoverLeft ? GetColor(255, 255, 255) : GetColor(200, 225, 255), font13);
 
-                // モーション名（上段）
-                const char* mName = Player3D::GetWorkoutMotionName(mType);
-                int nameW = GetDrawStringWidthToHandle(mName, static_cast<int>(strlen(mName)), font13);
-                DrawStringToHandle(bx + (bw - nameW) / 2, by + 2, mName, isOn ? GetColor(255, 255, 255) : GetColor(170, 180, 200), font13);
+            // 中央スライド表示枠
+            int centerX = leftX + leftW + 6;
+            int centerW = rightX - 6 - centerX;
+            unsigned int centerBg     = hasMotion ? (isFocus ? GetColor(34, 96, 62) : GetColor(24, 68, 46))
+                                                  : (isFocus ? GetColor(42, 48, 66) : GetColor(26, 30, 44));
+            unsigned int centerBorder = isFocus ? GetColor(255, 225, 80)
+                                                : (hasMotion ? GetColor(80, 210, 125) : GetColor(65, 75, 98));
+            SoftUI::DrawSoftCard(centerX, rowY + 1, centerW, rowH - 2, 6, centerBg, 245, centerBorder, isFocus ? 2 : 1);
 
-                // A/Eコード ＆ ON/OFFバッジ（下段）
-                char badgeBuf[32];
-            snprintf(badgeBuf, sizeof(badgeBuf), "%s", isOn ? "【 ON 】" : "【 OFF 】");
-                int bdW = GetDrawStringWidthToHandle(badgeBuf, static_cast<int>(strlen(badgeBuf)), font13);
-                DrawStringToHandle(bx + (bw - bdW) / 2, by + 17, badgeBuf, isOn ? GetColor(180, 255, 200) : GetColor(140, 150, 170), font13);
-            }
-            else
-            {
-                // 未所持（ロック表示）
-                unsigned int bgCol     = isHover ? GetColor(34, 38, 48) : GetColor(22, 25, 34);
-                unsigned int borderCol = isHover ? GetColor(140, 150, 175) : GetColor(50, 58, 72);
+            const char* motionTxt = hasMotion
+                ? Player3D::GetWorkoutMotionName(static_cast<WorkoutMotionType>(equippedId))
+                : "--- (未設定)";
+            int mW = GetDrawStringWidthToHandle(motionTxt, static_cast<int>(strlen(motionTxt)), font13);
+            DrawStringToHandle(centerX + (centerW - mW) / 2, rowY + 5, motionTxt,
+                               hasMotion ? GetColor(255, 255, 255) : GetColor(140, 155, 180), font13);
 
-                SoftUI::DrawSoftCard(bx, by, bw, bh, 8, bgCol, 240, borderCol, 1);
-
-            const char* lockTxt = "【未所持】";
-                int lW = GetDrawStringWidthToHandle(lockTxt, static_cast<int>(strlen(lockTxt)), font13);
-                DrawStringToHandle(bx + (bw - lW) / 2, by + 2, lockTxt, GetColor(130, 140, 155), font13);
-
-                char codeBuf[32];
-            snprintf(codeBuf, sizeof(codeBuf), "%s", "ガチャで解放");
-                int cW = GetDrawStringWidthToHandle(codeBuf, static_cast<int>(strlen(codeBuf)), font13);
-                DrawStringToHandle(bx + (bw - cW) / 2, by + 17, codeBuf, GetColor(100, 110, 130), font13);
-            }
+            // 右矢印 [▶] ボタン
+            SoftUI::DrawSoftCard(rightX, rightY, rightW, rightH, 6,
+                                 hoverRight ? GetColor(70, 125, 195) : GetColor(34, 52, 82), 250,
+                                 hoverRight ? GetColor(255, 235, 100) : GetColor(90, 135, 190), hoverRight ? 2 : 1);
+            int rArrW = GetDrawStringWidthToHandle("▶", static_cast<int>(strlen("▶")), font13);
+            DrawStringToHandle(rightX + (rightW - rArrW) / 2, rightY + 4, "▶",
+                               hoverRight ? GetColor(255, 255, 255) : GetColor(200, 225, 255), font13);
         }
 
         // 4. アクションボタン（ガチャ・セーブ・ロード・(Debug削除)）
@@ -471,7 +492,7 @@ namespace
             std::string codeStr = "※筋トレの所持状況・プロテインは自動保存されます";
             DrawStringToHandle(x + 12, footerY, codeStr.c_str(), GetColor(150, 175, 205), font13);
 
-            const char* hintTxt = "※クリックでON/OFF切替";
+            const char* hintTxt = "※◀ ▶ / 左右キーでスライド変更";
             int hW = GetDrawStringWidthToHandle(hintTxt, static_cast<int>(strlen(hintTxt)), font13);
             DrawStringToHandle(x + w - hW - 12, footerY, hintTxt, GetColor(130, 150, 175), font13);
         }
@@ -481,6 +502,17 @@ void UIManager::GetWorkoutBtnRect(int cardX, int cardY, int cardW, int cardH, in
                                   int& outX, int& outY, int& outW, int& outH)
 {
     ::GetWorkoutBtnRect(cardX, cardY, cardW, cardH, btnIdx, outX, outY, outW, outH);
+}
+
+void UIManager::GetWorkoutSlotRects(int cardX, int cardY, int cardW, int cardH, int slotIdx,
+                                    int& rowX, int& rowY, int& rowW, int& rowH,
+                                    int& leftX, int& leftY, int& leftW, int& leftH,
+                                    int& rightX, int& rightY, int& rightW, int& rightH)
+{
+    ::GetWorkoutSlotRectsImpl(cardX, cardY, cardW, cardH, slotIdx,
+                              rowX, rowY, rowW, rowH,
+                              leftX, leftY, leftW, leftH,
+                              rightX, rightY, rightW, rightH);
 }
 
 UIManager::~UIManager()
@@ -642,6 +674,9 @@ void UIManager::DrawGameClearScreen(GameManager& gm)
         else if (clearWorkout == Player3D::TitleWorkoutType::InclineBench) motionName = "インクラインベンチ";
         else if (clearWorkout == Player3D::TitleWorkoutType::BenchPress) motionName = "ベンチプレス";
         else if (clearWorkout == Player3D::TitleWorkoutType::InOverHeadPress) motionName = "インクラインOHP";
+        else if (clearWorkout == Player3D::TitleWorkoutType::ChestPress) motionName = "チェストプレス";
+        else if (clearWorkout == Player3D::TitleWorkoutType::ProneTwistRow) motionName = "プローンツイスト";
+        else if (clearWorkout == Player3D::TitleWorkoutType::WBarbell) motionName = "Wバーベル";
 
         char showcaseBuf[96];
         snprintf(showcaseBuf, sizeof(showcaseBuf), "WORKOUT SHOWCASE : %s", motionName);
@@ -1085,8 +1120,9 @@ void UIManager::DrawGameClearScreen(GameManager& gm)
 void UIManager::DrawTitleScreen(GameManager& gm)
 {
     auto& collMgr = WorkoutCollectionManager::GetInstance();
-    // ★ ガチャ演出中はタイトルの通常ボタン群（STARTやSTAGE等）を隠し、実演する3D猫と獲得カードのみを最高に際立たせる！
-    if (gm.m_showWorkoutCollection && collMgr.IsGachaAnimationActive())
+    // ★ 筋トレコレクション（3Dライブプレビュー）またはガチャ演出中はタイトルの通常ボタン群（STARTやSTAGE等）を隠し、
+    //    実演する3D猫とコレクション/獲得カードのみを最高に際立たせる！
+    if (gm.m_showWorkoutCollection)
     {
         DrawWorkoutCollectionModal(gm);
         return;
@@ -1488,6 +1524,39 @@ void UIManager::DrawTitleScreen(GameManager& gm)
             };
             activePool = ohpShouts;
             activeCount = sizeof(ohpShouts) / sizeof(ohpShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::ChestPress)
+        {
+            static const char* cpShouts[] = {
+                "ダンベルで胸筋爆発！",
+                "深い可動域が効くぜ！",
+                "大胸筋がステーキ状態！",
+                "胸の厚みが規格外！"
+            };
+            activePool = cpShouts;
+            activeCount = sizeof(cpShouts) / sizeof(cpShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::ProneTwistRow)
+        {
+            static const char* ptShouts[] = {
+                "背中に羽が生えるぜ！",
+                "ひねり上げて広背筋MAX！",
+                "ベンチに胸を預けて引け！",
+                "鬼の背中が仕上がり中！"
+            };
+            activePool = ptShouts;
+            activeCount = sizeof(ptShouts) / sizeof(ptShouts[0]);
+        }
+        else if (curWorkout == Player3D::TitleWorkoutType::WBarbell)
+        {
+            static const char* wbShouts[] = {
+                "Wバーベルがうなるぜ！",
+                "上腕三頭筋が鋼鉄！",
+                "馬蹄の輝きがまぶしい！",
+                "腕の太さが丸太超え！"
+            };
+            activePool = wbShouts;
+            activeCount = sizeof(wbShouts) / sizeof(wbShouts[0]);
         }
 
         // --- 掛け声吹き出し（左右各1箇所に厳選し、画面のごちゃつきを解消してテンポよく入れ替え） ---
@@ -3199,16 +3268,53 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
         return;
     }
 
-    // 1. 全画面暗転レイヤー（背景の3D筋トレ猫をほんのり見せつつダイアログを際立たせる）
-    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 200);
-    DrawBox(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 18), TRUE);
+    // 2. モーダル本体外枠（右側配置：左側に3Dライブプレビュー領域を確保）
+    int modalW = 760;
+    int modalH = 424;
+    int modalX = Config::SCREEN_WIDTH - modalW - 24;
+    int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
+
+    // 1. 右側パネル背景のみ暗転（左側の3Dプレビューエリアはクリアに表示して猫の筋トレ姿をはっきり見せる）
+    SetDrawBlendMode(DX_BLENDMODE_ALPHA, 165);
+    DrawBox(modalX - 16, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, GetColor(8, 10, 18), TRUE);
     SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
 
-    // 2. モーダル本体外枠
-    int modalW = 760;
-    int modalH = 376;
-    int modalX = (Config::SCREEN_WIDTH - modalW) / 2;
-    int modalY = (Config::SCREEN_HEIGHT - modalH) / 2;
+    // 1.5 左側：3Dライブプレビュー枠 ＆ 現在の筋トレ名バッジ
+    {
+        int prevX = 20;
+        int prevY = modalY;
+        int prevW = modalX - 36; // 約460px
+        int prevH = modalH;      // 424px
+
+        // 上下端に薄いシネマティックグラデーション帯（3D猫は隠さない）
+        SetDrawBlendMode(DX_BLENDMODE_ALPHA, 130);
+        DrawRoundRect(prevX, prevY, prevX + prevW, prevY + 46, 14, 14, GetColor(14, 18, 32), TRUE);
+        DrawRoundRect(prevX, prevY + prevH - 46, prevX + prevW, prevY + prevH, 14, 14, GetColor(14, 18, 32), TRUE);
+        SetDrawBlendMode(DX_BLENDMODE_NOBLEND, 0);
+
+        // ゴールドのプレビューフレーム枠線
+        DrawRoundRect(prevX, prevY, prevX + prevW, prevY + prevH, 16, 16, GetColor(255, 205, 70), FALSE);
+        DrawRoundRect(prevX + 1, prevY + 1, prevX + prevW - 1, prevY + prevH - 1, 15, 15, GetColor(255, 165, 40), FALSE);
+
+        // 上部バッジ: ★ LIVE 3D PREVIEW
+        const char* prevHeader = "★ LIVE 3D PREVIEW";
+        int phW = GetDrawStringWidthToHandle(prevHeader, static_cast<int>(strlen(prevHeader)), font16);
+        DrawStringToHandle(prevX + (prevW - phW) / 2, prevY + 14, prevHeader, GetColor(255, 225, 90), font16);
+
+        // 下部ラベル: 選択中スロット＆筋トレ名
+        static const char* kSlotNames[3] = { "1個目", "2個目", "3個目" };
+        int selSlot = gm.m_selectedWorkoutBtn;
+        if (selSlot < 0 || selSlot >= Player3D::GetMaxEquippedWorkouts()) selSlot = 0;
+        int prevId = Player3D::GetEquippedWorkoutSlot(selSlot);
+        const char* prevMotionName = (prevId >= 0 && prevId < static_cast<int>(WorkoutMotionType::Count))
+            ? Player3D::GetWorkoutMotionName(static_cast<WorkoutMotionType>(prevId))
+            : "未設定 (待機ポーズ)";
+
+        char prevFooter[96];
+        snprintf(prevFooter, sizeof(prevFooter), "[%s]  %s", kSlotNames[selSlot], prevMotionName);
+        int pfW = GetDrawStringWidthToHandle(prevFooter, static_cast<int>(strlen(prevFooter)), font18);
+        DrawStringToHandle(prevX + (prevW - pfW) / 2, prevY + prevH - 34, prevFooter, GetColor(255, 255, 255), font18);
+    }
 
     unsigned int borderGlow = collMgr.IsDebugMode() ? GetColor(255, 215, 60) : GetColor(220, 90, 240);
     SoftUI::DrawSoftCard(modalX, modalY, modalW, modalH, 20, GetColor(20, 24, 38), 250, borderGlow, collMgr.IsDebugMode() ? 3 : 2);
@@ -3222,9 +3328,9 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     // ヘッダー左側: ★ 筋トレコレクション
     DrawStringToHandle(modalX + 20, modalY + 14, "★ 筋トレコレクション", GetColor(255, 220, 90), font18);
 
-    // ヘッダー: (所持: X / 9)
+    // ヘッダー: (所持: X / 12)
     char countBuf[32];
-    snprintf(countBuf, sizeof(countBuf), "(所持: %d / 9)", collMgr.GetUnlockedCount());
+    snprintf(countBuf, sizeof(countBuf), "(所持: %d / %d)", collMgr.GetUnlockedCount(), collMgr.GetTotalMotionCount());
     DrawStringToHandle(modalX + 245, modalY + 16, countBuf, GetColor(200, 220, 255), font16);
 
     // ヘッダー中央右: プロテイン: X pt
@@ -3261,68 +3367,81 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     DrawRoundRect(xBtnX, xBtnY, xBtnX + xBtnSize, xBtnY + xBtnSize, 6, 6, hoverX ? GetColor(190, 40, 60) : GetColor(50, 40, 65), TRUE);
     DrawStringToHandle(xBtnX + 7, xBtnY + 5, "×", hoverX ? GetColor(255, 255, 255) : GetColor(200, 180, 220), font16);
 
-    // 3. 9つの筋トレモーションボタン（上段5個 / 下段4個）
-    int topRowY = modalY + 56;
-    int botRowY = modalY + 110;
-    int btnW    = 124;
-    int btnH    = 46;
+    // 3. 縦に3つのスライド式筋トレ選択スロット（1個目・2個目・3個目 / 最大3種・ランダム発動）
+    static const char* kSlotTitles[3] = { "1個目", "2個目", "3個目" };
+    int slotRowX = modalX + 30;
+    int slotRowW = modalW - 60; // 700px
+    int slotRowH = 44;
+    int slotGapY = 8;
+    int slotStartY = modalY + 58;
 
-    for (int i = 0; i < static_cast<int>(WorkoutMotionType::Count); ++i)
+    for (int s = 0; s < Player3D::GetMaxEquippedWorkouts(); ++s)
     {
-        auto mType      = static_cast<WorkoutMotionType>(i);
-        bool isUnlocked = collMgr.IsMotionUnlocked(i);
-        bool isOn       = Player3D::IsWorkoutMotionEnabled(mType);
-        std::string aeCode = WorkoutCollectionManager::IdToAeCode(i);
+        int ry = slotStartY + s * (slotRowH + slotGapY);
+        int leftW  = 54;
+        int leftH  = 38;
+        int leftX  = slotRowX + 102;
+        int leftY  = ry + 3;
 
-        int bx = (i < 5) ? (modalX + 30 + i * 140) : (modalX + 100 + (i - 5) * 140);
-        int by = (i < 5) ? topRowY : botRowY;
+        int rightW = 54;
+        int rightH = 38;
+        int rightX = slotRowX + slotRowW - rightW;
+        int rightY = ry + 3;
 
-        bool isHover = (mx >= bx && mx <= bx + btnW && my >= by && my <= by + btnH);
-        bool isFocus = (gm.m_selectedWorkoutBtn == i) || isHover;
+        int centerX = leftX + leftW + 8;
+        int centerW = rightX - 8 - centerX;
 
-        if (isUnlocked)
-        {
-            unsigned int bgCol     = isOn ? (isFocus ? GetColor(38, 120, 72) : GetColor(24, 86, 52))
-                                          : (isFocus ? GetColor(50, 60, 80)  : GetColor(30, 36, 50));
-            unsigned int borderCol = isFocus ? GetColor(255, 230, 80)
-                                             : (isOn ? GetColor(85, 230, 130) : GetColor(70, 85, 110));
+        bool hoverRow   = (mx >= slotRowX && mx <= slotRowX + slotRowW && my >= ry && my <= ry + slotRowH);
+        bool hoverLeft  = (mx >= leftX && mx <= leftX + leftW && my >= leftY && my <= leftY + leftH);
+        bool hoverRight = (mx >= rightX && mx <= rightX + rightW && my >= rightY && my <= rightY + rightH);
+        bool isFocus    = (gm.m_selectedWorkoutBtn == s) || hoverRow;
 
-            SoftUI::DrawSoftCard(bx, by, btnW, btnH, 8,
-                                 bgCol, 245, borderCol, isFocus ? 2 : 1,
-                                 isFocus || isOn, isFocus ? GetColor(255, 220, 70) : GetColor(70, 210, 115));
+        int equippedId = Player3D::GetEquippedWorkoutSlot(s);
+        bool hasMotion = (equippedId >= 0 && equippedId < static_cast<int>(WorkoutMotionType::Count));
 
-            // モーション名（上段）
-            const char* mName = Player3D::GetWorkoutMotionName(mType);
-            int nameW = GetDrawStringWidthToHandle(mName, static_cast<int>(strlen(mName)), font13);
-            DrawStringToHandle(bx + (btnW - nameW) / 2, by + 4, mName, isOn ? GetColor(255, 255, 255) : GetColor(170, 180, 200), font13);
+        // 左側：1個目 / 2個目 / 3個目 バッジ
+        unsigned int badgeBg     = isFocus ? GetColor(65, 92, 145) : GetColor(30, 40, 62);
+        unsigned int badgeBorder = isFocus ? GetColor(255, 225, 80) : GetColor(80, 100, 138);
+        SoftUI::DrawSoftCard(slotRowX, ry + 3, 94, 38, 10, badgeBg, 250, badgeBorder, isFocus ? 2 : 1,
+                             isFocus, GetColor(255, 210, 70));
+        int lblW = GetDrawStringWidthToHandle(kSlotTitles[s], static_cast<int>(strlen(kSlotTitles[s])), font16);
+        DrawStringToHandle(slotRowX + (94 - lblW) / 2, ry + 13, kSlotTitles[s],
+                           isFocus ? GetColor(255, 240, 120) : GetColor(210, 230, 255), font16);
 
-            // A/Eコード ＆ ON/OFFバッジ（下段）
-            char badgeBuf[32];
-            snprintf(badgeBuf, sizeof(badgeBuf), "%s", isOn ? "【 ON 】" : "【 OFF 】");
-            int bdW = GetDrawStringWidthToHandle(badgeBuf, static_cast<int>(strlen(badgeBuf)), font13);
-            DrawStringToHandle(bx + (btnW - bdW) / 2, by + 23, badgeBuf, isOn ? GetColor(180, 255, 200) : GetColor(140, 150, 170), font13);
-        }
-        else
-        {
-            // 未所持（ロック表示）
-            unsigned int bgCol     = isHover ? GetColor(34, 38, 48) : GetColor(22, 25, 34);
-            unsigned int borderCol = isHover ? GetColor(140, 150, 175) : GetColor(50, 58, 72);
+        // 左矢印 [ ◀ ] ボタン
+        SoftUI::DrawSoftCard(leftX, leftY, leftW, leftH, 10,
+                             hoverLeft ? GetColor(75, 135, 210) : GetColor(34, 54, 88), 250,
+                             hoverLeft ? GetColor(255, 235, 100) : GetColor(95, 145, 205), hoverLeft ? 2 : 1);
+        int lArrW = GetDrawStringWidthToHandle("◀", static_cast<int>(strlen("◀")), font18);
+        DrawStringToHandle(leftX + (leftW - lArrW) / 2, leftY + 9, "◀",
+                           hoverLeft ? GetColor(255, 255, 255) : GetColor(200, 225, 255), font18);
 
-            SoftUI::DrawSoftCard(bx, by, btnW, btnH, 8, bgCol, 240, borderCol, 1);
+        // 中央スライド表示カード
+        unsigned int centerBg     = hasMotion ? (isFocus ? GetColor(36, 112, 70) : GetColor(24, 80, 50))
+                                              : (isFocus ? GetColor(46, 54, 74)  : GetColor(26, 30, 44));
+        unsigned int centerBorder = isFocus ? GetColor(255, 230, 80)
+                                            : (hasMotion ? GetColor(85, 225, 135) : GetColor(68, 78, 102));
+        SoftUI::DrawSoftCard(centerX, ry + 3, centerW, 38, 10, centerBg, 248, centerBorder, isFocus ? 2 : 1,
+                             isFocus || hasMotion, isFocus ? GetColor(255, 220, 70) : GetColor(70, 210, 115));
 
-            const char* lockTxt = "【未所持】";
-            int lW = GetDrawStringWidthToHandle(lockTxt, static_cast<int>(strlen(lockTxt)), font13);
-            DrawStringToHandle(bx + (btnW - lW) / 2, by + 4, lockTxt, GetColor(130, 140, 155), font13);
+        const char* motionName = hasMotion
+            ? Player3D::GetWorkoutMotionName(static_cast<WorkoutMotionType>(equippedId))
+            : "--- (未設定 / ガチャで解放)";
+        int mW = GetDrawStringWidthToHandle(motionName, static_cast<int>(strlen(motionName)), font18);
+        DrawStringToHandle(centerX + (centerW - mW) / 2, ry + 12, motionName,
+                           hasMotion ? GetColor(255, 255, 255) : GetColor(145, 160, 185), font18);
 
-            char codeBuf[32];
-            snprintf(codeBuf, sizeof(codeBuf), "%s", "ガチャで解放");
-            int cW = GetDrawStringWidthToHandle(codeBuf, static_cast<int>(strlen(codeBuf)), font13);
-            DrawStringToHandle(bx + (btnW - cW) / 2, by + 23, codeBuf, GetColor(100, 110, 130), font13);
-        }
+        // 右矢印 [ ▶ ] ボタン
+        SoftUI::DrawSoftCard(rightX, rightY, rightW, rightH, 10,
+                             hoverRight ? GetColor(75, 135, 210) : GetColor(34, 54, 88), 250,
+                             hoverRight ? GetColor(255, 235, 100) : GetColor(95, 145, 205), hoverRight ? 2 : 1);
+        int rArrW = GetDrawStringWidthToHandle("▶", static_cast<int>(strlen("▶")), font18);
+        DrawStringToHandle(rightX + (rightW - rArrW) / 2, rightY + 9, "▶",
+                           hoverRight ? GetColor(255, 255, 255) : GetColor(200, 225, 255), font18);
     }
 
     // 4. アクションボタン（ガチャ・セーブ・ロード・(Debug削除)）
-    int actBtnY = modalY + 168;
+    int actBtnY = modalY + 212;
     int actBtnH = 36;
 #ifdef _DEBUG
     const int numTitleActs = 4;
@@ -3399,12 +3518,12 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     // 5. ★ デバッグツールバー（Debugビルド時のみ）
     if (collMgr.IsDebugMode())
     {
-        int dbgRowY = modalY + 214;
+        int dbgRowY = modalY + 258;
         int dbgRowH = 32;
 
         int dBtnX[5] = { modalX + 30, modalX + 176, modalX + 322, modalX + 448, modalX + 574 };
         int dBtnW[5] = { 136, 136, 116, 116, 156 };
-        const char* dLabels[5] = { "【1: 全解放】", "【2: +1000pt】", "【3: 全ON】", "【4: 全OFF】", "【5: データ削除】" };
+        const char* dLabels[5] = { "【1: 全解放】", "【2: +1000pt】", "【3: 3枠セット】", "【4: 1枠のみ】", "【5: データ削除】" };
         unsigned int dColors[5] = {
             GetColor(255, 180, 40),
             GetColor(255, 220, 50),
@@ -3430,14 +3549,14 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     else
     {
         // デバッグOFF時のショートカット案内ヒント
-        int hintY = modalY + 222;
+        int hintY = modalY + 266;
         const char* dHint = "※ [D] または [F1] キーで【筋トレデバッグモード】を切り替え可能";
         DrawStringToHandle(modalX + 30, hintY, dHint, GetColor(130, 150, 180), font13);
     }
 #endif
 
     // 6. ステータスメッセージ / セーブコード（行1）
-    int statusY = modalY + 258;
+    int statusY = modalY + 302;
     if (collMgr.GetStatusMessageTimer() > 0)
     {
         const auto& msg = collMgr.GetStatusMessage();
@@ -3450,14 +3569,14 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     }
 
     // 操作案内（行2：ステータスと重複しない独立行）
-    int guideY = modalY + 282;
-    const char* hintTxt = "※クリックまたは[ENTER / SPACE]でON/OFF切替";
+    int guideY = modalY + 326;
+    const char* hintTxt = "※ [↑/↓] 枠選択 / [←/→] または ◀ ▶ クリックでスライド変更（最大3種・ランダム発動）";
     DrawStringToHandle(modalX + 30, guideY, hintTxt, GetColor(140, 160, 185), font13);
 
     // 7. 下部中央 [ × 閉じる (ESC / C) ] ボタン
     int closeBtnW = 220;
     int closeBtnH = 36;
-    int closeBtnX = (Config::SCREEN_WIDTH - closeBtnW) / 2;
+    int closeBtnX = modalX + (modalW - closeBtnW) / 2;
     int closeBtnY = modalY + modalH - 46;
 
     bool hoverClose = (mx >= closeBtnX && mx <= closeBtnX + closeBtnW && my >= closeBtnY && my <= closeBtnY + closeBtnH);
@@ -3470,7 +3589,7 @@ void UIManager::DrawWorkoutCollectionModal(GameManager& gm)
     );
     const char* closeTxt = "[ × 閉じる (ESC / C) ]";
     int cW = GetDrawStringWidthToHandle(closeTxt, static_cast<int>(strlen(closeTxt)), font16);
-    DrawStringToHandle((Config::SCREEN_WIDTH - cW) / 2, closeBtnY + 8, closeTxt, hoverClose ? GetColor(255, 255, 255) : GetColor(220, 200, 240), font16);
+    DrawStringToHandle(closeBtnX + (closeBtnW - cW) / 2, closeBtnY + 8, closeTxt, hoverClose ? GetColor(255, 255, 255) : GetColor(220, 200, 240), font16);
 
     // ★ ガチャ演出中であれば最前面に熱血アニメーションを描画！
     if (collMgr.IsGachaAnimationActive())
