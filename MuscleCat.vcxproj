@@ -79,6 +79,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)Source;$(ProjectDir)EffekseerForDXLib\プロジェクトに追加すべきファイル_VC用;$(ProjectDir)DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <DisableSpecificWarnings>4828;4010;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalOptions>/utf-8 /wd4828 /wd4010 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -99,6 +100,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)Source;$(ProjectDir)EffekseerForDXLib\プロジェクトに追加すべきファイル_VC用;$(ProjectDir)DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <DisableSpecificWarnings>4828;4010;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalOptions>/utf-8 /wd4828 /wd4010 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -117,6 +119,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)Source;$(ProjectDir)EffekseerForDXLib\プロジェクトに追加すべきファイル_VC用;$(ProjectDir)DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <DisableSpecificWarnings>4828;4010;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalOptions>/utf-8 /wd4828 /wd4010 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
@@ -137,6 +140,7 @@
       <AdditionalIncludeDirectories>$(ProjectDir)Source;$(ProjectDir)EffekseerForDXLib\プロジェクトに追加すべきファイル_VC用;$(ProjectDir)DxLib_VC\プロジェクトに追加すべきファイル_VC用;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
       <LanguageStandard>stdcpp17</LanguageStandard>
+      <DisableSpecificWarnings>4828;4010;%(DisableSpecificWarnings)</DisableSpecificWarnings>
       <AdditionalOptions>/utf-8 /wd4828 /wd4010 %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
