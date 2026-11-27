@@ -18,6 +18,8 @@
 #include "Common.h"
 #include "DxLib.h"
 #include <cstdlib>
+#include <ctime>
+#include <direct.h>
 
 // ============================================================================
 // ふわっとしたUI共通描画ヘルパー（角丸・多層ソフトシャドウ・マシュマロフロスト・浮遊感）
@@ -647,6 +649,57 @@ void GameManager::Update()
     if (m_fadeInTimer > 0)
     {
         m_fadeInTimer--;
+    }
+
+    // ★ 動画撮影モード（REC MODE）：R + E + C キー同時押しでどの画面からでもON/OFF切替
+    {
+        bool recCombo = (CheckHitKey(KEY_INPUT_R) != 0) &&
+                        (CheckHitKey(KEY_INPUT_E) != 0) &&
+                        (CheckHitKey(KEY_INPUT_C) != 0);
+        if (recCombo && !m_prevRecCombo)
+        {
+            ToggleRecordingMode();
+        }
+        m_prevRecCombo = recCombo;
+    }
+
+    if (m_isRecordingMode)
+    {
+        UpdateRecordingModeControls();
+
+        // オービット／フリーカメラ時、またはタイトル/リザルト画面での撮影時は専用スタジオ更新のみ行う
+        if (m_recCamMode != RecCameraMode::PlayClean || m_state != GameState::Playing)
+        {
+            if (!m_recFreeze)
+            {
+                m_titleAnimTimer++;
+                auto player = m_objManager.GetPlayer();
+                if (player)
+                {
+                    if (m_recStudioMotion >= 0)
+                    {
+                        player->UpdateTitleAnimation(static_cast<Player3D::TitleWorkoutType>(m_recStudioMotion));
+                    }
+                    else if (m_state == GameState::Title || m_state == GameState::GameClear)
+                    {
+                        player->UpdateTitleAnimation(CalcActiveTitleWorkout(m_titleAnimTimer));
+                    }
+                }
+                if (m_state != GameState::Title)
+                {
+                    EffectManager::GetInstance().Update();
+                    CustomEffectManager::GetInstance().Update();
+                }
+            }
+            ApplyRecordingCamera();
+            return;
+        }
+        else if (m_recFreeze)
+        {
+            // PlayCleanモードでもPキーでフリーズフレーム一時停止可能
+            m_camera.Apply();
+            return;
+        }
     }
 
     // シーン切り替えホワイトフェードアウト進行中
@@ -1665,6 +1718,13 @@ void GameManager::Draw()
     // 2. 2D HUD / UI描画 (Zバッファ無効)
     SetUseZBuffer3D(FALSE);
     SetWriteZBuffer3D(FALSE);
+
+    // ★ 動画撮影モード（REC MODE）時は全ゲームUI・HUD・FPS表示を非表示にし、純粋な3D映像のみ出力
+    if (m_isRecordingMode)
+    {
+        DrawRecordingOverlay();
+        return;
+    }
 
     if (m_state == GameState::Playing && m_finishSlowMoTimer == 0)
     {
@@ -3944,3 +4004,392 @@ void GameManager::UpdateWorkoutCollectionModal(int mx, int my, bool isMouseTrigg
 // 筋トレコレクションモーダルの描画処理
 // ============================================================================
 void GameManager::DrawWorkoutCollectionModal() { m_uiManager.DrawWorkoutCollectionModal(*this); }
+
+// ============================================================================
+// 動画撮影モード（REC MODE：R + E + C 同時押しでON/OFF）の実装
+// ============================================================================
+void GameManager::ToggleRecordingMode()
+{
+    m_isRecordingMode = !m_isRecordingMode;
+    m_recDragging     = false;
+
+    if (m_isRecordingMode)
+    {
+        m_recShowGuide    = true;
+        m_recFreeze       = false;
+        m_recAutoOrbit    = false;
+        m_recStudioMotion = -1;
+        m_recNoticeTimer  = 150;
+        snprintf(m_recNoticeText, sizeof(m_recNoticeText), "REC MODE ON  ([H]でガイド非表示 / [R+E+C]で終了)");
+
+        // タイトルモーダル類が開いていれば閉じる
+        m_showHowToPlay         = false;
+        m_showSoundSettings     = false;
+        m_showWorkoutCollection = false;
+        SetCameraScreenCenter(640.0f, 360.0f);
+
+        auto player = m_objManager.GetPlayer();
+        VECTOR catPos = player ? player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
+
+        if (m_state == GameState::Playing && !m_isPaused)
+        {
+            // プレイ中に入った場合はそのまま通常プレイをHUDなしで録画できるモードから開始
+            m_recCamMode     = RecCameraMode::PlayClean;
+            m_recOrbitAngleH = m_camera.GetAngleH() + MathHelper::PI;
+            m_recOrbitAngleV = 0.18f;
+            m_recOrbitDist   = 210.0f;
+            m_recOrbitHeight = 42.0f;
+            m_recFreePos     = m_camera.GetCameraPos();
+            m_recFreeYaw     = m_camera.GetAngleH();
+            m_recFreePitch   = -0.10f;
+        }
+        else
+        {
+            // タイトル/リザルト/ポーズ中に入った場合は猫オービット撮影モードから開始
+            m_recCamMode     = RecCameraMode::OrbitCat;
+            m_recOrbitAngleH = (m_state == GameState::Title) ? m_titleCameraAngle : -0.45f;
+            m_recOrbitAngleV = 0.16f;
+            m_recOrbitDist   = 210.0f;
+            m_recOrbitHeight = 36.0f;
+            m_recFreePos     = VGet(
+                catPos.x + std::sin(m_recOrbitAngleH) * m_recOrbitDist,
+                catPos.y + m_recOrbitHeight + 30.0f,
+                catPos.z + std::cos(m_recOrbitAngleH) * m_recOrbitDist
+            );
+            m_recFreeYaw     = m_recOrbitAngleH + MathHelper::PI;
+            m_recFreePitch   = -0.12f;
+        }
+
+        // トグル直後の誤入力防止のため前フレームキー状態を同期
+        m_prevKeyRecH   = (CheckHitKey(KEY_INPUT_H) != 0);
+        m_prevKeyRecV   = (CheckHitKey(KEY_INPUT_V) != 0);
+        m_prevKeyRecO   = (CheckHitKey(KEY_INPUT_O) != 0);
+        m_prevKeyRecP   = (CheckHitKey(KEY_INPUT_P) != 0);
+        m_prevKeyRecN   = (CheckHitKey(KEY_INPUT_N) != 0);
+        m_prevKeyRecM   = (CheckHitKey(KEY_INPUT_M) != 0);
+        m_prevKeyRecF12 = (CheckHitKey(KEY_INPUT_F12) != 0);
+
+        SoundManager::GetInstance().PlaySE(SeType::Decide);
+    }
+    else
+    {
+        m_recFreeze = false;
+        SetCameraScreenCenter(640.0f, 360.0f);
+        if (m_state == GameState::Playing && !m_isPaused)
+        {
+            SetMouseDispFlag(FALSE);
+            m_camera.ResetMouseToCenter();
+        }
+        else
+        {
+            SetMouseDispFlag(TRUE);
+        }
+        SoundManager::GetInstance().PlaySE(SeType::Cancel);
+    }
+}
+
+void GameManager::UpdateRecordingModeControls()
+{
+    if (m_recNoticeTimer > 0)
+    {
+        m_recNoticeTimer--;
+    }
+
+    bool keyH   = (CheckHitKey(KEY_INPUT_H) != 0);
+    bool keyV   = (CheckHitKey(KEY_INPUT_V) != 0);
+    bool keyO   = (CheckHitKey(KEY_INPUT_O) != 0);
+    bool keyP   = (CheckHitKey(KEY_INPUT_P) != 0);
+    bool keyN   = (CheckHitKey(KEY_INPUT_N) != 0);
+    bool keyM   = (CheckHitKey(KEY_INPUT_M) != 0);
+    bool keyF12 = (CheckHitKey(KEY_INPUT_F12) != 0);
+
+    bool trigH   = keyH   && !m_prevKeyRecH;
+    bool trigV   = keyV   && !m_prevKeyRecV;
+    bool trigO   = keyO   && !m_prevKeyRecO;
+    bool trigP   = keyP   && !m_prevKeyRecP;
+    bool trigN   = keyN   && !m_prevKeyRecN;
+    bool trigM   = keyM   && !m_prevKeyRecM;
+    bool trigF12 = keyF12 && !m_prevKeyRecF12;
+
+    m_prevKeyRecH   = keyH;
+    m_prevKeyRecV   = keyV;
+    m_prevKeyRecO   = keyO;
+    m_prevKeyRecP   = keyP;
+    m_prevKeyRecN   = keyN;
+    m_prevKeyRecM   = keyM;
+    m_prevKeyRecF12 = keyF12;
+
+    // [H] ガイドUI表示 / 完全非表示（録画用クリーン画面）
+    if (trigH)
+    {
+        m_recShowGuide = !m_recShowGuide;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+
+    // [V] カメラモード切替 (Playing中: PlayClean -> OrbitCat -> FreeFly / それ以外: OrbitCat <-> FreeFly)
+    if (trigV)
+    {
+        if (m_state == GameState::Playing && !m_isPaused)
+        {
+            if (m_recCamMode == RecCameraMode::PlayClean)      m_recCamMode = RecCameraMode::OrbitCat;
+            else if (m_recCamMode == RecCameraMode::OrbitCat)  m_recCamMode = RecCameraMode::FreeFly;
+            else                                               m_recCamMode = RecCameraMode::PlayClean;
+        }
+        else
+        {
+            m_recCamMode = (m_recCamMode == RecCameraMode::OrbitCat) ? RecCameraMode::FreeFly : RecCameraMode::OrbitCat;
+        }
+
+        if (m_recCamMode == RecCameraMode::PlayClean)
+        {
+            SetMouseDispFlag(FALSE);
+            m_camera.ResetMouseToCenter();
+            snprintf(m_recNoticeText, sizeof(m_recNoticeText), "カメラ: 通常プレイ (HUD非表示)");
+        }
+        else if (m_recCamMode == RecCameraMode::OrbitCat)
+        {
+            SetMouseDispFlag(TRUE);
+            snprintf(m_recNoticeText, sizeof(m_recNoticeText), "カメラ: 猫オービット撮影");
+        }
+        else
+        {
+            SetMouseDispFlag(TRUE);
+            auto player = m_objManager.GetPlayer();
+            VECTOR catPos = player ? player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
+            float cosV = std::cos(m_recOrbitAngleV);
+            m_recFreePos = VGet(
+                catPos.x + std::sin(m_recOrbitAngleH) * cosV * m_recOrbitDist,
+                catPos.y + m_recOrbitHeight + std::sin(m_recOrbitAngleV) * m_recOrbitDist,
+                catPos.z + std::cos(m_recOrbitAngleH) * cosV * m_recOrbitDist
+            );
+            m_recFreeYaw   = m_recOrbitAngleH + MathHelper::PI;
+            m_recFreePitch = -m_recOrbitAngleV;
+            snprintf(m_recNoticeText, sizeof(m_recNoticeText), "カメラ: フリー飛行 (WASD + Space/Shift)");
+        }
+        m_recNoticeTimer = 120;
+        SoundManager::GetInstance().PlaySE(SeType::Decide);
+    }
+
+    // [O] 自動周回カメラ ON/OFF
+    if (trigO)
+    {
+        m_recAutoOrbit = !m_recAutoOrbit;
+        snprintf(m_recNoticeText, sizeof(m_recNoticeText), "シネマティック自動周回: %s", m_recAutoOrbit ? "ON" : "OFF");
+        m_recNoticeTimer = 100;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+
+    // [P] フリーズフレーム一時停止 ON/OFF
+    if (trigP)
+    {
+        m_recFreeze = !m_recFreeze;
+        snprintf(m_recNoticeText, sizeof(m_recNoticeText), "フリーズフレーム: %s", m_recFreeze ? "一時停止中" : "再生中");
+        m_recNoticeTimer = 100;
+        SoundManager::GetInstance().PlaySE(SeType::Pause);
+    }
+
+    // [N] / [M] 筋トレモーション切替 (-1: 通常, 0: 待機, 1〜12: 全12種筋トレ)
+    const int kMaxStudioMotion = static_cast<int>(WorkoutMotionType::Count); // 12
+    if (trigN || trigM)
+    {
+        int totalChoices = kMaxStudioMotion + 2; // -1 .. 12 (14通り)
+        int cur = m_recStudioMotion + 1;         // 0 .. 13
+        cur = (cur + (trigM ? 1 : (totalChoices - 1))) % totalChoices;
+        m_recStudioMotion = cur - 1;
+
+        if (m_recStudioMotion == -1)
+            snprintf(m_recNoticeText, sizeof(m_recNoticeText), "モーション: 通常 (自動)");
+        else if (m_recStudioMotion == 0)
+            snprintf(m_recNoticeText, sizeof(m_recNoticeText), "モーション: 待機ポーズ (Idle)");
+        else
+            snprintf(m_recNoticeText, sizeof(m_recNoticeText), "モーション: %s",
+                     Player3D::GetWorkoutMotionName(static_cast<WorkoutMotionType>(m_recStudioMotion - 1)));
+        m_recNoticeTimer = 120;
+        SoundManager::GetInstance().PlaySE(SeType::Cursor);
+    }
+
+    // [F12] スクリーンショット保存（Screenshotsフォルダへ連番タイムスタンプPNG保存）
+    if (trigF12)
+    {
+        _mkdir("Screenshots");
+        std::time_t t = std::time(nullptr);
+        std::tm tmBuf = {};
+        localtime_s(&tmBuf, &t);
+        static int s_shotSeq = 0;
+        s_shotSeq++;
+        char pathBuf[128];
+        snprintf(pathBuf, sizeof(pathBuf), "Screenshots/rec_%04d%02d%02d_%02d%02d%02d_%02d.png",
+                 tmBuf.tm_year + 1900, tmBuf.tm_mon + 1, tmBuf.tm_mday,
+                 tmBuf.tm_hour, tmBuf.tm_min, tmBuf.tm_sec, s_shotSeq % 100);
+        SaveDrawScreenToPNG(0, 0, Config::SCREEN_WIDTH, Config::SCREEN_HEIGHT, pathBuf);
+        snprintf(m_recNoticeText, sizeof(m_recNoticeText), "スクショ保存: %s", pathBuf);
+        m_recNoticeTimer = 150;
+        SoundManager::GetInstance().PlaySE(SeType::Stamp);
+    }
+
+    // オービット／フリーカメラ時のカメラ入力操作
+    if (m_recCamMode == RecCameraMode::OrbitCat || m_recCamMode == RecCameraMode::FreeFly)
+    {
+        SetMouseDispFlag(TRUE);
+        int mx = 0, my = 0;
+        GetMousePoint(&mx, &my);
+        int mouseInput = GetMouseInput();
+        bool dragNow = ((mouseInput & MOUSE_INPUT_LEFT) != 0 || (mouseInput & MOUSE_INPUT_RIGHT) != 0);
+
+        float dx = 0.0f;
+        float dy = 0.0f;
+        if (dragNow)
+        {
+            if (m_recDragging)
+            {
+                dx = static_cast<float>(mx - m_recPrevMouseX);
+                dy = static_cast<float>(my - m_recPrevMouseY);
+            }
+            m_recDragging   = true;
+            m_recPrevMouseX = mx;
+            m_recPrevMouseY = my;
+        }
+        else
+        {
+            m_recDragging = false;
+        }
+
+        if (m_recCamMode == RecCameraMode::OrbitCat)
+        {
+            if (m_recAutoOrbit)
+            {
+                m_recOrbitAngleH += 0.008f;
+            }
+            if (CheckHitKey(KEY_INPUT_LEFT))  m_recOrbitAngleH -= 0.03f;
+            if (CheckHitKey(KEY_INPUT_RIGHT)) m_recOrbitAngleH += 0.03f;
+            if (CheckHitKey(KEY_INPUT_UP))    m_recOrbitAngleV += 0.025f;
+            if (CheckHitKey(KEY_INPUT_DOWN))  m_recOrbitAngleV -= 0.025f;
+
+            m_recOrbitAngleH += dx * 0.006f;
+            m_recOrbitAngleV += dy * 0.005f;
+            m_recOrbitAngleV = MathHelper::Clamp(m_recOrbitAngleV, -0.35f, 1.25f);
+
+            int wheel = GetMouseWheelRotVol();
+            if (wheel != 0)
+            {
+                m_recOrbitDist -= static_cast<float>(wheel) * 16.0f;
+            }
+            if (CheckHitKey(KEY_INPUT_Q)) m_recOrbitDist -= 3.5f;
+            if (CheckHitKey(KEY_INPUT_Z)) m_recOrbitDist += 3.5f;
+            m_recOrbitDist = MathHelper::Clamp(m_recOrbitDist, 65.0f, 520.0f);
+
+            if (CheckHitKey(KEY_INPUT_T)) m_recOrbitHeight += 1.5f;
+            if (CheckHitKey(KEY_INPUT_G)) m_recOrbitHeight -= 1.5f;
+            m_recOrbitHeight = MathHelper::Clamp(m_recOrbitHeight, 0.0f, 180.0f);
+        }
+        else // RecCameraMode::FreeFly
+        {
+            if (CheckHitKey(KEY_INPUT_LEFT))  m_recFreeYaw   -= 0.03f;
+            if (CheckHitKey(KEY_INPUT_RIGHT)) m_recFreeYaw   += 0.03f;
+            if (CheckHitKey(KEY_INPUT_UP))    m_recFreePitch += 0.025f;
+            if (CheckHitKey(KEY_INPUT_DOWN))  m_recFreePitch -= 0.025f;
+
+            m_recFreeYaw   += dx * 0.005f;
+            m_recFreePitch -= dy * 0.005f;
+            m_recFreePitch = MathHelper::Clamp(m_recFreePitch, -1.35f, 1.35f);
+
+            float moveSpeed = (CheckHitKey(KEY_INPUT_LCONTROL) != 0) ? 10.0f : 4.5f;
+            float cosP = std::cos(m_recFreePitch);
+            VECTOR fwd   = VGet(std::sin(m_recFreeYaw) * cosP, std::sin(m_recFreePitch), std::cos(m_recFreeYaw) * cosP);
+            VECTOR right = VGet(std::cos(m_recFreeYaw), 0.0f, -std::sin(m_recFreeYaw));
+
+            if (CheckHitKey(KEY_INPUT_W)) m_recFreePos = VAdd(m_recFreePos, VScale(fwd, moveSpeed));
+            if (CheckHitKey(KEY_INPUT_S)) m_recFreePos = VSub(m_recFreePos, VScale(fwd, moveSpeed));
+            if (CheckHitKey(KEY_INPUT_D)) m_recFreePos = VAdd(m_recFreePos, VScale(right, moveSpeed));
+            if (CheckHitKey(KEY_INPUT_A)) m_recFreePos = VSub(m_recFreePos, VScale(right, moveSpeed));
+            if (CheckHitKey(KEY_INPUT_SPACE)) m_recFreePos.y += moveSpeed;
+            if (CheckHitKey(KEY_INPUT_LSHIFT) || CheckHitKey(KEY_INPUT_RSHIFT)) m_recFreePos.y -= moveSpeed;
+        }
+    }
+}
+
+void GameManager::ApplyRecordingCamera()
+{
+    SetCameraScreenCenter(640.0f, 360.0f);
+    if (m_recCamMode == RecCameraMode::OrbitCat)
+    {
+        auto player = m_objManager.GetPlayer();
+        VECTOR catPos = player ? player->GetPos() : VGet(0.0f, 0.0f, 0.0f);
+        VECTOR target = VGet(catPos.x, catPos.y + m_recOrbitHeight, catPos.z);
+        float cosV = std::cos(m_recOrbitAngleV);
+        VECTOR camPos = VGet(
+            target.x + std::sin(m_recOrbitAngleH) * cosV * m_recOrbitDist,
+            target.y + std::sin(m_recOrbitAngleV) * m_recOrbitDist,
+            target.z + std::cos(m_recOrbitAngleH) * cosV * m_recOrbitDist
+        );
+        SetCameraPositionAndTarget_UpVecY(camPos, target);
+        m_objManager.GetStage().Update(target);
+    }
+    else if (m_recCamMode == RecCameraMode::FreeFly)
+    {
+        float cosP = std::cos(m_recFreePitch);
+        VECTOR fwd = VGet(std::sin(m_recFreeYaw) * cosP, std::sin(m_recFreePitch), std::cos(m_recFreeYaw) * cosP);
+        VECTOR target = VAdd(m_recFreePos, VScale(fwd, 100.0f));
+        SetCameraPositionAndTarget_UpVecY(m_recFreePos, target);
+        m_objManager.GetStage().Update(m_recFreePos);
+    }
+}
+
+void GameManager::DrawRecordingOverlay()
+{
+    // [H]キーでガイド非表示にしている場合は、一切UIを描画せず100%クリーンな録画画面にする
+    if (!m_recShowGuide) return;
+
+    const auto& fm = FontManager::GetInstance();
+    int font13 = fm.GetFont13();
+    int font16 = fm.GetFont16();
+
+    // 左上：● REC MODE ステータスバッジ
+    int bx = 18;
+    int by = 16;
+    int bw = 340;
+    int bh = 54;
+    SoftUI::DrawSoftCard(bx, by, bw, bh, 12, GetColor(16, 18, 28), 200, GetColor(240, 65, 75), 2);
+
+    // 点滅する赤い録画ドット
+    bool blinkOn = ((GetNowCount() / 500) % 2 == 0);
+    if (blinkOn)
+    {
+        DrawCircle(bx + 20, by + 17, 6, GetColor(255, 50, 60), TRUE);
+    }
+    DrawStringToHandle(bx + 34, by + 9, "REC MODE (動画撮影モード)", GetColor(255, 225, 225), font16);
+
+    const char* camLabel = (m_recCamMode == RecCameraMode::PlayClean) ? "通常プレイ"
+                         : (m_recCamMode == RecCameraMode::OrbitCat)  ? (m_recAutoOrbit ? "オービット(自動周回)" : "オービット")
+                                                                      : "フリーカメラ";
+    const char* motLabel = (m_recStudioMotion == -1) ? "通常"
+                         : (m_recStudioMotion == 0)  ? "待機"
+                                                     : Player3D::GetWorkoutMotionName(static_cast<WorkoutMotionType>(m_recStudioMotion - 1));
+    char subBuf[128];
+    snprintf(subBuf, sizeof(subBuf), "カメラ:%s  |  動作:%s%s", camLabel, motLabel, m_recFreeze ? " [停止]" : "");
+    DrawStringToHandle(bx + 14, by + 32, subBuf, GetColor(185, 215, 245), font13);
+
+    // 通知バナー（切り替え直後・スクショ保存時）
+    if (m_recNoticeTimer > 0)
+    {
+        int nw = GetDrawStringWidthToHandle(m_recNoticeText, static_cast<int>(strlen(m_recNoticeText)), font16) + 32;
+        int nx = (Config::SCREEN_WIDTH - nw) / 2;
+        int ny = 20;
+        SoftUI::DrawSoftCard(nx, ny, nw, 34, 12, GetColor(18, 22, 36), 215, GetColor(255, 215, 70), 1);
+        DrawStringToHandle(nx + 16, ny + 8, m_recNoticeText, GetColor(255, 240, 140), font16);
+    }
+
+    // 右下：コンパクトな操作ガイドカード
+    int gx = Config::SCREEN_WIDTH - 360;
+    int gy = Config::SCREEN_HEIGHT - 168;
+    int gw = 342;
+    int gh = 150;
+    SoftUI::DrawSoftCard(gx, gy, gw, gh, 12, GetColor(14, 18, 30), 190, GetColor(90, 125, 175), 1);
+    DrawStringToHandle(gx + 12, gy + 8,  "[R+E+C] 撮影モード終了  /  [H] UI完全非表示", GetColor(255, 225, 95), font13);
+    DrawStringToHandle(gx + 12, gy + 28, "[V] カメラ切替 (プレイ / オービット / フリー)", GetColor(215, 230, 250), font13);
+    DrawStringToHandle(gx + 12, gy + 48, "[O] 自動周回ON/OFF  /  [P] 一時停止(フリーズ)", GetColor(215, 230, 250), font13);
+    DrawStringToHandle(gx + 12, gy + 68, "[N / M] 全12種筋トレモーション切替", GetColor(215, 230, 250), font13);
+    DrawStringToHandle(gx + 12, gy + 88, "[ドラッグ / 矢印] 回転  [ホイール / Q・Z] ズーム", GetColor(180, 205, 235), font13);
+    DrawStringToHandle(gx + 12, gy + 108,"[フリー時] WASD移動 / Space上昇 / Shift下降", GetColor(180, 205, 235), font13);
+    DrawStringToHandle(gx + 12, gy + 128,"[F12] スクリーンショット保存 (Screenshots/)", GetColor(150, 235, 185), font13);
+}

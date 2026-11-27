@@ -153,6 +153,47 @@ private:
     bool  m_prevKeyPlus            = false;
 
     // ------------------------------------------------------------------------
+    // 動画撮影モード（REC MODE：R+E+C同時押しでON/OFF）関連メンバ
+    // ------------------------------------------------------------------------
+    enum class RecCameraMode
+    {
+        PlayClean = 0,  // 通常プレイ操作（HUD非表示）
+        OrbitCat,       // 猫中心オービット撮影カメラ（自由回転・ズーム・自動周回）
+        FreeFly         // 自由飛行ドローンカメラ（WASD + Space/Shift + マウス/矢印）
+    };
+    bool          m_isRecordingMode   = false;                    // 動画撮影モード有効フラグ
+    bool          m_prevRecCombo      = false;                    // R+E+C同時押しのエッジ検出用
+    bool          m_recShowGuide      = true;                     // 撮影モード操作ガイド表示フラグ（Hキーで完全非表示）
+    bool          m_recAutoOrbit      = false;                    // オービット自動周回フラグ（Oキー）
+    bool          m_recFreeze         = false;                    // フリーズフレーム一時停止フラグ（Pキー）
+    RecCameraMode m_recCamMode        = RecCameraMode::OrbitCat;  // 撮影カメラモード
+    int           m_recStudioMotion   = -1;                       // -1: シーン通常モーション, 0: Idle, 1〜12: 全12種筋トレ実演
+    float         m_recOrbitAngleH    = -0.45f;                   // オービット水平角
+    float         m_recOrbitAngleV    = 0.18f;                    // オービット仰角
+    float         m_recOrbitDist      = 210.0f;                   // オービット距離
+    float         m_recOrbitHeight    = 36.0f;                    // オービット注視点高さオフセット
+    VECTOR        m_recFreePos        = VGet(0.0f, 120.0f, -200.0f); // フリーカメラ座標
+    float         m_recFreeYaw        = 0.0f;                     // フリーカメラ水平角
+    float         m_recFreePitch      = -0.15f;                   // フリーカメラ仰角
+    int           m_recPrevMouseX     = 0;                        // マウスドラッグ回転用の前フレームX
+    int           m_recPrevMouseY     = 0;                        // マウスドラッグ回転用の前フレームY
+    bool          m_recDragging       = false;                    // マウスドラッグ中フラグ
+    int           m_recNoticeTimer    = 0;                        // 撮影モード通知（スクショ保存等）表示タイマー
+    char          m_recNoticeText[96] = {};                       // 撮影モード通知テキスト
+    bool          m_prevKeyRecH       = false;
+    bool          m_prevKeyRecV       = false;
+    bool          m_prevKeyRecO       = false;
+    bool          m_prevKeyRecP       = false;
+    bool          m_prevKeyRecN       = false;
+    bool          m_prevKeyRecM       = false;
+    bool          m_prevKeyRecF12     = false;
+
+    void ToggleRecordingMode();
+    void UpdateRecordingModeControls();
+    void ApplyRecordingCamera();
+    void DrawRecordingOverlay();
+
+    // ------------------------------------------------------------------------
     // 内部ヘルパー・画面別描画メソッド
     // ------------------------------------------------------------------------
     void BeginSceneTransition(SceneTransitionTarget target); // シーン切替ホワイトフェードアウト開始
